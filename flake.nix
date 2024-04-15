@@ -21,12 +21,11 @@
         };
 
         checks = {
-          default =
+          pytest =
             self.packages.${system}.default.overrideAttrs
               (oldAttrs: {
                 name = "check-${oldAttrs.name}";
                 doCheck = true;
-                buildPhase = "";
                 checkPhase = "pytest";
               });
         };
