@@ -15,7 +15,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
-        python-version: '3.11'  # Specify your Python version here
+        python-version: '3.11'
 
     - name: Install Poetry
       run: |
@@ -24,7 +24,7 @@ jobs:
     - name: Configure Poetry
       run: |
         echo "$HOME/.local/bin" >> $GITHUB_PATH
-        poetry config virtualenvs.create false  # This makes poetry install to the system Python
+        poetry config virtualenvs.create false
 
     - name: Install dependencies
       run: poetry install
