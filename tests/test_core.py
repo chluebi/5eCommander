@@ -1,10 +1,27 @@
 from src.core.base_types import Resource, Region, StartCondition, Database
 from src.core.base_types import GuildNotFound, PlayerNotFound, NotEnoughResourcesException
-from src.core.regions import start_condition
+from src.core.start_condition import start_condition
 from src.core.database import TestDatabase
+from src.core.creatures import *
+from src.core.regions import *
 
 
-def test_basic():
+def test_text():
+    commoner = Commoner()
+
+    assert commoner.quest_ability_effect_text() == ""
+    assert commoner.rally_ability_effect_text() == "gain 1 🚩rally"
+
+    village = Village()
+
+    assert village.quest_effect_text() == 'gain 1 ⚒️worker'
+
+    small_mine = SmallMine()
+
+    assert small_mine.quest_effect_text() == 'pay 5 🪙gold -> gain 1 ⚒️worker'
+
+
+def test_basic_db():
     test_db = TestDatabase(start_condition)
     guild_db = test_db.add_guild(1)
 

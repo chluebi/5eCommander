@@ -1,4 +1,4 @@
-from src.core.base_types import StartCondition, RegionCategory
+from src.core.base_types import Database, Resource, Price, Gain, Region, RegionCategory
 
 
 class RegionCategories:
@@ -12,33 +12,26 @@ region_categories = [
 ]
 
 
-class Village:
+
+class Village(Region):
 
     name = "village"
     category = RegionCategories.settlement
 
-    def __init__(self):
-        pass
-
-    def mission(self, player):
-        return
+    def quest_effect(self) -> tuple[list[Price], list[Gain]]:
+        return [], [Gain(Resource.WORKERS, 1)]
 
 
-class SmallMine:
+class SmallMine(Region):
 
     name = "small mine"
     category = RegionCategories.mine
 
-    def __init__(self):
-        pass
-
-    def mission(self, player):
-        return
+    def quest_effect(self) -> tuple[list[Price], list[Gain]]:
+        return [Gain(Resource.WORKERS, 1)], [Price(Resource.GOLD, 5)]
 
 
 regions = [
     Village(),
     SmallMine(),
 ]
-
-start_condition = StartCondition([Village(), SmallMine()])
