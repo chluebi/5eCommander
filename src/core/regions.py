@@ -12,7 +12,6 @@ region_categories = [
 ]
 
 
-
 class Village(Region):
 
     name = "village"

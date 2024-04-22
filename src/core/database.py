@@ -8,14 +8,8 @@ class TestDatabase(Database):
         super().__init__(start_condition)
         self.guilds: list[TestDatabase.Guild] = []
 
-    def transaction_start(self):
-        pass
-
-    def transaction_end(self):
-        pass
-
     def add_guild(self, guild_id: int) -> Database.Guild:
-        guild = TestDatabase.Guild(guild_id, self.start_condition)
+        guild = TestDatabase.Guild(self, guild_id, self.start_condition)
         self.guilds.append(guild)
         return guild
 
@@ -34,13 +28,13 @@ class TestDatabase(Database):
 
     class Guild(Database.Guild):
 
-        def __init__(self, guild_id: int, start_condition: StartCondition):
-            super().__init__(guild_id)
+        def __init__(self, parent: Database, guild_id: int, start_condition: StartCondition):
+            super().__init__(parent, guild_id)
             self.players: list[TestDatabase.Player] = []
             self.regions: list[TestDatabase.Region] = start_condition.start_active_regions
 
         def add_player(self, user_id: int) -> Database.Player:
-            player = TestDatabase.Player(self.guild_id, user_id)
+            player = TestDatabase.Player(self.parent, self.guild_id, user_id)
             self.players.append(player)
             return player
 
@@ -61,13 +55,13 @@ class TestDatabase(Database):
 
     class Region(Database.Region):
 
-        def __init__(self, region: Region):
-            super().__init__(region)
+        def __init__(self, parent: Database, region: Region):
+            super().__init__(parent, region)
 
     class Player(Database.Player):
 
-        def __init__(self, guild_id, user_id):
-            super().__init__(guild_id, user_id)
+        def __init__(self, parent: Database, guild_id: int, user_id: int):
+            super().__init__(parent, guild_id, user_id)
             self.resources: dict[Resource, int] = {r: 0 for r in list(Resource)}
 
         def has(self, resource: Resource, amount: int) -> bool:
@@ -75,6 +69,3 @@ class TestDatabase(Database):
 
         def give(self, resource: Resource, amount: int):
             self.resources[resource] += amount
-
-        def remove(self, resource: Resource, amount: int):
-            self.give(resource, -amount)

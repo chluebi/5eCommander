@@ -1,6 +1,6 @@
 from typing import Union
 from enum import Enum
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 
 class GuildNotFound(Exception):
@@ -167,11 +167,26 @@ class Database:
     def __init__(self, start_condition: StartCondition):
         self.start_condition = start_condition
 
-    def transaction_start(self):
+    def start_transaction(self):
         pass
 
-    def transaction_end(self):
+    def end_transaction(self):
         pass
+
+    class Transaction:
+
+        def __init__(self, parent, in_trans=False):
+            self.parent = parent
+            self.in_trans = in_trans
+
+        def __enter__(self):
+            if not self.in_trans:
+                self.parent.start_transaction()
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            if not self.in_trans:
+                self.parent.end_transaction()
 
     def add_guild(self, guild_id: int):
         pass
@@ -184,12 +199,14 @@ class Database:
 
     class Region:
 
-        def __init__(self, region: Region):
+        def __init__(self, parent, region: Region):
+            self.parent = parent
             self.region = region
 
     class Guild:
 
-        def __init__(self, guild_id: int):
+        def __init__(self, parent, guild_id: int):
+            self.parent = parent
             self.guild_id = guild_id
 
         def add_player(self, user_id: int):
@@ -203,7 +220,8 @@ class Database:
 
     class Player:
 
-        def __init__(self, guild_id: int, user_id: int):
+        def __init__(self, parent, guild_id: int, user_id: int):
+            self.parent = parent
             self.guild_id = guild_id
             self.user_id = user_id
 
@@ -215,3 +233,11 @@ class Database:
 
         def remove(self, resource: Resource, amount: int) -> None:
             self.give(resource, -amount)
+
+        def fulfills_price(self, price: list[Price], in_trans=False) -> bool:
+            merged_prices = defaultdict(lambda: 0)
+            for p in price:
+                merged_prices[p.resource] += p.amount
+
+            with self.parent.Transaction(self.parent, in_trans):
+                return all(self.has(key, value) for key, value in merged_prices.items())

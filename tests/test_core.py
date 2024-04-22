@@ -14,11 +14,11 @@ def test_text():
 
     village = Village()
 
-    assert village.quest_effect_text() == 'gain 1 ⚒️worker'
+    assert village.quest_effect_text() == "gain 1 ⚒️worker"
 
     small_mine = SmallMine()
 
-    assert small_mine.quest_effect_text() == 'pay 5 🪙gold -> gain 1 ⚒️worker'
+    assert small_mine.quest_effect_text() == "pay 5 🪙gold -> gain 1 ⚒️worker"
 
 
 def test_basic_db():
@@ -59,3 +59,50 @@ def test_basic_db():
         got_error = True
 
     assert got_error
+
+    player2_db: TestDatabase.Player = guild_db.add_player(2)
+    player2_db.give(Resource.GOLD, 1)
+
+    price1 = [Price(Resource.GOLD, 1)]
+
+    assert player2_db.fulfills_price(price1)
+
+    player2_db.give(Resource.GOLD, 1)
+    assert player2_db.fulfills_price(price1)
+
+    player2_db.remove(Resource.GOLD, 2)
+    assert not player2_db.fulfills_price(price1)
+
+
+    price2 = [Price(Resource.GOLD, 1), Price(Resource.ARTEFACTS, 1)]
+    assert not player2_db.fulfills_price(price2)
+
+    player2_db.give(Resource.GOLD, 1)
+    assert not player2_db.fulfills_price(price2)
+
+    player2_db.remove(Resource.GOLD, 1)
+    player2_db.give(Resource.ARTEFACTS, 1)
+    assert not player2_db.fulfills_price(price2)
+
+    player2_db.give(Resource.GOLD, 1)
+    assert player2_db.fulfills_price(price2)
+
+
+    price3 = [Price(Resource.GOLD, 1), Price(Resource.GOLD, 1)]
+
+    assert not player2_db.fulfills_price(price3)
+
+    player3_db: TestDatabase.Player = guild_db.add_player(3)
+    assert not player3_db.fulfills_price(price3)
+
+    player3_db.give(Resource.GOLD, 1)
+    assert not player3_db.fulfills_price(price3)
+
+    player3_db.give(Resource.GOLD, 1)
+    assert player3_db.fulfills_price(price3)
+
+    player3_db.remove(Resource.GOLD, 2)
+    assert not player3_db.fulfills_price(price3)
+
+    player3_db.give(Resource.GOLD, 2)
+    assert player3_db.fulfills_price(price3)
