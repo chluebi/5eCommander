@@ -237,7 +237,32 @@ class Database:
         def fulfills_price(self, price: list[Price], in_trans=False) -> bool:
             merged_prices = defaultdict(lambda: 0)
             for p in price:
+                if p.amount == 0:
+                    continue
                 merged_prices[p.resource] += p.amount
 
             with self.parent.Transaction(self.parent, in_trans):
                 return all(self.has(key, value) for key, value in merged_prices.items())
+            
+        def gain(self, gain: list[Gain], in_trans=False) -> None:
+            merged_gains = defaultdict(lambda: 0)
+            for g in gain:
+                if g.amount == 0:
+                    continue
+                merged_gains[g.resource] += g.amount
+
+            with self.parent.Transaction(self.parent, in_trans):
+                for key, value in merged_gains.items():
+                    self.give(key, value)
+            
+        def pay_price(self, price: list[Price], in_trans=False) -> None:
+            merged_price = defaultdict(lambda: 0)
+            for p in price:
+                if p.amount == 0:
+                    continue
+                merged_price[p.resource] += p.amount
+
+            with self.parent.Transaction(self.parent, in_trans):
+                for key, value in merged_price.items():
+                    self.remove(key, value)
+

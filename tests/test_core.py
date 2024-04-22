@@ -60,6 +60,9 @@ def test_basic_db():
 
     assert got_error
 
+
+    # fulfills
+
     player2_db: TestDatabase.Player = guild_db.add_player(2)
     player2_db.give(Resource.GOLD, 1)
 
@@ -106,3 +109,17 @@ def test_basic_db():
 
     player3_db.give(Resource.GOLD, 2)
     assert player3_db.fulfills_price(price3)
+
+
+    # pay, gain
+    player4_db: TestDatabase.Player = guild_db.add_player(4)
+
+    for i in range(1, 100):
+        player4_db.gain([Gain(Resource.GOLD, 1) for j in range(i)])
+
+        assert player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i)])
+        assert player4_db.fulfills_price([Gain(Resource.GOLD, i)])
+        assert not player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i+1)])
+        assert not player4_db.fulfills_price([Gain(Resource.GOLD, i+1)])
+
+        player4_db.pay_price([Gain(Resource.GOLD, 1) for j in range(i)])
