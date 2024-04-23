@@ -1,5 +1,5 @@
 from src.core.base_types import Resource, Region, StartCondition, Database
-from src.core.base_types import GuildNotFound, PlayerNotFound, NotEnoughResourcesException
+from src.core.base_types import GuildNotFound, PlayerNotFound, NotEnoughResourcesException, EmptyDeckException
 from src.core.start_condition import start_condition
 from src.core.database import TestDatabase
 from src.core.creatures import *
@@ -60,7 +60,6 @@ def test_basic_db():
 
     assert got_error
 
-
     # fulfills
 
     player2_db: TestDatabase.Player = guild_db.add_player(2)
@@ -76,7 +75,6 @@ def test_basic_db():
     player2_db.remove(Resource.GOLD, 2)
     assert not player2_db.fulfills_price(price1)
 
-
     price2 = [Price(Resource.GOLD, 1), Price(Resource.ARTEFACTS, 1)]
     assert not player2_db.fulfills_price(price2)
 
@@ -89,7 +87,6 @@ def test_basic_db():
 
     player2_db.give(Resource.GOLD, 1)
     assert player2_db.fulfills_price(price2)
-
 
     price3 = [Price(Resource.GOLD, 1), Price(Resource.GOLD, 1)]
 
@@ -110,7 +107,6 @@ def test_basic_db():
     player3_db.give(Resource.GOLD, 2)
     assert player3_db.fulfills_price(price3)
 
-
     # pay, gain
     player4_db: TestDatabase.Player = guild_db.add_player(4)
 
@@ -119,7 +115,42 @@ def test_basic_db():
 
         assert player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i)])
         assert player4_db.fulfills_price([Gain(Resource.GOLD, i)])
-        assert not player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i+1)])
-        assert not player4_db.fulfills_price([Gain(Resource.GOLD, i+1)])
+        assert not player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i + 1)])
+        assert not player4_db.fulfills_price([Gain(Resource.GOLD, i + 1)])
 
         player4_db.pay_price([Gain(Resource.GOLD, 1) for j in range(i)])
+
+
+    # deck and drawing
+    player5_db: TestDatabase.Player = guild_db.add_player(5)
+
+    assert player5_db.get_deck() == start_condition.start_deck
+
+    for _ in start_condition.start_deck:
+        assert player5_db.draw_card_raw() in start_condition.start_deck
+
+    for _ in range(10):
+        got_error = False
+        try:
+            player5_db.draw_card_raw()
+        except EmptyDeckException:
+            got_error = True
+        assert got_error
+
+    for i in range(len(start_condition.start_deck)*2):
+        player6_db: TestDatabase.Player = guild_db.add_player(6)
+
+        assert player6_db.get_deck() == start_condition.start_deck
+
+        cards_drawn, reshuffled = player6_db.draw_cards(N=i)
+
+        assert len(cards_drawn) == min(i, len(start_condition.start_deck))
+        if i <= len(start_condition.start_deck):
+            assert not reshuffled
+        else:
+            assert reshuffled
+
+        for card in cards_drawn:
+            assert card in start_condition.start_deck
+
+        guild_db.remove_player(player6_db.user_id)

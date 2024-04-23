@@ -2,6 +2,8 @@ from typing import Union
 from enum import Enum
 from collections import namedtuple, defaultdict
 
+BASE_HANDS_SIZE = 5
+
 
 class GuildNotFound(Exception):
     pass
@@ -15,6 +17,10 @@ class NotEnoughResourcesException(Exception):
     pass
 
 
+class EmptyDeckException(Exception):
+    pass
+
+
 Resource = Enum(
     "Resource",
     [
@@ -25,14 +31,16 @@ Resource = Enum(
         "MAGIC",
         "RALLY",
         "STRENGTH",
-        "CARDS_IN_HAND",
-        "KILL_MONSTERS",
+        "CREATURES_IN_HAND",
+        "KILL_CREATURES",
     ],
 )
 
 Price = namedtuple("Price", ["resource", "amount"], defaults=[Resource.GOLD, 0])
 Gain = namedtuple("Gain", ["resource", "amount"], defaults=[Resource.GOLD, 0])
 Choice = namedtuple("Choice", ["choices"], defaults=[[]])
+
+Option = namedtuple("Option", ["price", "gain"], defaults=[[], []])
 
 
 def resource_to_emoji(resource: Resource) -> str:
@@ -51,9 +59,9 @@ def resource_to_emoji(resource: Resource) -> str:
             return "🚩"
         case Resource.STRENGTH:
             return "🗡️"
-        case Resource.CARDS_IN_HAND:
+        case Resource.CREATURES_IN_HAND:
             return "🃏"
-        case Resource.KILL_MONSTERS:
+        case Resource.KILL_CREATURES:
             return "👹"
         case _:
             return "❓"
@@ -62,12 +70,12 @@ def resource_to_emoji(resource: Resource) -> str:
 def r_change_to_string(r_change: Union[Price | Gain]) -> str:
 
     change_text = ""
-    if r_change.resource == Resource.CARDS_IN_HAND:
+    if r_change.resource == Resource.CREATURES_IN_HAND:
         if isinstance(r_change, Price):
             change_text = "draw {0} {1}"
         else:
-            raise Exception("Cards can only be gained")
-    elif r_change.resource == Resource.KILL_MONSTERS:
+            raise Exception("Creatures in hand can only be drawn not lost")
+    elif r_change.resource == Resource.KILL_CREATURES:
         change_text = "kill {0} {1} from your hand"
     elif r_change.resource == Resource.WORKERS and isinstance(r_change, Price):
         change_text = "use {0} {1}"
@@ -77,10 +85,10 @@ def r_change_to_string(r_change: Union[Price | Gain]) -> str:
         change_text = "pay {0} {1}"
 
     resource_text = ""
-    if r_change.resource == Resource.CARDS_IN_HAND:
-        resource_text = "cards"
-    elif r_change.resource == Resource.KILL_MONSTERS:
-        resource_text = "monsters"
+    if r_change.resource == Resource.CREATURES_IN_HAND:
+        resource_text = "creatures"
+    elif r_change.resource == Resource.KILL_CREATURES:
+        resource_text = "creatures"
     else:
         resource_text = r_change.resource.name.lower()
 
@@ -120,6 +128,14 @@ class Region:
     def __init__(self):
         pass
 
+    def __repr__(self) -> str:
+        return f"<Region: {self.name}>"
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Region):
+            return str(self) == str(other)
+        return False
+
     def quest_effect_text(self) -> str:
         price, gains = self.quest_effect()
         return r_changes_to_string(price + gains)
@@ -135,6 +151,14 @@ class Creature:
 
     def __init__(self):
         pass
+
+    def __repr__(self) -> str:
+        return f"<Creature: {self.name}>"
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Creature):
+            return str(self) == str(other)
+        return False
 
     # questing
     def quest_ability_effect_text(self) -> str:
@@ -156,10 +180,14 @@ class Creature:
 class StartCondition:
 
     def __init__(
-        self, start_active_regions: list[Region], start_available_creatures: list[Creature]
+        self,
+        start_active_regions: list[Region],
+        start_available_creatures: list[Creature],
+        start_deck: list[Creature],
     ):
         self.start_active_regions = start_active_regions
         self.start_available_creatures = start_available_creatures
+        self.start_deck = start_deck
 
 
 class Database:
@@ -225,6 +253,23 @@ class Database:
             self.guild_id = guild_id
             self.user_id = user_id
 
+        def get_resources(self):
+            pass
+
+        def get_deck(self):
+            pass
+
+        def get_hand(self):
+            pass
+
+        def get_discard(self):
+            pass
+
+        def get_full_deck(self):
+            return sorted(
+                self.get_deck() + self.get_hand() + self.get_discard(), key=lambda x: str(x)
+            )
+
         def has(self, resource: Resource, amount: int) -> bool:
             pass
 
@@ -243,7 +288,7 @@ class Database:
 
             with self.parent.Transaction(self.parent, in_trans):
                 return all(self.has(key, value) for key, value in merged_prices.items())
-            
+
         def gain(self, gain: list[Gain], in_trans=False) -> None:
             merged_gains = defaultdict(lambda: 0)
             for g in gain:
@@ -254,7 +299,7 @@ class Database:
             with self.parent.Transaction(self.parent, in_trans):
                 for key, value in merged_gains.items():
                     self.give(key, value)
-            
+
         def pay_price(self, price: list[Price], in_trans=False) -> None:
             merged_price = defaultdict(lambda: 0)
             for p in price:
@@ -266,3 +311,32 @@ class Database:
                 for key, value in merged_price.items():
                     self.remove(key, value)
 
+        def draw_card_raw(self) -> Creature:
+            pass
+
+        def reshuffle_discard(self) -> None:
+            pass
+
+        def draw_cards(self, N=1) -> tuple[int, bool]:
+            cards_drawn = []
+            discard_reshuffled = False
+            for _ in range(N):
+                if len(self.get_deck()) == 0:
+                    self.reshuffle_discard()
+                    discard_reshuffled = True
+
+                    if len(self.get_deck()) == 0:
+                        return cards_drawn, discard_reshuffled
+
+                card = self.draw_card_raw()
+                cards_drawn.append(card)
+
+            return cards_drawn, discard_reshuffled
+
+    class FreeCreature:
+
+        def __init__(self, parent, guild_id: int, channel_id: int, message_id: int):
+            self.parent = parent
+            self.guild_id = guild_id
+            self.channel_id = channel_id
+            self.message_id = message_id
