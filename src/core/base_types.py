@@ -32,7 +32,7 @@ Resource = Enum(
         "RALLY",
         "STRENGTH",
         "CREATURES_IN_HAND",
-        "KILL_CREATURES",
+        "DELETE_CREATURES",
     ],
 )
 
@@ -58,11 +58,11 @@ def resource_to_emoji(resource: Resource) -> str:
         case Resource.RALLY:
             return "🚩"
         case Resource.STRENGTH:
-            return "🗡️"
+            return "⚔️"
         case Resource.CREATURES_IN_HAND:
             return "🃏"
-        case Resource.KILL_CREATURES:
-            return "👹"
+        case Resource.DELETE_CREATURES:
+            return "❎"
         case _:
             return "❓"
 
@@ -75,8 +75,8 @@ def r_change_to_string(r_change: Union[Price | Gain]) -> str:
             change_text = "draw {0} {1}"
         else:
             raise Exception("Creatures in hand can only be drawn not lost")
-    elif r_change.resource == Resource.KILL_CREATURES:
-        change_text = "kill {0} {1} from your hand"
+    elif r_change.resource == Resource.DELETE_CREATURES:
+        change_text = "delete {0} {1} from your hand"
     elif r_change.resource == Resource.WORKERS and isinstance(r_change, Price):
         change_text = "use {0} {1}"
     elif isinstance(r_change, Gain):
@@ -87,7 +87,7 @@ def r_change_to_string(r_change: Union[Price | Gain]) -> str:
     resource_text = ""
     if r_change.resource == Resource.CREATURES_IN_HAND:
         resource_text = "creatures"
-    elif r_change.resource == Resource.KILL_CREATURES:
+    elif r_change.resource == Resource.DELETE_CREATURES:
         resource_text = "creatures"
     else:
         resource_text = r_change.resource.name.lower()
