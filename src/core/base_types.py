@@ -1,3 +1,4 @@
+import time
 from typing import Union
 from enum import Enum
 from collections import namedtuple, defaultdict
@@ -230,6 +231,9 @@ class Database:
     def __init__(self, start_condition: StartCondition):
         self.start_condition = start_condition
 
+    def timestamp_after(self, seconds: int):
+        return int(time.time() + seconds)
+
     def start_transaction(self):
         pass
 
@@ -251,7 +255,16 @@ class Database:
             if exc_type is not None and not self.in_trans:
                 self.parent.end_transaction()
 
+    def add_event(self, event: Event):
+        pass
+
+    def get_events(self, timestamp_start: int, timestamp_end: int):
+        pass
+
     def add_guild(self, guild_id: int):
+        pass
+
+    def get_guilds(self):
         pass
 
     def get_guild(self, guild_id: int):
@@ -274,13 +287,16 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseGuild: {self.id}>"
 
-        def get_config(self):
-            pass
-
         def set_config(self, config: dict):
             pass
 
+        def get_config(self):
+            pass
+
         def add_region(self, region: BaseRegion):
+            pass
+
+        def get_regions(self):
             pass
 
         def get_region(self, region: BaseRegion):
@@ -292,6 +308,9 @@ class Database:
         def add_player(self, user_id: int):
             pass
 
+        def get_players(self):
+            pass
+
         def get_player(self, user_id: int):
             pass
 
@@ -299,6 +318,9 @@ class Database:
             pass
 
         def add_creature(self, creature: BaseCreature, owner):
+            pass
+
+        def get_creatures(self):
             pass
 
         def get_creature(self, creature_id: int):
@@ -324,9 +346,12 @@ class Database:
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabaseRegion: {self.region} in {self.guild}>"
+            return f"<DatabaseRegion: {self.region} in {self.guild}, status: {self.occupied()}>"
 
-        def occupy(self, creature, until: int):
+        def occupy(self, creature):
+            pass
+
+        def unoccupy(self, current: int):
             pass
 
         def occupied(self) -> tuple:
@@ -334,32 +359,31 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(self, parent, guild, timestamp: int, region, creature):
+            def __init__(self, parent, guild, timestamp: int, region):
                 super().__init__(parent, timestamp, guild)
                 self.region = region
-                self.creature = creature
 
             def resolve(self):
-                pass
+                self.region.unoccupy(self.timestamp)
 
     class Player:
 
         def __init__(self, parent, guild: int, user_id: int):
             self.parent = parent
             self.guild = guild
-            self.user_id = user_id
+            self.id = user_id
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Player):
                 return (
                     self.parent == other.parent
                     and self.guild.id == other.guild.id
-                    and self.user_id == other.user_id
+                    and self.id == other.id
                 )
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabasePlayer: {self.user_id} in {self.guild}>"
+            return f"<DatabasePlayer: {self.id} in {self.guild}>"
 
         def get_resources(self) -> dict[Resource, int]:
             pass
@@ -373,12 +397,16 @@ class Database:
         def get_hand(self):
             pass
 
+        def get_played(self):
+            pass
+
         def get_discard(self):
             pass
 
         def get_full_deck(self):
             return sorted(
-                self.get_deck() + self.get_hand() + self.get_discard(), key=lambda x: str(x)
+                self.get_deck() + self.get_hand() + self.get_played() + self.get_discard(),
+                key=lambda x: str(x),
             )
 
         def has(self, resource: Resource, amount: int, in_trans=False) -> bool:
@@ -397,6 +425,9 @@ class Database:
                     continue
 
                 merged_prices[p.resource] += p.amount
+
+            if len(merged_prices) == 0:
+                return True
 
             resources: dict[Resource, int] = self.get_resources()
             hand_size: list = len(self.get_hand())
@@ -444,6 +475,9 @@ class Database:
                     continue
                 merged_gains[g.resource] += g.amount
 
+            if len(merged_gains) == 0:
+                return
+
             with self.parent.Transaction(self.parent, in_trans):
 
                 resources: dict[Resource, int] = self.get_resources()
@@ -465,6 +499,9 @@ class Database:
                 if p.amount == 0:
                     continue
                 merged_price[p.resource] += p.amount
+
+            if len(merged_price) == 0:
+                return
 
             with self.parent.Transaction(self.parent, in_trans):
 
@@ -517,12 +554,17 @@ class Database:
         def play_creature_to_region(self, creature, region, in_trans=False, extra_data={}):
 
             price, gain = region.region.quest_effect()
-            creature_gain = creature.creature.quest_ability_effect()
+            creature_price, creature_gain = creature.creature.quest_ability_effect()
 
             with self.parent.Transaction(self.parent, in_trans):
                 self.pay_price(price, in_trans=True, extra_data=extra_data)
-                self.play_creature(creature.id)
-                region.occupy()
+                if "pay_creature_price" in extra_data:
+                    self.pay_price(creature_price, in_trans=True, extra_data=extra_data)
+                self.play_creature(creature)
+                region: Database.Region = region
+                print("here", region)
+                region.occupy(creature)
+                print("after", region)
                 self.gain(gain, in_trans=True, extra_data=extra_data)
                 self.gain(creature_gain, in_trans=True, extra_data=extra_data)
 

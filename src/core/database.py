@@ -7,6 +7,7 @@ from src.core.base_types import (
     BaseRegion,
     BaseCreature,
     StartCondition,
+    Event,
     Database,
 )
 from src.core.base_types import (
@@ -24,11 +25,25 @@ class TestDatabase(Database):
     def __init__(self, start_condition):
         super().__init__(start_condition)
         self.guilds: list[TestDatabase.Guild] = []
+        self.events: list[Event] = []
+
+    def add_event(self, event: Event):
+        self.events.append(event)
+
+    def get_events(self, timestamp_start: int, timestamp_end: int):
+        return [
+            e
+            for e in self.events
+            if timestamp_start <= e.timestamp and timestamp_end >= e.timestamp
+        ]
 
     def add_guild(self, guild_id: int) -> Database.Guild:
         guild = TestDatabase.Guild(self, guild_id, self.start_condition)
         self.guilds.append(guild)
         return guild
+
+    def get_guilds(self):
+        return self.guilds
 
     def get_guild(self, guild_id: int) -> Database.Guild:
         guilds = [g for g in self.guilds if g.id == guild_id]
@@ -60,16 +75,19 @@ class TestDatabase(Database):
 
             self.creatures: list[TestDatabase.Creature] = []
 
-        def get_config(self) -> dict:
-            return self.config
-
         def set_config(self, config: dict) -> None:
             self.config = config
 
+        def get_config(self) -> dict:
+            return self.config
+
         def add_region(self, region: BaseRegion) -> Database.Region:
-            region = Database.Region(self.parent, region, self)
+            region = TestDatabase.Region(self.parent, region, self)
             self.regions.append(region)
             return region
+
+        def get_regions(self):
+            return self.regions
 
         def get_region(self, region: BaseRegion) -> Database.Region:
             regions = [r for r in self.regions if r.region == region]
@@ -91,8 +109,11 @@ class TestDatabase(Database):
             self.players.append(player)
             return player
 
+        def get_players(self):
+            return self.players
+
         def get_player(self, user_id: int) -> Database.Player:
-            players = [p for p in self.players if p.user_id == user_id]
+            players = [p for p in self.players if p.id == user_id]
 
             if len(players) != 1:
                 raise PlayerNotFound(
@@ -105,14 +126,17 @@ class TestDatabase(Database):
             self.players.remove(player)
             return player
 
-        def add_creature(self, creature: BaseCreature, owner_id: int) -> Database.Creature:
+        def add_creature(self, creature: BaseCreature, owner: Database.Player) -> Database.Creature:
             if len(self.creatures) == 0:
                 id = 0
             else:
                 id = max(c.id for c in self.creatures) + 1
-            creature = TestDatabase.Creature(self.parent, creature, self, owner_id, id)
+            creature = TestDatabase.Creature(self.parent, creature, self, owner, id)
             self.creatures.append(creature)
             return creature
+
+        def get_creatures(self):
+            return self.creatures
 
         def get_creature(self, creature_id: int):
             creatures = [c for c in self.creatures if c.id == creature_id]
@@ -134,8 +158,26 @@ class TestDatabase(Database):
             super().__init__(parent, region, guild)
             self.occupant = None
 
-        def occupy(self, creature: Database.Creature, until: int):
+        def occupy(self, creature: Database.Creature):
+            if self.occupant is not None:
+                Exception("Trying to occupy an occupied region")
+
+            until = self.parent.timestamp_after(self.guild.get_config()["region_recharge"])
             self.occupant = (creature, until)
+            self.parent.add_event(
+                Database.Region.RegionRechargeEvent(self.parent, self.guild, until, self)
+            )
+
+        def unoccupy(self, current: int):
+            if self.occupant is None:
+                Exception("Trying to unoccupy an already free region")
+
+            if current < self.occupant[1]:
+                Exception("Trying to unoccupy with too early timestamp")
+
+            creature: Database.Creature = self.occupant[0]
+            creature.owner.add_to_discard(creature)
+            self.occupant = None
 
         def occupied(self) -> tuple[Database.Creature, int]:
             return self.occupant
@@ -146,8 +188,7 @@ class TestDatabase(Database):
             super().__init__(parent, guild_id, user_id)
             self.resources: dict[Resource, int] = {r: 0 for r in BaseResources}
             self.deck: list[Database.Creature] = [
-                self.guild.add_creature(c, self.user_id)
-                for c in self.parent.start_condition.start_deck
+                self.guild.add_creature(c, self) for c in self.parent.start_condition.start_deck
             ]
             self.hand: list[Database.Creature] = []
             self.played: list[Database.Creature] = []
@@ -164,6 +205,9 @@ class TestDatabase(Database):
 
         def get_hand(self):
             return self.hand
+
+        def get_played(self):
+            return self.played
 
         def get_discard(self):
             return self.discard

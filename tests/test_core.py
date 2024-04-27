@@ -1,3 +1,4 @@
+import time
 from src.core.base_types import Resource, BaseRegion, StartCondition, Database
 from src.core.base_types import (
     GuildNotFound,
@@ -9,6 +10,16 @@ from src.core.start_condition import start_condition
 from src.core.database import TestDatabase
 from src.core.creatures import *
 from src.core.regions import *
+
+
+def are_subsets(a: list, b: list):
+    for e in a:
+        if e not in b:
+            return False
+    for e in b:
+        if e not in a:
+            return False
+    return True
 
 
 def test_text():
@@ -31,11 +42,11 @@ def test_basic_db():
     guild_db = test_db.add_guild(1)
 
     assert test_db.get_guild(guild_db.id) == guild_db
-    assert [r.region for r in guild_db.regions] == start_condition.start_active_regions
+    assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
 
     player1_db = guild_db.add_player(1)
 
-    assert guild_db.get_player(player1_db.user_id) == player1_db
+    assert guild_db.get_player(player1_db.id) == player1_db
     assert player1_db.has(Resource.GOLD, 0) == True
     assert player1_db.has(Resource.GOLD, 1) == False
 
@@ -165,7 +176,7 @@ def test_basic_db():
     player7_db: TestDatabase.Player = guild_db.add_player(7)
     assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
-    creature1_db: TestDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.user_id)
+    creature1_db: TestDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.id)
     player7_db.add_to_discard(creature1_db)
 
     assert player7_db.get_discard() == [creature1_db]
@@ -178,3 +189,29 @@ def test_basic_db():
 
     player7_db.draw_cards(N=1)
     assert len(player7_db.get_hand()) == len(start_condition.start_deck) + 1
+
+    # playing creatures
+    player8_db: TestDatabase.Player = guild_db.add_player(8)
+    assert [c.creature for c in player8_db.get_deck()] == start_condition.start_deck
+
+    player8_db.draw_cards(5)
+    assert are_subsets([c.creature for c in player8_db.get_full_deck()], start_condition.start_deck)
+    for c in player8_db.get_hand():
+        assert c.creature in start_condition.start_deck
+
+    creature2_db: TestDatabase.Creature = player8_db.get_hand()[0]
+    assert isinstance(creature2_db.creature, Commoner)
+
+    region1_db: TestDatabase.Region = guild_db.get_regions()[0]
+    assert region1_db.occupied() is None
+    assert isinstance(region1_db.region, Village)
+
+    assert len(test_db.get_events(0, time.time() * 2)) == 0
+
+    player8_db.play_creature_to_region(creature2_db, region1_db)
+
+    assert len(test_db.get_events(0, time.time() * 2)) == 1
+    assert test_db.get_events(0, time.time() * 2)[0].timestamp > time.time()
+
+    assert region1_db.occupied()[0] == creature2_db
+    assert len(player8_db.get_hand()) == 4
