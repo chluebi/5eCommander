@@ -1,4 +1,4 @@
-from src.core.base_types import Database, Resource, Price, Gain, Region, RegionCategory
+from src.core.base_types import Database, Resource, Price, Gain, BaseRegion, RegionCategory
 
 
 class RegionCategories:
@@ -12,7 +12,7 @@ region_categories = [
 ]
 
 
-class Village(Region):
+class Village(BaseRegion):
 
     name = "village"
     category = RegionCategories.settlement
@@ -21,7 +21,7 @@ class Village(Region):
         return [], [Gain(Resource.WORKERS, 1)]
 
 
-class SmallMine(Region):
+class SmallMine(BaseRegion):
 
     name = "small mine"
     category = RegionCategories.mine

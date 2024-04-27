@@ -1,5 +1,10 @@
-from src.core.base_types import Resource, Region, StartCondition, Database
-from src.core.base_types import GuildNotFound, PlayerNotFound, NotEnoughResourcesException, EmptyDeckException
+from src.core.base_types import Resource, BaseRegion, StartCondition, Database
+from src.core.base_types import (
+    GuildNotFound,
+    PlayerNotFound,
+    NotEnoughResourcesException,
+    EmptyDeckException,
+)
 from src.core.start_condition import start_condition
 from src.core.database import TestDatabase
 from src.core.creatures import *
@@ -59,6 +64,8 @@ def test_basic_db():
         got_error = True
 
     assert got_error
+
+    guild_db = test_db.add_guild(1)
 
     # fulfills
 
@@ -120,14 +127,13 @@ def test_basic_db():
 
         player4_db.pay_price([Gain(Resource.GOLD, 1) for j in range(i)])
 
-
     # deck and drawing
     player5_db: TestDatabase.Player = guild_db.add_player(5)
 
-    assert player5_db.get_deck() == start_condition.start_deck
+    assert [c.creature for c in player5_db.get_deck()] == start_condition.start_deck
 
     for _ in start_condition.start_deck:
-        assert player5_db.draw_card_raw() in start_condition.start_deck
+        assert player5_db.draw_card_raw().creature in start_condition.start_deck
 
     for _ in range(10):
         got_error = False
@@ -137,10 +143,10 @@ def test_basic_db():
             got_error = True
         assert got_error
 
-    for i in range(len(start_condition.start_deck)*2):
+    for i in range(len(start_condition.start_deck) * 2):
         player6_db: TestDatabase.Player = guild_db.add_player(6)
 
-        assert player6_db.get_deck() == start_condition.start_deck
+        assert [c.creature for c in player6_db.get_deck()] == start_condition.start_deck
 
         cards_drawn, reshuffled = player6_db.draw_cards(N=i)
 
@@ -151,6 +157,24 @@ def test_basic_db():
             assert reshuffled
 
         for card in cards_drawn:
-            assert card in start_condition.start_deck
+            assert card.creature in start_condition.start_deck
 
         guild_db.remove_player(player6_db.user_id)
+
+    # drawing creatures
+    player7_db: TestDatabase.Player = guild_db.add_player(7)
+    assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
+
+    creature1_db: TestDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.user_id)
+    player7_db.add_to_discard(creature1_db)
+
+    assert player7_db.get_discard() == [creature1_db]
+
+    # draw entire deck
+    cards_drawn, reshuffled = player7_db.draw_cards(N=len(start_condition.start_deck))
+
+    assert len(cards_drawn) == len(start_condition.start_deck)
+    assert len(player7_db.get_deck()) == 0
+
+    player7_db.draw_cards(N=1)
+    assert len(player7_db.get_hand()) == len(start_condition.start_deck) + 1

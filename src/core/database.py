@@ -1,10 +1,18 @@
 import random
 from copy import deepcopy
 
-from src.core.base_types import Resource, Region, Creature, StartCondition, Database
+from src.core.base_types import (
+    Resource,
+    BaseResources,
+    BaseRegion,
+    BaseCreature,
+    StartCondition,
+    Database,
+)
 from src.core.base_types import (
     GuildNotFound,
     PlayerNotFound,
+    CreatureNotFound,
     NotEnoughResourcesException,
     EmptyDeckException,
 )
@@ -40,6 +48,7 @@ class TestDatabase(Database):
             super().__init__(parent, guild_id)
             self.players: list[TestDatabase.Player] = []
             self.regions: list[TestDatabase.Region] = deepcopy(start_condition.start_active_regions)
+            self.creatures: list[TestDatabase.Creature] = []
 
         def add_player(self, user_id: int) -> Database.Player:
             player = TestDatabase.Player(self.parent, self.guild_id, user_id)
@@ -61,22 +70,50 @@ class TestDatabase(Database):
             self.players.remove(player)
             return player
 
+        def add_creature(self, creature: BaseCreature, owner_id: int) -> Database.Creature:
+            if len(self.creatures) == 0:
+                id = 0
+            else:
+                id = max(c.id for c in self.creatures)
+            creature = TestDatabase.Creature(self.parent, creature, self.guild_id, owner_id, id)
+            self.creatures.append(creature)
+            return creature
+
+        def get_creature(self, creature_id: int):
+            creatures = [c for c in creatures if c.id == creature_id]
+
+            if len(creatures) != 1:
+                raise CreatureNotFound(
+                    "None or too many players with this user_id, needs to be unique"
+                )
+
+            return creatures[0]
+
+        def remove_creature(self, creature_id: int):
+            creature = self.get_creature(creature_id)
+            self.players.remove(creature)
+            return creature
+
     class Region(Database.Region):
 
-        def __init__(self, parent: Database, region: Region):
+        def __init__(self, parent: Database, region: BaseRegion):
             super().__init__(parent, region)
 
     class Player(Database.Player):
 
         def __init__(self, parent: Database, guild_id: int, user_id: int):
             super().__init__(parent, guild_id, user_id)
-            self.resources: dict[Resource, int] = {r: 0 for r in list(Resource)}
-            self.deck: list[Creature] = deepcopy(self.parent.start_condition.start_deck)
-            self.hand: list[Creature] = []
-            self.discard: list[Creature] = []
+            self.resources: dict[Resource, int] = {r: 0 for r in BaseResources}
+            guild: TestDatabase.Guild = self.parent.get_guild(self.guild_id)
+            self.deck: list[Database.Creature] = [guild.add_creature(c, self.user_id) for c in self.parent.start_condition.start_deck]
+            self.hand: list[Database.Creature] = []
+            self.discard: list[Database.Creature] = []
 
         def get_resources(self):
-            return self.resources
+            return deepcopy(self.resources)
+
+        def set_resources(self, resources: dict[Resource, int]):
+            self.resources = deepcopy(resources)
 
         def get_deck(self):
             return self.deck
@@ -105,3 +142,25 @@ class TestDatabase(Database):
         def reshuffle_discard(self) -> None:
             self.deck += self.discard
             self.discard = []
+
+        def delete_creature_from_hand(self, creature_id: int) -> None:
+            creatures = [c for c in self.get_hand() if c.id == creature_id]
+
+            if len(creatures) != 1:
+                raise CreatureNotFound(
+                    "None or too many players with this user_id, needs to be unique"
+                )
+            creature = creatures[0]
+
+            self.hand.remove(creature)
+            parent: TestDatabase = self.parent
+            parent.get_guild(self.guild_id).remove_creature(creature_id)
+
+        def add_to_discard(self, creature: Database.Creature) -> None:
+            self.discard.append(creature)
+
+    class Creature(Database.Creature):
+
+        def __init__(self, parent, creature: BaseCreature, guild_id: int, owner_id: int, id: int):
+
+            super().__init__(parent, creature, guild_id, owner_id, id)

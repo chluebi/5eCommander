@@ -13,11 +13,19 @@ class PlayerNotFound(Exception):
     pass
 
 
+class CreatureNotFound(Exception):
+    pass
+
+
 class NotEnoughResourcesException(Exception):
     pass
 
 
 class EmptyDeckException(Exception):
+    pass
+
+
+class NoCreaturesToDeleteProvided(Exception):
     pass
 
 
@@ -36,11 +44,21 @@ Resource = Enum(
     ],
 )
 
+BaseResources = [
+    Resource.ORDERS,
+    Resource.GOLD,
+    Resource.ARTEFACTS,
+    Resource.WORKERS,
+    Resource.MAGIC,
+    Resource.RALLY,
+    Resource.STRENGTH,
+]
+
 Price = namedtuple("Price", ["resource", "amount"], defaults=[Resource.GOLD, 0])
 Gain = namedtuple("Gain", ["resource", "amount"], defaults=[Resource.GOLD, 0])
 Choice = namedtuple("Choice", ["choices"], defaults=[[]])
 
-Option = namedtuple("Option", ["price", "gain"], defaults=[[], []])
+OptionalEffect = namedtuple("OptionalEffect", ["price", "gain"], defaults=[[], []])
 
 
 def resource_to_emoji(resource: Resource) -> str:
@@ -120,7 +138,7 @@ def r_changes_to_string(r_changes: list[Price | Gain]) -> str:
 RegionCategory = namedtuple("RegionCategory", ["name", "emoji"], defaults=["default_region", " "])
 
 
-class Region:
+class BaseRegion:
 
     name = "default_region"
     category = None
@@ -132,7 +150,7 @@ class Region:
         return f"<Region: {self.name}>"
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, Region):
+        if isinstance(other, BaseRegion):
             return str(self) == str(other)
         return False
 
@@ -144,10 +162,10 @@ class Region:
         return [], []
 
 
-class Creature:
+class BaseCreature:
 
     name = "default_creature"
-    quest_regions: list[Region] = []
+    quest_regions: list[BaseRegion] = []
 
     def __init__(self):
         pass
@@ -156,7 +174,7 @@ class Creature:
         return f"<Creature: {self.name}>"
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, Creature):
+        if isinstance(other, BaseCreature):
             return str(self) == str(other)
         return False
 
@@ -181,9 +199,9 @@ class StartCondition:
 
     def __init__(
         self,
-        start_active_regions: list[Region],
-        start_available_creatures: list[Creature],
-        start_deck: list[Creature],
+        start_active_regions: list[BaseRegion],
+        start_available_creatures: list[BaseCreature],
+        start_deck: list[BaseCreature],
     ):
         self.start_active_regions = start_active_regions
         self.start_available_creatures = start_available_creatures
@@ -227,15 +245,25 @@ class Database:
 
     class Region:
 
-        def __init__(self, parent, region: Region):
+        def __init__(self, parent, region: BaseRegion):
             self.parent = parent
             self.region = region
+
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.Region):
+                return self.parent == other.parent and self.region == other.region
+            return False
 
     class Guild:
 
         def __init__(self, parent, guild_id: int):
             self.parent = parent
             self.guild_id = guild_id
+
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.Guild):
+                return self.parent == other.parent and self.guild_id == other.guild_id
+            return False
 
         def add_player(self, user_id: int):
             pass
@@ -246,6 +274,15 @@ class Database:
         def remove_player(self, player):
             pass
 
+        def add_creature(self, creature: BaseCreature, owner_id: int):
+            pass
+
+        def get_creature(self, creature_id: int):
+            pass
+
+        def remove_creature(self, creature_id: int):
+            pass
+
     class Player:
 
         def __init__(self, parent, guild_id: int, user_id: int):
@@ -253,7 +290,19 @@ class Database:
             self.guild_id = guild_id
             self.user_id = user_id
 
-        def get_resources(self):
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.Player):
+                return (
+                    self.parent == other.parent
+                    and self.guild_id == other.guild_id
+                    and self.user_id == other.guild_id
+                )
+            return False
+
+        def get_resources(self) -> dict[Resource, int]:
+            pass
+
+        def set_resources(self, resources: dict[Resource, int]):
             pass
 
         def get_deck(self):
@@ -270,11 +319,11 @@ class Database:
                 self.get_deck() + self.get_hand() + self.get_discard(), key=lambda x: str(x)
             )
 
-        def has(self, resource: Resource, amount: int) -> bool:
-            pass
+        def has(self, resource: Resource, amount: int, in_trans=False) -> bool:
+            return self.fulfills_price([Price(resource, amount)])
 
         def give(self, resource: Resource, amount: int) -> None:
-            pass
+            self.gain([Gain(resource, amount)])
 
         def remove(self, resource: Resource, amount: int) -> None:
             self.give(resource, -amount)
@@ -284,12 +333,46 @@ class Database:
             for p in price:
                 if p.amount == 0:
                     continue
+
                 merged_prices[p.resource] += p.amount
 
-            with self.parent.Transaction(self.parent, in_trans):
-                return all(self.has(key, value) for key, value in merged_prices.items())
+            resources: dict[Resource, int] = self.get_resources()
+            hand_size: list = len(self.get_hand())
 
-        def gain(self, gain: list[Gain], in_trans=False) -> None:
+            for r, a in merged_prices.items():
+                if r in BaseResources:
+                    if resources[r] < a:
+                        return False
+                elif r == Resource.DELETE_CREATURES:
+                    if hand_size < a:
+                        return False
+            return True
+
+        def _delete_creatures(self, hand_size: int, a: int, extra_data: dict):
+            if hand_size < a:
+                raise NoCreaturesToDeleteProvided(
+                    "Need to delete {} creatures, only have {} creatures in hand".format(
+                        a, hand_size
+                    )
+                )
+
+            try:
+                creatures_to_delete = extra_data["creatures_to_delete"]
+            except KeyError:
+                raise NoCreaturesToDeleteProvided()
+
+            if len(creatures_to_delete) < a:
+                raise NoCreaturesToDeleteProvided(
+                    "Expected at least {} creatures to delete, only got {}".format(
+                        a, len(creatures_to_delete)
+                    )
+                )
+
+            creatures_to_delete = creatures_to_delete[:a]
+            for c in creatures_to_delete:
+                self.delete_creature_from_hand(c)
+
+        def gain(self, gain: list[Gain], in_trans=False, extra_data={}) -> None:
             merged_gains = defaultdict(lambda: 0)
             for g in gain:
                 if g.amount == 0:
@@ -297,10 +380,21 @@ class Database:
                 merged_gains[g.resource] += g.amount
 
             with self.parent.Transaction(self.parent, in_trans):
-                for key, value in merged_gains.items():
-                    self.give(key, value)
 
-        def pay_price(self, price: list[Price], in_trans=False) -> None:
+                resources: dict[Resource, int] = self.get_resources()
+                hand_size: list = len(self.get_hand())
+
+                for r, a in merged_gains.items():
+                    if r in BaseResources:
+                        resources[r] += a
+                    elif r == Resource.CREATURES_IN_HAND:
+                        self.draw_cards(N=a, in_trans=True)
+                    elif r == Resource.DELETE_CREATURES:
+                        self._delete_creatures(hand_size, a, extra_data)
+
+                self.set_resources(resources)
+
+        def pay_price(self, price: list[Price], in_trans=False, extra_data={}) -> None:
             merged_price = defaultdict(lambda: 0)
             for p in price:
                 if p.amount == 0:
@@ -308,30 +402,67 @@ class Database:
                 merged_price[p.resource] += p.amount
 
             with self.parent.Transaction(self.parent, in_trans):
-                for key, value in merged_price.items():
-                    self.remove(key, value)
 
-        def draw_card_raw(self) -> Creature:
+                resources: dict[Resource, int] = self.get_resources()
+                hand_size: list = len(self.get_hand())
+
+                for r, a in merged_price.items():
+                    if r in BaseResources:
+                        if resources[r] < a:
+                            raise NotEnoughResourcesException(
+                                "Player is paying {} {} but only has {}".format(a, r, resources[r])
+                            )
+                        resources[r] -= a
+                    elif r == Resource.DELETE_CREATURES:
+                        self._delete_creatures(hand_size, a, extra_data)
+                self.set_resources(resources)
+
+        def draw_card_raw(self) -> BaseCreature:
             pass
 
         def reshuffle_discard(self) -> None:
             pass
 
-        def draw_cards(self, N=1) -> tuple[int, bool]:
-            cards_drawn = []
-            discard_reshuffled = False
-            for _ in range(N):
-                if len(self.get_deck()) == 0:
-                    self.reshuffle_discard()
-                    discard_reshuffled = True
-
+        def draw_cards(self, N=1, in_trans=False) -> tuple[int, bool]:
+            with self.parent.Transaction(self.parent, in_trans):
+                cards_drawn = []
+                discard_reshuffled = False
+                for _ in range(N):
                     if len(self.get_deck()) == 0:
-                        return cards_drawn, discard_reshuffled
+                        self.reshuffle_discard()
+                        discard_reshuffled = True
 
-                card = self.draw_card_raw()
-                cards_drawn.append(card)
+                        if len(self.get_deck()) == 0:
+                            return cards_drawn, discard_reshuffled
 
-            return cards_drawn, discard_reshuffled
+                    card = self.draw_card_raw()
+                    cards_drawn.append(card)
+
+                return cards_drawn, discard_reshuffled
+
+        def delete_creature_from_hand(self, creature_id: int) -> None:
+            pass
+
+        def add_to_discard(self, creature) -> None:
+            pass
+
+    class Creature:
+
+        def __init__(self, parent, creature: BaseCreature, guild_id: int, owner_id: int, id: int):
+            self.parent = parent
+            self.creature = creature
+            self.guild_id = guild_id
+            self.owner_id = owner_id
+            self.id = id
+
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.Creature):
+                return (
+                    self.parent == other.parent
+                    and self.guild_id == other.guild_id
+                    and self.id == other.id
+                )
+            return False
 
     class FreeCreature:
 
@@ -340,3 +471,13 @@ class Database:
             self.guild_id = guild_id
             self.channel_id = channel_id
             self.message_id = message_id
+
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.FreeCreature):
+                return (
+                    self.parent == other.parent
+                    and self.guild_id == other.guild_id
+                    and self.channel_id == other.channel_id
+                    and self.message_id == other.message_id
+                )
+            return False
