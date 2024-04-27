@@ -31,7 +31,7 @@ def test_basic_db():
     guild_db = test_db.add_guild(1)
 
     assert test_db.get_guild(guild_db.guild_id) == guild_db
-    assert guild_db.regions == start_condition.start_active_regions
+    assert [r.region for r in guild_db.regions] == start_condition.start_active_regions
 
     player1_db = guild_db.add_player(1)
 
@@ -166,7 +166,7 @@ def test_basic_db():
     assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
     creature1_db: TestDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.user_id)
-    player7_db.add_to_discard(creature1_db)
+    player7_db.add_to_discard(creature1_db.id)
 
     assert player7_db.get_discard() == [creature1_db]
 

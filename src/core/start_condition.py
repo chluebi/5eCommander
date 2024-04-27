@@ -3,5 +3,5 @@ from src.core.regions import *
 from src.core.creatures import *
 
 start_condition = StartCondition(
-    [Village(), SmallMine()], [Commoner()], [Commoner() for i in range(10)]
+    {}, [Village(), SmallMine()], [Commoner()], [Commoner() for i in range(10)]
 )

@@ -17,6 +17,10 @@ class CreatureNotFound(Exception):
     pass
 
 
+class RegionNotFound(Exception):
+    pass
+
+
 class NotEnoughResourcesException(Exception):
     pass
 
@@ -147,7 +151,7 @@ class BaseRegion:
         pass
 
     def __repr__(self) -> str:
-        return f"<Region: {self.name}>"
+        return f"<BaseRegion: {self.name}>"
 
     def __eq__(self, other) -> bool:
         if isinstance(other, BaseRegion):
@@ -171,7 +175,7 @@ class BaseCreature:
         pass
 
     def __repr__(self) -> str:
-        return f"<Creature: {self.name}>"
+        return f"<BaseCreature: {self.name}>"
 
     def __eq__(self, other) -> bool:
         if isinstance(other, BaseCreature):
@@ -199,13 +203,26 @@ class StartCondition:
 
     def __init__(
         self,
+        start_config: dict,
         start_active_regions: list[BaseRegion],
         start_available_creatures: list[BaseCreature],
         start_deck: list[BaseCreature],
     ):
+        self.start_config = start_config
         self.start_active_regions = start_active_regions
         self.start_available_creatures = start_available_creatures
         self.start_deck = start_deck
+
+
+class Event:
+
+    def __init__(self, parent, timestamp: int, guild_id: int):
+        self.parent = parent
+        self.timestamp = timestamp
+        self.guild_id = guild_id
+
+    def resolve(self):
+        pass
 
 
 class Database:
@@ -231,7 +248,7 @@ class Database:
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
-            if not self.in_trans:
+            if exc_type is not None and not self.in_trans:
                 self.parent.end_transaction()
 
     def add_guild(self, guild_id: int):
@@ -243,17 +260,6 @@ class Database:
     def remove_guild(self, guild_id: int):
         pass
 
-    class Region:
-
-        def __init__(self, parent, region: BaseRegion):
-            self.parent = parent
-            self.region = region
-
-        def __eq__(self, other) -> bool:
-            if isinstance(other, Database.Region):
-                return self.parent == other.parent and self.region == other.region
-            return False
-
     class Guild:
 
         def __init__(self, parent, guild_id: int):
@@ -264,6 +270,24 @@ class Database:
             if isinstance(other, Database.Guild):
                 return self.parent == other.parent and self.guild_id == other.guild_id
             return False
+
+        def __repr__(self) -> str:
+            return f"<DatabaseGuild: {self.guild_id}>"
+
+        def get_config(self):
+            pass
+
+        def set_config(self, config: dict):
+            pass
+
+        def add_region(self, region: BaseRegion):
+            pass
+
+        def get_region(self, region: BaseRegion):
+            pass
+
+        def remove_region(self, region: BaseRegion):
+            pass
 
         def add_player(self, user_id: int):
             pass
@@ -283,12 +307,50 @@ class Database:
         def remove_creature(self, creature_id: int):
             pass
 
+    class Region:
+
+        def __init__(self, parent, region: BaseRegion, guild_id: int):
+            self.parent = parent
+            self.region = region
+            self.guild_id = guild_id
+
+        def __eq__(self, other) -> bool:
+            if isinstance(other, Database.Region):
+                return (
+                    self.parent == other.parent
+                    and self.region == other.region
+                    and self.guild_id == other.guild_id
+                )
+            return False
+
+        def __repr__(self) -> str:
+            return f"<DatabaseRegion: {self.region} in {self.guild_id}>"
+
+        def occupy(self, creature_id: int, until: int):
+            pass
+
+        def occupied(self) -> tuple:
+            pass
+
+        class RegionRechargeEvent(Event):
+
+            def __init__(
+                self, parent, guild_id: int, timestamp: int, region_id: int, creature_id: int
+            ):
+                super().__init__(parent, timestamp, guild_id)
+                self.region_id = region_id
+                self.creature_id = creature_id
+
+            def resolve(self):
+                guild: Database.Guild = self.parent.get_guild(self.guild_id)
+
     class Player:
 
         def __init__(self, parent, guild_id: int, user_id: int):
             self.parent = parent
             self.guild_id = guild_id
             self.user_id = user_id
+            self.guild = self.parent.get_guild(self.guild_id)
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Player):
@@ -298,6 +360,9 @@ class Database:
                     and self.user_id == other.guild_id
                 )
             return False
+
+        def __repr__(self) -> str:
+            return f"<DatabasePlayer: {self.user_id} in {self.guild_id}>"
 
         def get_resources(self) -> dict[Resource, int]:
             pass
@@ -367,6 +432,9 @@ class Database:
                         a, len(creatures_to_delete)
                     )
                 )
+
+            # like this extra_data can be further propagated
+            extra_data["creatures_to_delete"] -= a
 
             creatures_to_delete = creatures_to_delete[:a]
             for c in creatures_to_delete:
@@ -440,11 +508,33 @@ class Database:
 
                 return cards_drawn, discard_reshuffled
 
+        def get_creature_from_hand(self, creature_id: int):
+            pass
+
         def delete_creature_from_hand(self, creature_id: int) -> None:
+            pass
+
+        def play_creature(self, creature_id: int) -> None:
             pass
 
         def add_to_discard(self, creature) -> None:
             pass
+
+        def play_creature_to_region(
+            self, creature_id: int, region_id: int, in_trans=False, extra_data={}
+        ):
+            creature: Database.Creature = self.guild.get_creature(creature_id)
+            region: Database.Region = self.guild.get_region(region_id)
+
+            price, gain = region.region.quest_effect()
+            creature_gain = creature.creature.quest_ability_effect()
+
+            with self.parent.Transaction(self.parent, in_trans):
+                self.pay_price(price, in_trans=True, extra_data=extra_data)
+                self.play_creature(creature.id)
+                region.occupy()
+                self.gain(gain, in_trans=True, extra_data=extra_data)
+                self.gain(creature_gain, in_trans=True, extra_data=extra_data)
 
     class Creature:
 
@@ -463,6 +553,9 @@ class Database:
                     and self.id == other.id
                 )
             return False
+
+        def __repr__(self) -> str:
+            return f"<DatabaseCreature: {self.creature} in {self.guild_id} as {self.id} owned by {self.owner_id}>"
 
     class FreeCreature:
 

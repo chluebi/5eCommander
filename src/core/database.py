@@ -13,6 +13,7 @@ from src.core.base_types import (
     GuildNotFound,
     PlayerNotFound,
     CreatureNotFound,
+    RegionNotFound,
     NotEnoughResourcesException,
     EmptyDeckException,
 )
@@ -44,11 +45,47 @@ class TestDatabase(Database):
 
     class Guild(Database.Guild):
 
-        def __init__(self, parent: Database, guild_id: int, start_condition: StartCondition):
+        def __init__(
+            self,
+            parent: Database,
+            guild_id: int,
+            start_condition: StartCondition,
+        ):
             super().__init__(parent, guild_id)
+            self.config = start_condition.start_config
             self.players: list[TestDatabase.Player] = []
-            self.regions: list[TestDatabase.Region] = deepcopy(start_condition.start_active_regions)
+            self.regions: list[TestDatabase.Region] = []
+
+            for r in start_condition.start_active_regions:
+                self.add_region(r)
+
             self.creatures: list[TestDatabase.Creature] = []
+
+        def get_config(self) -> dict:
+            return self.config
+
+        def set_config(self, config: dict) -> None:
+            self.config = config
+
+        def add_region(self, region: BaseRegion) -> Database.Region:
+            region = Database.Region(self.parent, region, self.guild_id)
+            self.regions.append(region)
+            return region
+
+        def get_region(self, region: BaseRegion) -> Database.Region:
+            regions = [r for r in self.regions if r.region == region]
+
+            if len(regions) != 1:
+                raise RegionNotFound(
+                    "None or too many regions with this base region, needs to be unique"
+                )
+
+            return regions[0]
+
+        def remove_region(self, region: BaseRegion) -> Database.Region:
+            region = self.get_region(region)
+            self.regions.remove(region)
+            return region
 
         def add_player(self, user_id: int) -> Database.Player:
             player = TestDatabase.Player(self.parent, self.guild_id, user_id)
@@ -74,17 +111,17 @@ class TestDatabase(Database):
             if len(self.creatures) == 0:
                 id = 0
             else:
-                id = max(c.id for c in self.creatures)
+                id = max(c.id for c in self.creatures) + 1
             creature = TestDatabase.Creature(self.parent, creature, self.guild_id, owner_id, id)
             self.creatures.append(creature)
             return creature
 
         def get_creature(self, creature_id: int):
-            creatures = [c for c in creatures if c.id == creature_id]
+            creatures = [c for c in self.creatures if c.id == creature_id]
 
             if len(creatures) != 1:
                 raise CreatureNotFound(
-                    "None or too many players with this user_id, needs to be unique"
+                    "None or too many creatures with this id, needs to be unique"
                 )
 
             return creatures[0]
@@ -96,17 +133,27 @@ class TestDatabase(Database):
 
     class Region(Database.Region):
 
-        def __init__(self, parent: Database, region: BaseRegion):
-            super().__init__(parent, region)
+        def __init__(self, parent: Database, region: BaseRegion, guild_id: int):
+            super().__init__(parent, region, guild_id)
+            self.occupant = None
+
+        def occupy(self, creature_id: int, until: int):
+            self.occupant = (creature_id, until)
+
+        def occupied(self) -> tuple[Database.Creature, int]:
+            return self.occupant
 
     class Player(Database.Player):
 
         def __init__(self, parent: Database, guild_id: int, user_id: int):
             super().__init__(parent, guild_id, user_id)
             self.resources: dict[Resource, int] = {r: 0 for r in BaseResources}
-            guild: TestDatabase.Guild = self.parent.get_guild(self.guild_id)
-            self.deck: list[Database.Creature] = [guild.add_creature(c, self.user_id) for c in self.parent.start_condition.start_deck]
+            self.deck: list[Database.Creature] = [
+                self.guild.add_creature(c, self.user_id)
+                for c in self.parent.start_condition.start_deck
+            ]
             self.hand: list[Database.Creature] = []
+            self.played: list[Database.Creature] = []
             self.discard: list[Database.Creature] = []
 
         def get_resources(self):
@@ -143,20 +190,30 @@ class TestDatabase(Database):
             self.deck += self.discard
             self.discard = []
 
-        def delete_creature_from_hand(self, creature_id: int) -> None:
+        def get_creature_from_hand(self, creature_id: int) -> Database.Creature:
             creatures = [c for c in self.get_hand() if c.id == creature_id]
 
             if len(creatures) != 1:
                 raise CreatureNotFound(
                     "None or too many players with this user_id, needs to be unique"
                 )
-            creature = creatures[0]
+
+            return creatures[0]
+
+        def delete_creature_from_hand(self, creature_id: int) -> None:
+            creature = self.get_creature_from_hand(creature_id)
 
             self.hand.remove(creature)
             parent: TestDatabase = self.parent
             parent.get_guild(self.guild_id).remove_creature(creature_id)
 
-        def add_to_discard(self, creature: Database.Creature) -> None:
+        def play_creature(self, creature_id: int) -> None:
+            creature = self.get_creature_from_hand(creature_id)
+            self.hand.remove(creature)
+            self.played.append(creature)
+
+        def add_to_discard(self, creature_id: int) -> None:
+            creature = self.guild.get_creature(creature_id)
             self.discard.append(creature)
 
     class Creature(Database.Creature):
