@@ -31,15 +31,14 @@ class TestDatabase(Database):
         return guild
 
     def get_guild(self, guild_id: int) -> Database.Guild:
-        guilds = [g for g in self.guilds if g.guild_id == guild_id]
+        guilds = [g for g in self.guilds if g.id == guild_id]
 
         if len(guilds) != 1:
             raise GuildNotFound("None or too many guilds with this guild_id, needs to be unique")
 
         return guilds[0]
 
-    def remove_guild(self, guild_id: int) -> Database.Guild:
-        guild = self.get_guild(guild_id)
+    def remove_guild(self, guild: Database.Guild) -> Database.Guild:
         self.guilds.remove(guild)
         return guild
 
@@ -51,7 +50,7 @@ class TestDatabase(Database):
             guild_id: int,
             start_condition: StartCondition,
         ):
-            super().__init__(parent, guild_id)
+            super().__init__(parent, guild_id, start_condition)
             self.config = start_condition.start_config
             self.players: list[TestDatabase.Player] = []
             self.regions: list[TestDatabase.Region] = []
@@ -68,7 +67,7 @@ class TestDatabase(Database):
             self.config = config
 
         def add_region(self, region: BaseRegion) -> Database.Region:
-            region = Database.Region(self.parent, region, self.guild_id)
+            region = Database.Region(self.parent, region, self)
             self.regions.append(region)
             return region
 
@@ -88,7 +87,7 @@ class TestDatabase(Database):
             return region
 
         def add_player(self, user_id: int) -> Database.Player:
-            player = TestDatabase.Player(self.parent, self.guild_id, user_id)
+            player = TestDatabase.Player(self.parent, self, user_id)
             self.players.append(player)
             return player
 
@@ -102,8 +101,7 @@ class TestDatabase(Database):
 
             return players[0]
 
-        def remove_player(self, user_id: int) -> Database.Player:
-            player = self.get_player(user_id)
+        def remove_player(self, player: Database.Player) -> Database.Player:
             self.players.remove(player)
             return player
 
@@ -112,7 +110,7 @@ class TestDatabase(Database):
                 id = 0
             else:
                 id = max(c.id for c in self.creatures) + 1
-            creature = TestDatabase.Creature(self.parent, creature, self.guild_id, owner_id, id)
+            creature = TestDatabase.Creature(self.parent, creature, self, owner_id, id)
             self.creatures.append(creature)
             return creature
 
@@ -126,19 +124,18 @@ class TestDatabase(Database):
 
             return creatures[0]
 
-        def remove_creature(self, creature_id: int):
-            creature = self.get_creature(creature_id)
+        def remove_creature(self, creature: Database.Creature):
             self.players.remove(creature)
             return creature
 
     class Region(Database.Region):
 
-        def __init__(self, parent: Database, region: BaseRegion, guild_id: int):
-            super().__init__(parent, region, guild_id)
+        def __init__(self, parent: Database, region: BaseRegion, guild: Database.Guild):
+            super().__init__(parent, region, guild)
             self.occupant = None
 
-        def occupy(self, creature_id: int, until: int):
-            self.occupant = (creature_id, until)
+        def occupy(self, creature: Database.Creature, until: int):
+            self.occupant = (creature, until)
 
         def occupied(self) -> tuple[Database.Creature, int]:
             return self.occupant
@@ -190,34 +187,27 @@ class TestDatabase(Database):
             self.deck += self.discard
             self.discard = []
 
-        def get_creature_from_hand(self, creature_id: int) -> Database.Creature:
-            creatures = [c for c in self.get_hand() if c.id == creature_id]
-
-            if len(creatures) != 1:
-                raise CreatureNotFound(
-                    "None or too many players with this user_id, needs to be unique"
-                )
-
-            return creatures[0]
-
-        def delete_creature_from_hand(self, creature_id: int) -> None:
-            creature = self.get_creature_from_hand(creature_id)
-
+        def delete_creature_from_hand(self, creature: Database.Creature) -> None:
             self.hand.remove(creature)
             parent: TestDatabase = self.parent
-            parent.get_guild(self.guild_id).remove_creature(creature_id)
+            parent.get_guild(self.guild_id).remove_creature(creature)
 
-        def play_creature(self, creature_id: int) -> None:
-            creature = self.get_creature_from_hand(creature_id)
+        def play_creature(self, creature: Database.Creature) -> None:
             self.hand.remove(creature)
             self.played.append(creature)
 
-        def add_to_discard(self, creature_id: int) -> None:
-            creature = self.guild.get_creature(creature_id)
+        def add_to_discard(self, creature: Database.Creature) -> None:
             self.discard.append(creature)
 
     class Creature(Database.Creature):
 
-        def __init__(self, parent, creature: BaseCreature, guild_id: int, owner_id: int, id: int):
+        def __init__(
+            self,
+            parent,
+            creature: BaseCreature,
+            guild: Database.Guild,
+            owner: Database.Player,
+            id: int,
+        ):
 
-            super().__init__(parent, creature, guild_id, owner_id, id)
+            super().__init__(parent, creature, guild, owner, id)

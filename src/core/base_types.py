@@ -216,10 +216,10 @@ class StartCondition:
 
 class Event:
 
-    def __init__(self, parent, timestamp: int, guild_id: int):
+    def __init__(self, parent, timestamp: int, guild):
         self.parent = parent
         self.timestamp = timestamp
-        self.guild_id = guild_id
+        self.guild_id = guild
 
     def resolve(self):
         pass
@@ -262,17 +262,17 @@ class Database:
 
     class Guild:
 
-        def __init__(self, parent, guild_id: int):
+        def __init__(self, parent, id: int, start_condition: StartCondition):
             self.parent = parent
-            self.guild_id = guild_id
+            self.id = id
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Guild):
-                return self.parent == other.parent and self.guild_id == other.guild_id
+                return self.parent == other.parent and self.id == other.id
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabaseGuild: {self.guild_id}>"
+            return f"<DatabaseGuild: {self.id}>"
 
         def get_config(self):
             pass
@@ -298,35 +298,35 @@ class Database:
         def remove_player(self, player):
             pass
 
-        def add_creature(self, creature: BaseCreature, owner_id: int):
+        def add_creature(self, creature: BaseCreature, owner):
             pass
 
         def get_creature(self, creature_id: int):
             pass
 
-        def remove_creature(self, creature_id: int):
+        def remove_creature(self, creature):
             pass
 
     class Region:
 
-        def __init__(self, parent, region: BaseRegion, guild_id: int):
+        def __init__(self, parent, region: BaseRegion, guild):
             self.parent = parent
             self.region = region
-            self.guild_id = guild_id
+            self.guild = guild
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Region):
                 return (
                     self.parent == other.parent
                     and self.region == other.region
-                    and self.guild_id == other.guild_id
+                    and self.guild.guild_id == other.guild.guild_id
                 )
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabaseRegion: {self.region} in {self.guild_id}>"
+            return f"<DatabaseRegion: {self.region} in {self.guild}>"
 
-        def occupy(self, creature_id: int, until: int):
+        def occupy(self, creature, until: int):
             pass
 
         def occupied(self) -> tuple:
@@ -334,35 +334,32 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(
-                self, parent, guild_id: int, timestamp: int, region_id: int, creature_id: int
-            ):
-                super().__init__(parent, timestamp, guild_id)
-                self.region_id = region_id
-                self.creature_id = creature_id
+            def __init__(self, parent, guild, timestamp: int, region, creature):
+                super().__init__(parent, timestamp, guild)
+                self.region = region
+                self.creature = creature
 
             def resolve(self):
-                guild: Database.Guild = self.parent.get_guild(self.guild_id)
+                pass
 
     class Player:
 
-        def __init__(self, parent, guild_id: int, user_id: int):
+        def __init__(self, parent, guild: int, user_id: int):
             self.parent = parent
-            self.guild_id = guild_id
+            self.guild = guild
             self.user_id = user_id
-            self.guild = self.parent.get_guild(self.guild_id)
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Player):
                 return (
                     self.parent == other.parent
-                    and self.guild_id == other.guild_id
-                    and self.user_id == other.guild_id
+                    and self.guild.id == other.guild.id
+                    and self.user_id == other.user_id
                 )
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabasePlayer: {self.user_id} in {self.guild_id}>"
+            return f"<DatabasePlayer: {self.user_id} in {self.guild}>"
 
         def get_resources(self) -> dict[Resource, int]:
             pass
@@ -508,23 +505,16 @@ class Database:
 
                 return cards_drawn, discard_reshuffled
 
-        def get_creature_from_hand(self, creature_id: int):
+        def delete_creature_from_hand(self, creature) -> None:
             pass
 
-        def delete_creature_from_hand(self, creature_id: int) -> None:
-            pass
-
-        def play_creature(self, creature_id: int) -> None:
+        def play_creature(self, creature) -> None:
             pass
 
         def add_to_discard(self, creature) -> None:
             pass
 
-        def play_creature_to_region(
-            self, creature_id: int, region_id: int, in_trans=False, extra_data={}
-        ):
-            creature: Database.Creature = self.guild.get_creature(creature_id)
-            region: Database.Region = self.guild.get_region(region_id)
+        def play_creature_to_region(self, creature, region, in_trans=False, extra_data={}):
 
             price, gain = region.region.quest_effect()
             creature_gain = creature.creature.quest_ability_effect()
@@ -538,30 +528,30 @@ class Database:
 
     class Creature:
 
-        def __init__(self, parent, creature: BaseCreature, guild_id: int, owner_id: int, id: int):
+        def __init__(self, parent, creature: BaseCreature, guild, owner, id: int):
             self.parent = parent
             self.creature = creature
-            self.guild_id = guild_id
-            self.owner_id = owner_id
+            self.guild = guild
+            self.owner = owner
             self.id = id
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Creature):
                 return (
                     self.parent == other.parent
-                    and self.guild_id == other.guild_id
+                    and self.guild.id == other.guild.id
                     and self.id == other.id
                 )
             return False
 
         def __repr__(self) -> str:
-            return f"<DatabaseCreature: {self.creature} in {self.guild_id} as {self.id} owned by {self.owner_id}>"
+            return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
     class FreeCreature:
 
-        def __init__(self, parent, guild_id: int, channel_id: int, message_id: int):
+        def __init__(self, parent, guild, channel_id: int, message_id: int):
             self.parent = parent
-            self.guild_id = guild_id
+            self.guild = guild
             self.channel_id = channel_id
             self.message_id = message_id
 
@@ -569,7 +559,7 @@ class Database:
             if isinstance(other, Database.FreeCreature):
                 return (
                     self.parent == other.parent
-                    and self.guild_id == other.guild_id
+                    and self.guild.id == other.guild.id
                     and self.channel_id == other.channel_id
                     and self.message_id == other.message_id
                 )

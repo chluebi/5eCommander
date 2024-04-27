@@ -30,7 +30,7 @@ def test_basic_db():
     test_db = TestDatabase(start_condition)
     guild_db = test_db.add_guild(1)
 
-    assert test_db.get_guild(guild_db.guild_id) == guild_db
+    assert test_db.get_guild(guild_db.id) == guild_db
     assert [r.region for r in guild_db.regions] == start_condition.start_active_regions
 
     player1_db = guild_db.add_player(1)
@@ -47,7 +47,7 @@ def test_basic_db():
     assert player1_db.has(Resource.GOLD, 0) == True
     assert player1_db.has(Resource.GOLD, 1) == False
 
-    guild_db.remove_player(player1_db.user_id)
+    guild_db.remove_player(player1_db)
     got_error = False
     try:
         guild_db.get_player(player1_db)
@@ -56,10 +56,10 @@ def test_basic_db():
 
     assert got_error
 
-    test_db.remove_guild(guild_db.guild_id)
+    test_db.remove_guild(guild_db)
     got_error = False
     try:
-        test_db.get_guild(guild_db.guild_id)
+        test_db.get_guild(guild_db.id)
     except GuildNotFound:
         got_error = True
 
@@ -159,14 +159,14 @@ def test_basic_db():
         for card in cards_drawn:
             assert card.creature in start_condition.start_deck
 
-        guild_db.remove_player(player6_db.user_id)
+        guild_db.remove_player(player6_db)
 
     # drawing creatures
     player7_db: TestDatabase.Player = guild_db.add_player(7)
     assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
     creature1_db: TestDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.user_id)
-    player7_db.add_to_discard(creature1_db.id)
+    player7_db.add_to_discard(creature1_db)
 
     assert player7_db.get_discard() == [creature1_db]
 
