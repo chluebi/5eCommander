@@ -145,6 +145,7 @@ RegionCategory = namedtuple("RegionCategory", ["name", "emoji"], defaults=["defa
 
 class BaseRegion:
 
+    id = -1
     name = "default_region"
     category = None
 
@@ -152,11 +153,11 @@ class BaseRegion:
         pass
 
     def __repr__(self) -> str:
-        return f"<BaseRegion: {self.name}>"
+        return f"<BaseRegion: {self.id}#{self.name}>"
 
     def __eq__(self, other) -> bool:
         if isinstance(other, BaseRegion):
-            return str(self) == str(other)
+            return self.id == other.id
         return False
 
     def quest_effect_text(self) -> str:
@@ -169,6 +170,7 @@ class BaseRegion:
 
 class BaseCreature:
 
+    id = -1
     name = "default_creature"
     quest_regions: list[BaseRegion] = []
 
@@ -217,7 +219,8 @@ class StartCondition:
 
 class Event:
 
-    def __init__(self, parent, timestamp: int, guild):
+    def __init__(self, id, parent, timestamp: int, guild):
+        self.id = id
         self.parent = parent
         self.timestamp = timestamp
         self.guild_id = guild
@@ -255,6 +258,9 @@ class Database:
             if exc_type is not None and not self.in_trans:
                 self.parent.end_transaction()
 
+    def fresh_event_id(self, guild):
+        pass
+
     def add_event(self, event: Event):
         pass
 
@@ -291,6 +297,9 @@ class Database:
             pass
 
         def get_config(self):
+            pass
+
+        def fresh_region_id(self):
             pass
 
         def add_region(self, region: BaseRegion):
@@ -331,7 +340,8 @@ class Database:
 
     class Region:
 
-        def __init__(self, parent, region: BaseRegion, guild):
+        def __init__(self, id: int, parent, region: BaseRegion, guild):
+            self.id = id
             self.parent = parent
             self.region = region
             self.guild = guild
@@ -340,8 +350,8 @@ class Database:
             if isinstance(other, Database.Region):
                 return (
                     self.parent == other.parent
-                    and self.region == other.region
-                    and self.guild.guild_id == other.guild.guild_id
+                    and self.id == other.id
+                    and self.guild.id == other.guild.id
                 )
             return False
 
@@ -359,8 +369,8 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(self, parent, guild, timestamp: int, region):
-                super().__init__(parent, timestamp, guild)
+            def __init__(self, id, parent, guild, timestamp: int, region):
+                super().__init__(id, parent, timestamp, guild)
                 self.region = region
 
             def resolve(self):

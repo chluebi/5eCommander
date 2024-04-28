@@ -27,6 +27,13 @@ class TestDatabase(Database):
         self.guilds: list[TestDatabase.Guild] = []
         self.events: list[Event] = []
 
+    def fresh_event_id(self, guild):
+        guild_events = [e for e in self.events if e.guild == guild]
+        if len(guild_events) == 0:
+            return 0
+        max_id = max([e.id for e in self.events])
+        return max_id + 1
+
     def add_event(self, event: Event):
         self.events.append(event)
 
@@ -81,8 +88,14 @@ class TestDatabase(Database):
         def get_config(self) -> dict:
             return self.config
 
+        def fresh_region_id(self) -> int:
+            if len(self.regions) == 0:
+                return 0
+            max_id = max([r.id for r in self.regions])
+            return max_id + 1
+
         def add_region(self, region: BaseRegion) -> Database.Region:
-            region = TestDatabase.Region(self.parent, region, self)
+            region = TestDatabase.Region(self.fresh_region_id(), self.parent, region, self)
             self.regions.append(region)
             return region
 
@@ -154,8 +167,8 @@ class TestDatabase(Database):
 
     class Region(Database.Region):
 
-        def __init__(self, parent: Database, region: BaseRegion, guild: Database.Guild):
-            super().__init__(parent, region, guild)
+        def __init__(self, id: int, parent: Database, region: BaseRegion, guild: Database.Guild):
+            super().__init__(id, parent, region, guild)
             self.occupant = None
 
         def occupy(self, creature: Database.Creature):
@@ -165,7 +178,9 @@ class TestDatabase(Database):
             until = self.parent.timestamp_after(self.guild.get_config()["region_recharge"])
             self.occupant = (creature, until)
             self.parent.add_event(
-                Database.Region.RegionRechargeEvent(self.parent, self.guild, until, self)
+                Database.Region.RegionRechargeEvent(
+                    self.parent.fresh_event_id(self.guild), self.parent, self.guild, until, self
+                )
             )
 
         def unoccupy(self, current: int):

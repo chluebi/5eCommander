@@ -14,6 +14,7 @@ region_categories = [
 
 class Village(BaseRegion):
 
+    id = 0
     name = "village"
     category = RegionCategories.settlement
 
@@ -23,6 +24,7 @@ class Village(BaseRegion):
 
 class SmallMine(BaseRegion):
 
+    id = 1
     name = "small mine"
     category = RegionCategories.mine
 
@@ -34,3 +36,5 @@ regions = [
     Village(),
     SmallMine(),
 ]
+
+assert len(set([r.id for r in regions])) == len(regions)
