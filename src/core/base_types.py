@@ -223,7 +223,7 @@ class StartCondition:
 
 class Event:
 
-    def __init__(self, id, parent, timestamp: int, guild):
+    def __init__(self, id: int, parent, timestamp: int, guild):
         self.id = id
         self.parent = parent
         self.timestamp = timestamp
@@ -330,6 +330,9 @@ class Database:
         def remove_player(self, player):
             pass
 
+        def fresh_creature_id(self):
+            pass
+
         def add_creature(self, creature: BaseCreature, owner):
             pass
 
@@ -373,7 +376,7 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(self, id, parent, guild, timestamp: int, region):
+            def __init__(self, id: int, parent, guild, timestamp: int, region):
                 super().__init__(id, parent, timestamp, guild)
                 self.region = region
 
@@ -382,7 +385,7 @@ class Database:
 
     class Player:
 
-        def __init__(self, parent, guild: int, user_id: int):
+        def __init__(self, parent, guild, user_id: int):
             self.parent = parent
             self.guild = guild
             self.id = user_id
@@ -604,12 +607,12 @@ class Database:
 
     class Creature:
 
-        def __init__(self, parent, creature: BaseCreature, guild, owner, id: int):
+        def __init__(self, parent, id: int, creature: BaseCreature, guild, owner):
             self.parent = parent
+            self.id = id
             self.creature = creature
             self.guild = guild
             self.owner = owner
-            self.id = id
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Creature):

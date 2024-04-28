@@ -139,12 +139,17 @@ class TestDatabase(Database):
             self.players.remove(player)
             return player
 
-        def add_creature(self, creature: BaseCreature, owner: Database.Player) -> Database.Creature:
+        def fresh_creature_id(self) -> int:
             if len(self.creatures) == 0:
-                id = 0
-            else:
-                id = max(c.id for c in self.creatures) + 1
-            creature = TestDatabase.Creature(self.parent, creature, self, owner, id)
+                return 0
+
+            max_id = max([c.id for c in self.creatures])
+            return max_id + 1
+
+        def add_creature(self, creature: BaseCreature, owner: Database.Player) -> Database.Creature:
+            creature = TestDatabase.Creature(
+                self.parent, self.fresh_creature_id(), creature, self, owner
+            )
             self.creatures.append(creature)
             return creature
 
@@ -263,10 +268,10 @@ class TestDatabase(Database):
         def __init__(
             self,
             parent,
+            id: int,
             creature: BaseCreature,
             guild: Database.Guild,
             owner: Database.Player,
-            id: int,
         ):
 
-            super().__init__(parent, creature, guild, owner, id)
+            super().__init__(parent, id, creature, guild, owner)
