@@ -227,7 +227,7 @@ class Event:
         self.id = id
         self.parent = parent
         self.timestamp = timestamp
-        self.guild_id = guild
+        self.guild = guild
 
     def resolve(self):
         pass
@@ -586,6 +586,7 @@ class Database:
                 self.play_creature(creature)
                 region: Database.Region = region
                 region.occupy(creature)
+                creature.play()
                 self.gain(gain, in_trans=True, extra_data=extra_data)
                 if len(creature_price) == 0 or (
                     len(creature_price) > 0 and "pay_creature_price" in extra_data
@@ -625,6 +626,18 @@ class Database:
 
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
+
+        def play(self):
+            pass
+
+        class CreatureRechargeEvent(Event):
+
+            def __init__(self, id: int, parent, guild, timestamp: int, creature):
+                super().__init__(id, parent, timestamp, guild)
+                self.creature = creature
+
+            def resolve(self):
+                self.creature.owner.add_to_discard(self.creature)
 
     class FreeCreature:
 

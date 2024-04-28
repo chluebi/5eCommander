@@ -218,7 +218,7 @@ def test_basic_db():
 
     assert player8_db.get_resources() == resources
 
-    assert len(test_db.get_events(0, time.time() * 2)) == 1
+    assert len(test_db.get_events(0, time.time() * 2)) == 2
     assert test_db.get_events(0, time.time() * 2)[0].timestamp > time.time()
 
     assert region1_db.occupied()[0] == creature2_db

@@ -195,8 +195,6 @@ class TestDatabase(Database):
             if current < self.occupant[1]:
                 Exception("Trying to unoccupy with too early timestamp")
 
-            creature: Database.Creature = self.occupant[0]
-            creature.owner.add_to_discard(creature)
             self.occupant = None
 
         def occupied(self) -> tuple[Database.Creature, int]:
@@ -275,3 +273,12 @@ class TestDatabase(Database):
         ):
 
             super().__init__(parent, id, creature, guild, owner)
+
+        def play(self):
+            until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
+
+            self.parent.add_event(
+                Database.Creature.CreatureRechargeEvent(
+                    self.parent.fresh_event_id(self.guild), self.parent, self.guild, until, self
+                )
+            )
