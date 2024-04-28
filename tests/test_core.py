@@ -215,7 +215,6 @@ def test_basic_db():
     player8_db.play_creature_to_region(creature2_db, region1_db)
 
     resources[Resource.WORKERS] += 1
-
     assert player8_db.get_resources() == resources
 
     assert len(test_db.get_events(0, time.time() * 2)) == 2
@@ -234,5 +233,21 @@ def test_basic_db():
     player8_db.play_creature_to_campaign(creature3_db)
 
     resources[Resource.RALLY] += 1
+    assert player8_db.get_resources() == resources
 
+    # claim creatures
+
+    assert player8_db.get_resources()[Resource.RALLY] >= 1
+    resources: dict[Resource, int] = player8_db.get_resources()
+
+    free_creature1_db: TestDatabase.FreeCreature = guild_db.add_free_creature(
+        Commoner(), 0, 0, player8_db
+    )
+
+    assert free_creature1_db.is_protected(time.time())
+    assert not free_creature1_db.is_expired(time.time())
+
+    free_creature1_db.claim(time.time(), player8_db)
+
+    resources[Resource.RALLY] -= 1
     assert player8_db.get_resources() == resources

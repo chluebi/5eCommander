@@ -38,6 +38,14 @@ class CreatureCannotQuestHere(Exception):
     pass
 
 
+class ProtectedFreeCreature(Exception):
+    pass
+
+
+class ExpiredFreeCreature(Exception):
+    pass
+
+
 Resource = Enum(
     "Resource",
     [
@@ -177,6 +185,7 @@ class BaseCreature:
     id = -1
     name = "default_creature"
     quest_region_categories: list[RegionCategory] = []
+    claim_cost: int = 0
 
     def __init__(self):
         pass
@@ -343,6 +352,32 @@ class Database:
             pass
 
         def remove_creature(self, creature):
+            pass
+
+        def add_to_creature_pool(self, creature: BaseCreature):
+            pass
+
+        def get_creature_pool(self):
+            pass
+
+        def get_random_from_creature_pool(self):
+            pass
+
+        def remove_from_creature_pool(self, creature: BaseCreature):
+            pass
+
+        def add_free_creature(
+            self, creature: BaseCreature, channel_id: int, message_id: int, roller
+        ):
+            pass
+
+        def get_free_creatures(self):
+            pass
+
+        def get_free_creature(self, channel_id: int, message_id: int):
+            pass
+
+        def remove_free_creature(self, creature):
             pass
 
     class Region:
@@ -641,9 +676,21 @@ class Database:
 
     class FreeCreature:
 
-        def __init__(self, parent, guild, channel_id: int, message_id: int):
+        def __init__(
+            self,
+            parent,
+            creature: BaseCreature,
+            guild,
+            channel_id: int,
+            message_id: int,
+            roller,
+            timestamp_protected: int,
+            timestamp_expires: int,
+        ):
             self.parent = parent
             self.guild = guild
+            self.creature = creature
+            self.roller = roller
             self.channel_id = channel_id
             self.message_id = message_id
 
@@ -651,8 +698,60 @@ class Database:
             if isinstance(other, Database.FreeCreature):
                 return (
                     self.parent == other.parent
+                    and self.creature == other.creature
                     and self.guild.id == other.guild.id
                     and self.channel_id == other.channel_id
                     and self.message_id == other.message_id
                 )
             return False
+
+        def get_protected_timestamp(self) -> int:
+            pass
+
+        def get_expires_timestamp(self) -> int:
+            pass
+
+        def is_protected(self, timestamp: int) -> bool:
+            return self.get_protected_timestamp() > timestamp
+
+        def is_expired(self, timestamp: int) -> bool:
+            return self.get_expires_timestamp() < timestamp
+
+        def claimed(self):
+            pass
+
+        def claim(self, timestamp: int, owner, in_trans=False):
+
+            owner: Database.Player = owner
+            guild: Database.Guild = self.guild
+
+            guild.get_free_creature(self.channel_id, self.message_id)
+
+            if self.is_expired(timestamp):
+                raise ExpiredFreeCreature()
+
+            if self.is_protected(timestamp) and owner != self.roller:
+                raise ProtectedFreeCreature(
+                    f"This creature is protected until {self.get_protected_timestamp()}"
+                )
+
+            with self.parent.Transaction(self.parent, in_trans):
+                owner.pay_price([Price(Resource.RALLY, self.creature.claim_cost)], in_trans=True)
+                guild.remove_free_creature(self)
+                guild.add_creature(self.creature, owner)
+                self.claimed()
+
+        class FreeCreatureProtectedEvent(Event):
+
+            def __init__(self, id: int, parent, guild, timestamp: int, free_creature):
+                super().__init__(id, parent, timestamp, guild)
+                self.free_creature = free_creature
+
+        class FreeCreatureExpiresEvent(Event):
+
+            def __init__(self, id: int, parent, guild, timestamp: int, free_creature):
+                super().__init__(id, parent, timestamp, guild)
+                self.free_creature = free_creature
+
+            def resolve(self):
+                self.guild.remove_free_creature(self.free_creature)

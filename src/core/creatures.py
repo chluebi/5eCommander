@@ -18,6 +18,7 @@ class Commoner(BaseCreature):
         RegionCategories.settlement,
         RegionCategories.mine,
     ]
+    claim_cost: int = 1
 
     def campaign_ability_effect(self) -> tuple[list[Price], list[Gain]]:
         return [], [Gain(Resource.RALLY, 1)]

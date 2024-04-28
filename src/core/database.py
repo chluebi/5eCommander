@@ -80,7 +80,9 @@ class TestDatabase(Database):
             for r in start_condition.start_active_regions:
                 self.add_region(r)
 
+            self.creature_pool: list[BaseCreature] = set()
             self.creatures: list[TestDatabase.Creature] = []
+            self.free_creatures: list[TestDatabase.FreeCreature] = []
 
         def set_config(self, config: dict) -> None:
             self.config = config
@@ -167,7 +169,56 @@ class TestDatabase(Database):
             return creatures[0]
 
         def remove_creature(self, creature: Database.Creature):
-            self.players.remove(creature)
+            self.creatures.remove(creature)
+            return creature
+
+        def add_to_creature_pool(self, creature: BaseCreature):
+            self.creature_pool.insert(creature)
+
+        def get_creature_pool(self):
+            return self.creature_pool
+
+        def get_random_from_creature_pool(self) -> BaseCreature:
+            return random.choice(self.get_creature_pool())
+
+        def remove_from_creature_pool(self, creature: BaseCreature):
+            self.creature_pool.remove(creature)
+
+        def add_free_creature(
+            self, creature: BaseCreature, channel_id: int, message_id: int, roller: Database.Player
+        ) -> Database.FreeCreature:
+            free_creature = TestDatabase.FreeCreature(
+                self.parent,
+                creature,
+                self,
+                channel_id,
+                message_id,
+                roller,
+                self.parent.timestamp_after(self.config["free_protection"]),
+                self.parent.timestamp_after(self.config["free_expire"]),
+            )
+            self.free_creatures.append(free_creature)
+            return free_creature
+
+        def get_free_creatures(self):
+            return self.free_creatures
+
+        def get_free_creature(self, channel_id: int, message_id: int):
+            free_creatures = [
+                c
+                for c in self.free_creatures
+                if c.channel_id == channel_id and c.message_id == message_id
+            ]
+
+            if len(free_creatures) != 1:
+                raise CreatureNotFound(
+                    "None or too many creatures with this id, needs to be unique"
+                )
+
+            return free_creatures[0]
+
+        def remove_free_creature(self, creature: Database.FreeCreature):
+            self.free_creatures.remove(creature)
             return creature
 
     class Region(Database.Region):
@@ -282,3 +333,47 @@ class TestDatabase(Database):
                     self.parent.fresh_event_id(self.guild), self.parent, self.guild, until, self
                 )
             )
+
+    class FreeCreature(Database.FreeCreature):
+
+        def __init__(
+            self,
+            parent,
+            creature: BaseCreature,
+            guild,
+            channel_id: int,
+            message_id: int,
+            roller,
+            timestamp_protected: int,
+            timestamp_expires: int,
+        ):
+            super().__init__(
+                parent,
+                creature,
+                guild,
+                channel_id,
+                message_id,
+                roller,
+                timestamp_protected,
+                timestamp_expires,
+            )
+            self.timestamp_protected = timestamp_protected
+            self.timestamp_expires = timestamp_expires
+
+        def get_protected_timestamp(self) -> int:
+            return self.timestamp_protected
+
+        def get_expires_timestamp(self) -> int:
+            return self.timestamp_expires
+
+        def claimed(self):
+            new_events = []
+            for e in self.parent.events:
+                if isinstance(e, Database.FreeCreature.FreeCreatureProtectedEvent):
+                    if e.free_creature == self:
+                        continue
+                if isinstance(e, Database.FreeCreature.FreeCreatureProtectedEvent):
+                    if e.free_creature == self:
+                        continue
+                new_events.append(e)
+            self.parent.events = new_events
