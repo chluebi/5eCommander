@@ -26,7 +26,7 @@ def test_text():
     commoner = Commoner()
 
     assert commoner.quest_ability_effect_text() == ""
-    assert commoner.rally_ability_effect_text() == "gain 1 🚩rally"
+    assert commoner.campaign_ability_effect_text() == "gain 1 🚩rally"
 
     village = Village()
 
@@ -208,10 +208,31 @@ def test_basic_db():
 
     assert len(test_db.get_events(0, time.time() * 2)) == 0
 
+    resources: dict[Resource, int] = player8_db.get_resources()
+
+    # needs an order to actually be able to play it
+    player8_db.gain([Gain(Resource.ORDERS, 1)])
     player8_db.play_creature_to_region(creature2_db, region1_db)
+
+    resources[Resource.WORKERS] += 1
+
+    assert player8_db.get_resources() == resources
 
     assert len(test_db.get_events(0, time.time() * 2)) == 1
     assert test_db.get_events(0, time.time() * 2)[0].timestamp > time.time()
 
     assert region1_db.occupied()[0] == creature2_db
     assert len(player8_db.get_hand()) == 4
+
+    # campaign
+
+    creature3_db: TestDatabase.Creature = player8_db.get_hand()[0]
+    assert isinstance(creature3_db.creature, Commoner)
+
+    resources: dict[Resource, int] = player8_db.get_resources()
+
+    player8_db.play_creature_to_campaign(creature3_db)
+
+    resources[Resource.RALLY] += 1
+
+    assert player8_db.get_resources() == resources

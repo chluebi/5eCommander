@@ -34,6 +34,10 @@ class NoCreaturesToDeleteProvided(Exception):
     pass
 
 
+class CreatureCannotQuestHere(Exception):
+    pass
+
+
 Resource = Enum(
     "Resource",
     [
@@ -172,7 +176,7 @@ class BaseCreature:
 
     id = -1
     name = "default_creature"
-    quest_regions: list[BaseRegion] = []
+    quest_region_categories: list[RegionCategory] = []
 
     def __init__(self):
         pass
@@ -193,12 +197,12 @@ class BaseCreature:
     def quest_ability_effect(self) -> tuple[list[Price], list[Gain]]:
         return [], []
 
-    # rallying
-    def rally_ability_effect_text(self) -> str:
-        price, gains = self.rally_ability_effect()
+    # campaigning
+    def campaign_ability_effect_text(self) -> str:
+        price, gains = self.campaign_ability_effect()
         return r_changes_to_string(price + gains)
 
-    def rally_ability_effect(self) -> tuple[list[Price], list[Gain]]:
+    def campaign_ability_effect(self) -> tuple[list[Price], list[Gain]]:
         return [], []
 
 
@@ -563,20 +567,40 @@ class Database:
 
         def play_creature_to_region(self, creature, region, in_trans=False, extra_data={}):
 
+            if region.region.category not in creature.creature.quest_region_categories:
+                raise CreatureCannotQuestHere(
+                    f"Region is {region.region.category} but creature can only go to {creature.creature.quest_region_categories}"
+                )
+
             price, gain = region.region.quest_effect()
             creature_price, creature_gain = creature.creature.quest_ability_effect()
 
             with self.parent.Transaction(self.parent, in_trans):
+                self.pay_price([Price(Resource.ORDERS, 1)], in_trans=True)
                 self.pay_price(price, in_trans=True, extra_data=extra_data)
-                if "pay_creature_price" in extra_data:
+                if len(creature_price) > 0 and "pay_creature_price" in extra_data:
                     self.pay_price(creature_price, in_trans=True, extra_data=extra_data)
                 self.play_creature(creature)
                 region: Database.Region = region
-                print("here", region)
                 region.occupy(creature)
-                print("after", region)
                 self.gain(gain, in_trans=True, extra_data=extra_data)
-                self.gain(creature_gain, in_trans=True, extra_data=extra_data)
+                if len(creature_price) == 0 or (
+                    len(creature_price) > 0 and "pay_creature_price" in extra_data
+                ):
+                    self.gain(creature_gain, in_trans=True, extra_data=extra_data)
+
+        def play_creature_to_campaign(self, creature, in_trans=False, extra_data={}):
+
+            creature_price, creature_gain = creature.creature.campaign_ability_effect()
+
+            with self.parent.Transaction(self.parent, in_trans):
+                if len(creature_price) > 0 and "pay_creature_price" in extra_data:
+                    self.pay_price(creature_price, in_trans=True, extra_data=extra_data)
+                self.play_creature(creature)
+                if len(creature_price) == 0 or (
+                    len(creature_price) > 0 and "pay_creature_price" in extra_data
+                ):
+                    self.gain(creature_gain, in_trans=True, extra_data=extra_data)
 
     class Creature:
 
