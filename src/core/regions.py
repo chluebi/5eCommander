@@ -38,3 +38,8 @@ regions = [
 ]
 
 assert len(set([r.id for r in regions])) == len(regions)
+
+regions = {r.id: r for r in regions}
+
+assert all(key == r.id for key, r in regions.items())
+assert len(set([r.id for r in regions.values()])) == len(regions)

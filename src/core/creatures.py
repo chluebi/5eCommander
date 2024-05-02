@@ -27,3 +27,8 @@ class Commoner(BaseCreature):
 creatures = [Commoner()]
 
 assert len(set([c.id for c in creatures])) == len(creatures)
+
+creatures = {c.id: c for c in creatures}
+
+assert all(key == c.id for key, c in creatures.items())
+assert len(set([c.id for c in creatures.values()])) == len(creatures)
