@@ -2,6 +2,7 @@ import time
 from typing import Union
 from enum import Enum
 from collections import namedtuple, defaultdict
+from contextlib import contextmanager
 
 BASE_HANDS_SIZE = 5
 
@@ -232,9 +233,9 @@ class StartCondition:
 
 class Event:
 
-    def __init__(self, id: int, parent, timestamp: int, guild):
-        self.id = id
+    def __init__(self, parent, id: int, timestamp: int, guild):
         self.parent = parent
+        self.id = id
         self.timestamp = timestamp
         self.guild = guild
 
@@ -256,20 +257,18 @@ class Database:
     def end_transaction(self):
         pass
 
-    class Transaction:
+    def rollback_transaction(self):
+        pass
 
-        def __init__(self, parent, in_trans=False):
-            self.parent = parent
-            self.in_trans = in_trans
-
-        def __enter__(self):
-            if not self.in_trans:
-                self.parent.start_transaction()
-            return self
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            if exc_type is not None and not self.in_trans:
-                self.parent.end_transaction()
+    @contextmanager
+    def transaction(self):
+        self.start_transaction()
+        try:
+            yield
+            self.end_transaction()
+        except Exception as e:
+            self.rollback_transaction()
+            raise e
 
     def fresh_event_id(self, guild):
         pass
@@ -294,7 +293,7 @@ class Database:
 
     class Guild:
 
-        def __init__(self, parent, id: int, start_condition: StartCondition):
+        def __init__(self, parent, id: int):
             self.parent = parent
             self.id = id
 
@@ -327,13 +326,13 @@ class Database:
         def remove_region(self, region: BaseRegion):
             pass
 
-        def add_player(self, user_id: int):
+        def add_player(self, player_id: int):
             pass
 
         def get_players(self):
             pass
 
-        def get_player(self, user_id: int):
+        def get_player(self, player_id: int):
             pass
 
         def remove_player(self, player):
@@ -382,9 +381,9 @@ class Database:
 
     class Region:
 
-        def __init__(self, id: int, parent, region: BaseRegion, guild):
-            self.id = id
+        def __init__(self, parent, id: int, region: BaseRegion, guild):
             self.parent = parent
+            self.id = id
             self.region = region
             self.guild = guild
 
@@ -411,8 +410,8 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(self, id: int, parent, guild, timestamp: int, region):
-                super().__init__(id, parent, timestamp, guild)
+            def __init__(self, parent, id: int, guild, timestamp: int, region):
+                super().__init__(parent, id, timestamp, guild)
                 self.region = region
 
             def resolve(self):
@@ -420,10 +419,10 @@ class Database:
 
     class Player:
 
-        def __init__(self, parent, guild, user_id: int):
+        def __init__(self, parent, id, guild):
             self.parent = parent
+            self.id = id
             self.guild = guild
-            self.id = user_id
 
         def __eq__(self, other) -> bool:
             if isinstance(other, Database.Player):
@@ -530,7 +529,7 @@ class Database:
             if len(merged_gains) == 0:
                 return
 
-            with self.parent.Transaction(self.parent, in_trans):
+            with self.parent.transaction():
 
                 resources: dict[Resource, int] = self.get_resources()
                 hand_size: list = len(self.get_hand())
@@ -663,12 +662,18 @@ class Database:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
         def play(self):
-            pass
+            until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
+
+            self.parent.add_event(
+                Database.Creature.CreatureRechargeEvent(
+                    self.parent.fresh_event_id(self.guild), self.parent, self.guild, until, self
+                )
+            )
 
         class CreatureRechargeEvent(Event):
 
-            def __init__(self, id: int, parent, guild, timestamp: int, creature):
-                super().__init__(id, parent, timestamp, guild)
+            def __init__(self, parent, id: int, guild, timestamp: int, creature):
+                super().__init__(parent, id, timestamp, guild)
                 self.creature = creature
 
             def resolve(self):
@@ -743,14 +748,14 @@ class Database:
 
         class FreeCreatureProtectedEvent(Event):
 
-            def __init__(self, id: int, parent, guild, timestamp: int, free_creature):
-                super().__init__(id, parent, timestamp, guild)
+            def __init__(self, parent, id: int, guild, timestamp: int, free_creature):
+                super().__init__(parent, id, timestamp, guild)
                 self.free_creature = free_creature
 
         class FreeCreatureExpiresEvent(Event):
 
-            def __init__(self, id: int, parent, guild, timestamp: int, free_creature):
-                super().__init__(id, parent, timestamp, guild)
+            def __init__(self, parent, id: int, guild, timestamp: int, free_creature):
+                super().__init__(parent, id, timestamp, guild)
                 self.free_creature = free_creature
 
             def resolve(self):
