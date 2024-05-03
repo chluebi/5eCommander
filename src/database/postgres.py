@@ -1,7 +1,19 @@
 import random
 from copy import deepcopy
 
-from sqlalchemy import Engine, text, MetaData, Table, Column, Integer, ForeignKeyConstraint, PrimaryKeyConstraint, BigInteger
+from sqlalchemy import (
+    Transaction,
+    Connection,
+    Engine,
+    text,
+    MetaData,
+    Table,
+    Column,
+    Integer,
+    ForeignKeyConstraint,
+    PrimaryKeyConstraint,
+    BigInteger,
+)
 
 from src.core.base_types import (
     Resource,
@@ -33,245 +45,351 @@ class PostgresDatabase(Database):
 
         metadata = MetaData()
 
-        # Continue using the previous metadata object
-        metadata = MetaData()
-
-        guilds_table = Table('Guilds', metadata,
-            Column('id', BigInteger, primary_key=True),
-            Column('region_recharge', Integer, nullable=False, default=10),
-            Column('creature_recharge', Integer, nullable=False, default=10),
-            Column('free_protection', Integer, nullable=False, default=5),
-            Column('free_expire', Integer, nullable=False, default=60)
+        guilds_table = Table(
+            "guilds",
+            metadata,
+            Column("id", BigInteger, primary_key=True),
+            Column("region_recharge", Integer, nullable=False, default=10),
+            Column("creature_recharge", Integer, nullable=False, default=10),
+            Column("free_protection", Integer, nullable=False, default=5),
+            Column("free_expire", Integer, nullable=False, default=60),
         )
 
-        region_recharge_event_table = Table('RegionRechargeEvents', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('timestamp', BigInteger, nullable=False),
-            Column('region_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_RegionRechargeEvents')
+        region_recharge_event_table = Table(
+            "region_recharge_events",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("timestamp", BigInteger, nullable=False),
+            Column("region_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_region_recharge_events"),
         )
 
-        creature_recharge_event_table = Table('CreatureRechargeEvents', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('timestamp', BigInteger, nullable=False),
-            Column('creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_CreatureRechargeEvents')
+        creature_recharge_event_table = Table(
+            "creature_recharge_events",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("timestamp", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_creature_recharge_events"),
         )
 
-        free_creature_protected_event_table = Table('FreeCreatureProtectedEvents', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('timestamp', BigInteger, nullable=False),
-            Column('free_creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_FreeCreatureProtectedEvents')
+        free_creature_protected_event_table = Table(
+            "free_creature_protected_events",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("timestamp", BigInteger, nullable=False),
+            Column("free_creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_protected_events"),
         )
 
-        free_creature_expires_event_table = Table('FreeCreatureExpiresEvents', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('timestamp', BigInteger, nullable=False),
-            Column('free_creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_FreeCreatureExpiresEvents')
+        free_creature_expires_event_table = Table(
+            "free_creature_expires_events",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("timestamp", BigInteger, nullable=False),
+            Column("free_creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_expires_events"),
         )
 
-        region_table = Table('Regions', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('base_region_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_Regions')
+        region_table = Table(
+            "regions",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("base_region_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_regions"),
         )
 
-        player_table = Table('Players', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_Players')
+        player_table = Table(
+            "players",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_players"),
         )
 
-        base_creature_table = Table('BaseCreatures', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_BaseCreatures')
+        base_creature_table = Table(
+            "base_creatures",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_base_creatures"),
         )
 
-        creature_table = Table('Creatures', metadata,
-            Column('id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('owner_id', BigInteger, nullable=False),
-            Column('base_creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id'], ['Guilds.id']),
-            ForeignKeyConstraint(['guild_id', 'owner_id'], ['Players.guild_id', 'Players.id']),
-            ForeignKeyConstraint(['guild_id', 'base_creature_id'], ['BaseCreatures.guild_id', 'BaseCreatures.id']),
-            PrimaryKeyConstraint('id', 'guild_id', name='pk_Creatures')
+        creature_table = Table(
+            "creatures",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("owner_id", BigInteger, nullable=False),
+            Column("base_creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["guild_id", "owner_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "base_creature_id"], ["base_creatures.guild_id", "base_creatures.id"]
+            ),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_creatures"),
         )
 
-        occupies_table = Table('Occupies', metadata,
-            Column('guild_id', BigInteger, nullable=False),
-            Column('creature_id', BigInteger, nullable=False),
-            Column('region_id', BigInteger, nullable=False),
-            Column('timestamp_occupied', BigInteger, nullable=True),
-            ForeignKeyConstraint(['guild_id', 'creature_id'], ['Creatures.guild_id', 'Creatures.id']),
-            ForeignKeyConstraint(['guild_id', 'region_id'], ['Regions.guild_id', 'Regions.id']),
-            PrimaryKeyConstraint('guild_id', 'region_id', name='pk_Occupies')
+        occupies_table = Table(
+            "occupies",
+            metadata,
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            Column("region_id", BigInteger, nullable=False),
+            Column("timestamp_occupied", BigInteger, nullable=True),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+            ),
+            ForeignKeyConstraint(["guild_id", "region_id"], ["regions.guild_id", "regions.id"]),
+            PrimaryKeyConstraint("guild_id", "region_id", name="pk_occupies"),
         )
 
-        free_creature_table = Table('FreeCreatures', metadata,
-            Column('base_creature_id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('channel_id', BigInteger, nullable=False),
-            Column('message_id', BigInteger, nullable=False),
-            Column('roller_id', BigInteger, nullable=False),
-            Column('timestamp_protected', BigInteger, nullable=False),
-            Column('timestamp_expires', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id', 'base_creature_id'], ['BaseCreatures.guild_id', 'BaseCreatures.id']),
-            ForeignKeyConstraint(['guild_id', 'roller_id'], ['Players.guild_id', 'Players.id']),
-            PrimaryKeyConstraint('guild_id', 'channel_id', 'message_id', name='pk_FreeCreatures')
+        free_creature_table = Table(
+            "free_creatures",
+            metadata,
+            Column("base_creature_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("channel_id", BigInteger, nullable=False),
+            Column("message_id", BigInteger, nullable=False),
+            Column("roller_id", BigInteger, nullable=False),
+            Column("timestamp_protected", BigInteger, nullable=False),
+            Column("timestamp_expires", BigInteger, nullable=False),
+            ForeignKeyConstraint(
+                ["guild_id", "base_creature_id"], ["base_creatures.guild_id", "base_creatures.id"]
+            ),
+            ForeignKeyConstraint(["guild_id", "roller_id"], ["players.guild_id", "players.id"]),
+            PrimaryKeyConstraint("guild_id", "channel_id", "message_id", name="pk_free_creatures"),
         )
 
-        resource_table = Table('Resources', metadata,
-            Column('player_id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('resource_type', Integer, nullable=False),
-            Column('quantity', Integer, nullable=False, default=0),
-            ForeignKeyConstraint(['guild_id', 'player_id'], ['Players.guild_id', 'Players.id']),
-            PrimaryKeyConstraint('player_id', 'guild_id', 'resource_type', name='pk_Resources')
+        resource_table = Table(
+            "resources",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("resource_type", Integer, nullable=False),
+            Column("quantity", Integer, nullable=False, default=0),
+            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            PrimaryKeyConstraint("player_id", "guild_id", "resource_type", name="pk_resources"),
         )
 
-
-        deck_table = Table('Deck', metadata,
-            Column('player_id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id', 'player_id'], ['Players.guild_id', 'Players.id']),
-            ForeignKeyConstraint(['guild_id', 'creature_id'], ['Creatures.guild_id', 'Creatures.id']),
-            PrimaryKeyConstraint('player_id', 'guild_id', 'creature_id', name='pk_Deck')
+        deck_table = Table(
+            "deck",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+            ),
+            PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_deck"),
         )
 
-        hand_table = Table('Hand', metadata,
-            Column('player_id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('creature_id', BigInteger, nullable=False),
-            Column('order', Integer, nullable=False),
-            ForeignKeyConstraint(['guild_id', 'player_id'], ['Players.guild_id', 'Players.id']),
-            ForeignKeyConstraint(['guild_id', 'creature_id'], ['Creatures.guild_id', 'Creatures.id']),
-            PrimaryKeyConstraint('player_id', 'guild_id', 'creature_id', name='pk_Hand')
+        hand_table = Table(
+            "hand",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            Column("order", Integer, nullable=False),
+            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+            ),
+            PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_hand"),
         )
 
-        discard_table = Table('Discard', metadata,
-            Column('player_id', BigInteger, nullable=False),
-            Column('guild_id', BigInteger, nullable=False),
-            Column('creature_id', BigInteger, nullable=False),
-            ForeignKeyConstraint(['guild_id', 'player_id'], ['Players.guild_id', 'Players.id']),
-            ForeignKeyConstraint(['guild_id', 'creature_id'], ['Creatures.guild_id', 'Creatures.id']),
-            PrimaryKeyConstraint('player_id', 'guild_id', 'creature_id', name='pk_Discard')
+        discard_table = Table(
+            "discard",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+            ),
+            PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_discard"),
         )
 
-
-        metadata.create_all(engine)
+        metadata.create_all(self.engine)
 
     # transaction stuff
-    def start_transaction(self):
-        if not self._in_transaction:
-            self.engine.begin()
-            self._in_transaction = True
+    def start_connection(self):
+        return self.engine.connect()
 
-    def end_transaction(self):
-        if self._in_transaction:
-            self.engine.commit()
-            self._in_transaction = False
+    def end_connection(self, con: Connection):
+        con.close()
 
-    def rollback_transaction(self):
-        if self._in_transaction:
-            self.engine.rollback()
-            self._in_transaction = False
+    def commit_connection(self, con: Connection):
+        con.commit()
 
-    def fresh_event_id(self, guild):
-        sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM Events WHERE guild_id = :guild_id")
-        result = self.engine.execute(sql, {'guild_id': guild}).scalar()
-        return result
+    def rollback_connection(self, con: Connection):
+        con.rollback()
 
-    def add_event(self, event: Event):
-        if isinstance(event, Database.Region.RegionRechargeEvent):
-            sql = text("INSERT INTO RegionRechargeEvents (id, guild_id, timestamp, region_id) VALUES (:id, :guild_id, :timestamp, :region_id)")
-            self.engine.execute(sql, {'id': event.id, 'guild_id': event.guild.id, 'timestamp': event.timestamp, 'region_id': event.region.id})
-        elif isinstance(event, Database.Creature.CreatureRechargeEvent):
-            sql = text("INSERT INTO CreatureRechargeEvents (id, guild_id, timestamp, creature_id) VALUES (:id, :guild_id, :timestamp, :creature_id)")
-            self.engine.execute(sql, {'id': event.id, 'guild_id': event.guild.id, 'timestamp': event.timestamp, 'creature_id': event.creature.id})
-        elif isinstance(event, Database.FreeCreature.FreeCreatureProtectedEvent):
-            sql = text("INSERT INTO FreeCreatureProtectedEvents (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)")
-            self.engine.execute(sql, {'id': event.id, 'guild_id': event.guild.id, 'timestamp': event.timestamp, 'free_creature_id': event.free_creature.id})
-        elif isinstance(event, Database.FreeCreature.FreeCreatureExpiresEvent):
-            sql = text("INSERT INTO FreeCreatureExpiresEvents (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)")
-            self.engine.execute(sql, {'id': event.id, 'guild_id': event.guild.id, 'timestamp': event.timestamp, 'free_creature_id': event.free_creature.id})
+    def fresh_event_id(self, guild, con=None):
+        with self.parent.transaction(con=con) as con:
+            sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
+            result = con.execute(sql, {"guild_id": guild}).scalar()
+            return result
 
-    def get_events(self, timestamp_start: int, timestamp_end: int) -> list[Event]:
-        results = []
-        tables = ['RegionRechargeEvents', 'CreatureRechargeEvents', 'FreeCreatureProtectedEvents', 'FreeCreatureExpiresEvents']
-        for table in tables:
-            sql = text(f"SELECT * FROM {table} WHERE timestamp BETWEEN :start AND :end")
-            result = self.engine.execute(sql, {'start': timestamp_start, 'end': timestamp_end}).fetchall()
-            results.extend(result)
-        return results
+    def add_event(self, event: Event, con=None):
+        with self.parent.transaction(con=con) as con:
+            if isinstance(event, Database.Region.RegionRechargeEvent):
+                sql = text(
+                    "INSERT INTO region_recharge_events (id, guild_id, timestamp, region_id) VALUES (:id, :guild_id, :timestamp, :region_id)"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "id": event.id,
+                        "guild_id": event.guild.id,
+                        "timestamp": event.timestamp,
+                        "region_id": event.region.id,
+                    },
+                )
+            elif isinstance(event, Database.Creature.CreatureRechargeEvent):
+                sql = text(
+                    "INSERT INTO creature_recharge_events (id, guild_id, timestamp, creature_id) VALUES (:id, :guild_id, :timestamp, :creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "id": event.id,
+                        "guild_id": event.guild.id,
+                        "timestamp": event.timestamp,
+                        "creature_id": event.creature.id,
+                    },
+                )
+            elif isinstance(event, Database.FreeCreature.FreeCreatureProtectedEvent):
+                sql = text(
+                    "INSERT INTO free_creature_protected_events (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "id": event.id,
+                        "guild_id": event.guild.id,
+                        "timestamp": event.timestamp,
+                        "free_creature_id": event.free_creature.id,
+                    },
+                )
+            elif isinstance(event, Database.FreeCreature.FreeCreatureExpiresEvent):
+                sql = text(
+                    "INSERT INTO free_creature_expires_events (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "id": event.id,
+                        "guild_id": event.guild.id,
+                        "timestamp": event.timestamp,
+                        "free_creature_id": event.free_creature.id,
+                    },
+                )
 
-    def add_guild(self, guild_id: int) -> Database.Guild:
+    def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
+        with self.parent.transaction(con=con) as con:
+            results = []
+            tables = [
+                "region_recharge_events",
+                "creature_recharge_events",
+                "free_creature_protected_events",
+                "free_creature_expires_events",
+            ]
+            for table in tables:
+                sql = text(f"SELECT * FROM {table} WHERE timestamp BETWEEN :start AND :end")
+                result = con.execute(
+                    sql, {"start": timestamp_start, "end": timestamp_end}
+                ).fetchall()
+                results.extend(result)
+            return results
+
+    def add_guild(self, guild_id: int, con=None) -> Database.Guild:
 
         guild = PostgresDatabase.Guild(self, guild_id, self.start_condition.start_config)
 
-        with self.parent.transaction():
-            sql_guild = text("""
-                INSERT INTO Guilds (guild_id, region_recharge, creature_recharge, free_protection, free_expire)
+        with self.transaction(con=con) as con:
+
+            sql_guild = text(
+                """
+                INSERT INTO guilds (id, region_recharge, creature_recharge, free_protection, free_expire)
                 VALUES (:guild_id, 10, 10, 5, 60)
-            """)
-            self.engine.execute(sql_guild, {'guild_id': guild_id})
+            """
+            )
+            con.execute(sql_guild, {"guild_id": guild_id})
 
             for base_region in self.start_condition.start_active_regions:
-                guild.add_region(base_region)
+                guild.add_region(base_region, con=con)
 
             for base_creature in self.start_condition.start_available_creatures:
-                guild.add_to_creature_pool(base_creature)
-
-
-        return PostgresDatabase.Guild(self, guild_id, self.start_condition.start_config)
-
-    def get_guilds(self):
-        sql = text("SELECT guild_id, region_recharge, creature_recharge, free_protection, free_expire FROM Guilds")
-        result = self.engine.execute(sql)
-        guilds = [PostgresDatabase.Guild(self, row['guild_id'], {
-            "region_recharge": row['region_recharge'],
-            "creature_recharge": row['creature_recharge'],
-            "free_protection": row['free_protection'],
-            "free_expire": row['free_expire']
-        }) for row in result]
-        return guilds
-
-    def get_guild(self, guild_id: int) -> Database.Guild:
-        sql = text("SELECT guild_id, region_recharge, creature_recharge, free_protection, free_expire FROM Guilds WHERE guild_id = :guild_id")
-        result = self.engine.execute(sql, {'guild_id': guild_id}).fetchone()
-
-        if not result:
-            raise GuildNotFound("None or too many guilds with this guild_id, needs to be unique")
-
-        guild = PostgresDatabase.Guild(self, result['guild_id'], {
-            "region_recharge": result['region_recharge'],
-            "creature_recharge": result['creature_recharge'],
-            "free_protection": result['free_protection'],
-            "free_expire": result['free_expire']
-        })
+                guild.add_to_creature_pool(base_creature, con=con)
 
         return guild
 
-    def remove_guild(self, guild: Database.Guild) -> Database.Guild:
-        sql = text("DELETE FROM Guilds WHERE guild_id = :guild_id")
-        self.engine.execute(sql, {'guild_id': guild.id})
-        return guild
+    def get_guilds(self, con=None):
+        with self.transaction(con=con) as con:
+            sql = text(
+                "SELECT id, region_recharge, creature_recharge, free_protection, free_expire FROM guilds"
+            )
+            result = con.execute(sql)
+            guilds = [
+                PostgresDatabase.Guild(
+                    self,
+                    row[0],
+                    {
+                        "region_recharge": row[1],
+                        "creature_recharge": row[2],
+                        "free_protection": row[3],
+                        "free_expire": row[4],
+                    },
+                )
+                for row in result
+            ]
+            return guilds
+
+    def get_guild(self, guild_id: int, con=None) -> Database.Guild:
+        with self.transaction(con=con) as con:
+            sql = text(
+                "SELECT id, region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE id = :id"
+            )
+            result = con.execute(sql, {"id": guild_id}).fetchone()
+
+            if not result:
+                raise GuildNotFound(
+                    "None or too many guilds with this guild_id, needs to be unique"
+                )
+
+            guild = PostgresDatabase.Guild(
+                self,
+                result[0],
+                {
+                    "region_recharge": result[1],
+                    "creature_recharge": result[2],
+                    "free_protection": result[3],
+                    "free_expire": result[4],
+                },
+            )
+
+            return guild
+
+    def remove_guild(self, guild: Database.Guild, con=None) -> Database.Guild:
+        with self.transaction(con=con) as con:
+            sql = text("DELETE FROM guilds WHERE guild_id = :guild_id")
+            con.execute(sql, {"guild_id": guild.id})
+            return guild
 
     class Guild(Database.Guild):
 
@@ -279,330 +397,601 @@ class PostgresDatabase(Database):
             super().__init__(parent, guild_id)
             self.config = config
 
-        def set_config(self, config: dict) -> None:
-            sql = text("""
-                UPDATE Guilds SET 
-                    region_recharge = :region_recharge, 
-                    creature_recharge = :creature_recharge, 
-                    free_protection = :free_protection, 
-                    free_expire = :free_expire 
-                WHERE guild_id = :guild_id
-            """)
-            self.parent.engine.execute(sql, {
-                'guild_id': self.id,
-                'region_recharge': config['region_recharge'],
-                'creature_recharge': config['creature_recharge'],
-                'free_protection': config['free_protection'],
-                'free_expire': config['free_expire']
-            })
-            self.config = config
+        def set_config(self, config: dict, con=None) -> None:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    UPDATE Guilds SET 
+                        region_recharge = :region_recharge, 
+                        creature_recharge = :creature_recharge, 
+                        free_protection = :free_protection, 
+                        free_expire = :free_expire 
+                    WHERE guild_id = :guild_id
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "guild_id": self.id,
+                        "region_recharge": config["region_recharge"],
+                        "creature_recharge": config["creature_recharge"],
+                        "free_protection": config["free_protection"],
+                        "free_expire": config["free_expire"],
+                    },
+                )
 
-        def get_config(self) -> dict:
-            sql = text("SELECT region_recharge, creature_recharge, free_protection, free_expire FROM Guilds WHERE guild_id = :guild_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchone()
-            if result:
-                self.config = {
-                    'region_recharge': result['region_recharge'],
-                    'creature_recharge': result['creature_recharge'],
-                    'free_protection': result['free_protection'],
-                    'free_expire': result['free_expire']
-                }
-            return self.config
+        def get_config(self, con=None) -> dict:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE guild_id = :guild_id"
+                )
+                result = con.execute(sql, {"guild_id": self.id}).fetchone()
+                if result:
+                    self.config = {
+                        "region_recharge": result[0],
+                        "creature_recharge": result[1],
+                        "free_protection": result[2],
+                        "free_expire": result[3],
+                    }
+                return self.config
 
-        def fresh_region_id(self) -> int:
-            sql = text("SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM Regions WHERE guild_id = :guild_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.id}).scalar()
-            return result
+        def fresh_region_id(self, con=None) -> int:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
+                )
+                result = con.execute(sql, {"guild_id": self.id}).scalar()
+                return result
 
-        def add_region(self, base_region: BaseRegion) -> Database.Region:
-            region_id = self.fresh_region_id()
-            sql = text("""
-                INSERT INTO Regions (id, guild_id, base_region_id)
-                VALUES (:id, :guild_id, :base_region_id)
-            """)
-            self.parent.engine.execute(sql, {'id': region_id, 'guild_id': self.id, 'base_region_id': base_region.id})
-            return PostgresDatabase.Region(self.parent, region_id, base_region)
+        def add_region(self, base_region: BaseRegion, con=None) -> Database.Region:
+            with self.parent.transaction(con=con) as con:
+                region_id = self.fresh_region_id(con=con)
+                sql = text(
+                    """
+                    INSERT INTO regions (id, guild_id, base_region_id)
+                    VALUES (:id, :guild_id, :base_region_id)
+                """
+                )
+                con.execute(
+                    sql, {"id": region_id, "guild_id": self.id, "base_region_id": base_region.id}
+                )
+                return PostgresDatabase.Region(self.parent, region_id, base_region, self)
 
-        def get_regions(self):
-            sql = text("SELECT id, guild_id, base_region_id FROM Regions WHERE guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchall()
-            return [PostgresDatabase.Region(self.parent, row['id'], regions[row['base_region_id']], row['guild_id']) for row in results]
+        def get_regions(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("SELECT id, base_region_id FROM regions WHERE guild_id = :guild_id")
+                results = con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [
+                    PostgresDatabase.Region(self.parent, row[0], regions[row[1]], self)
+                    for row in results
+                ]
 
-        def get_region(self, region_id: int) -> Database.Region:
-            sql = text("SELECT id, guild_id, base_region_id FROM Regions WHERE id = :id AND guild_id = :guild_id")
-            result = self.parent.engine.execute(sql, {'id': region_id, 'guild_id': self.id}).fetchone()
-            if not result:
-                raise RegionNotFound("None or too many regions with this base region, needs to be unique")
-            return PostgresDatabase.Region(self.parent, result['id'], regions[result['base_region_id']], result['guild_id'])
+        def get_region(self, region_id: int, con=None) -> Database.Region:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT id, base_region_id FROM regions WHERE id = :id AND guild_id = :guild_id"
+                )
+                result = con.execute(sql, {"id": region_id, "guild_id": self.id}).fetchone()
+                if not result:
+                    raise RegionNotFound(
+                        "None or too many regions with this base region, needs to be unique"
+                    )
+                return PostgresDatabase.Region(self.parent, result[0], regions[result[1]], self)
 
-        def remove_region(self, region: Database.Region) -> Database.Region:
-            sql = text("DELETE FROM Regions WHERE id = :id AND guild_id = :guild_id")
-            self.parent.engine.execute(sql, {'id': region.id, 'guild_id': self.id})
-            return region
+        def remove_region(self, region: Database.Region, con=None) -> Database.Region:
+            with self.parent.transaction(con=con) as con:
+                sql = text("DELETE FROM regions WHERE id = :id AND guild_id = :guild_id")
+                con.execute(sql, {"id": region.id, "guild_id": self.id})
+                return region
 
-        def add_player(self, player_id: int) -> Database.Player:
-            player = PostgresDatabase.Player(self.parent, self, player_id)
+        def add_player(self, player_id: int, con=None) -> Database.Player:
+            player = PostgresDatabase.Player(self.parent, player_id, self)
 
-            with self.parent.transaction():
-                sql_player = text("INSERT INTO Players (id, guild_id) VALUES (:player_id, :guild_id)")
+            with self.parent.transaction(con=con) as con:
+                sql_player = text(
+                    "INSERT INTO players (id, guild_id) VALUES (:player_id, :guild_id)"
+                )
 
-                self.parent.engine.execute(sql_player, {'player_id': player_id, 'guild_id': self.id})
+                con.execute(sql_player, {"player_id": player_id, "guild_id": self.id})
 
                 for base_creature in self.parent.start_condition.start_deck:
-                    creature = self.add_creature(base_creature, player)
-                    player.add_to_discard(creature)
+                    creature = self.add_creature(base_creature, player, con=con)
+                    player.add_to_discard(creature, con=con)
 
-            return 
-
-        def get_players(self):
-            sql = text("SELECT id FROM Players WHERE guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchall()
-            return [PostgresDatabase.Player(self.parent, self, row['id']) for row in results]
-
-        def get_player(self, player_id: int) -> Database.Player:
-            sql = text("SELECT id FROM Players WHERE guild_id = :guild_id AND id = :player_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.id, 'player_id': player_id}).fetchone()
-            if not result:
-                raise PlayerNotFound("None or too many players with this player_id, needs to be unique")
-            return PostgresDatabase.Player(self.parent, self, result['id'])
-
-        def remove_player(self, player: Database.Player) -> Database.Player:
-            sql = text("DELETE FROM Players WHERE guild_id = :guild_id AND id = :player_id")
-            self.parent.engine.execute(sql, {'guild_id': self.id, 'player_id': player.id})
             return player
 
-        def fresh_creature_id(self) -> int:
-            sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM Creatures WHERE guild_id = :guild_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.id}).scalar()
-            return result
+        def get_players(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("SELECT id FROM players WHERE guild_id = :guild_id")
+                results = con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [PostgresDatabase.Player(self.parent, row[0], self) for row in results]
 
-        def add_creature(self, creature: BaseCreature, owner: Database.Player) -> Database.Creature:
-            creature_id = self.fresh_creature_id()
-            sql = text("""
-                INSERT INTO Creatures (id, guild_id, base_creature_id, owner_id)
-                VALUES (:id, :guild_id, :base_creature_id, :owner_id)
-            """)
-            self.parent.engine.execute(sql, {'id': creature_id, 'guild_id': self.id, 'base_creature_id': creature.id, 'owner_id': owner.id})
-            return PostgresDatabase.Creature(self.parent, creature_id, creature, self, owner)
+        def get_player(self, player_id: int, con=None) -> Database.Player:
+            with self.parent.transaction(con=con) as con:
+                sql = text("SELECT id FROM players WHERE guild_id = :guild_id AND id = :player_id")
+                result = con.execute(sql, {"guild_id": self.id, "player_id": player_id}).fetchone()
+                if not result:
+                    raise PlayerNotFound(
+                        "None or too many players with this player_id, needs to be unique"
+                    )
+                return PostgresDatabase.Player(self.parent, result[0], self)
 
-        def get_creatures(self):
-            sql = text("SELECT id, base_creature_id, owner_id FROM Creatures WHERE guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchall()
-            return [PostgresDatabase.Creature(self.parent, row['id'], creatures[row['base_creature_id']], self, row['owner_id']) for row in results]
+        def remove_player(self, player: Database.Player, con=None) -> Database.Player:
+            with self.parent.transaction(con=con) as con:
+                sql = text("DELETE FROM players WHERE guild_id = :guild_id AND id = :player_id")
+                con.execute(sql, {"guild_id": self.id, "player_id": player.id})
+                return player
 
-        def get_creature(self, creature_id: int) -> Database.Creature:
-            sql = text("SELECT id, base_creature_id, owner_id FROM Creatures WHERE id = :creature_id AND guild_id = :guild_id")
-            result = self.parent.engine.execute(sql, {'creature_id': creature_id, 'guild_id': self.id}).fetchone()
-            if not result:
-                raise CreatureNotFound("None or too many creatures with this id, needs to be unique")
-            return PostgresDatabase.Creature(self.parent, result['id'], creatures[result['base_creature_id']], self, result['owner_id'])
+        def fresh_creature_id(self, con=None) -> int:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT COALESCE(MAX(id), -1) + 1 FROM creatures WHERE guild_id = :guild_id"
+                )
+                result = con.execute(sql, {"guild_id": self.id}).scalar()
+                return result
 
-        def remove_creature(self, creature: Database.Creature):
-            sql = text("DELETE FROM Creatures WHERE id = :id AND guild_id = :guild_id")
-            self.parent.engine.execute(sql, {'id': creature.id, 'guild_id': self.id})
-            return creature
+        def add_creature(
+            self, creature: BaseCreature, owner: Database.Player, con=None
+        ) -> Database.Creature:
+            with self.parent.transaction(con=con) as con:
+                creature_id = self.fresh_creature_id()
+                sql = text(
+                    """
+                    INSERT INTO creatures (id, guild_id, base_creature_id, owner_id)
+                    VALUES (:id, :guild_id, :base_creature_id, :owner_id)
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "id": creature_id,
+                        "guild_id": self.id,
+                        "base_creature_id": creature.id,
+                        "owner_id": owner.id,
+                    },
+                )
+                return PostgresDatabase.Creature(self.parent, creature_id, creature, self, owner)
 
-        def add_to_creature_pool(self, base_creature: BaseCreature):
-            sql = text("INSERT INTO BaseCreatures (id, guild_id) VALUES (:id, :guild_id)")
-            self.parent.engine.execute(sql, {'id': base_creature.id, 'guild_id': self.id})
+        def get_creatures(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT id, base_creature_id, owner_id FROM creatures WHERE guild_id = :guild_id"
+                )
+                results = con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [
+                    PostgresDatabase.Creature(
+                        self.parent,
+                        row[0],
+                        creatures[row[1]],
+                        self,
+                        PostgresDatabase.Player(self.parent, row[2], self),
+                    )
+                    for row in results
+                ]
 
-        def get_creature_pool(self):
-            sql = text("SELECT id FROM BaseCreatures WHERE guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchall()
-            return [result['id'] for result in results]
+        def get_creature(self, creature_id: int, con=None) -> Database.Creature:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT id, base_creature_id, owner_id FROM creatures WHERE id = :creature_id AND guild_id = :guild_id"
+                )
+                result = con.execute(
+                    sql, {"creature_id": creature_id, "guild_id": self.id}
+                ).fetchone()
+                if not result:
+                    raise CreatureNotFound(
+                        "None or too many creatures with this id, needs to be unique"
+                    )
+                return PostgresDatabase.Creature(
+                    self.parent,
+                    result[0],
+                    creatures[result[1]],
+                    self,
+                    PostgresDatabase.Player(self.parent, result[2], self),
+                )
 
-        def get_random_from_creature_pool(self) -> int:
-            creature_pool = self.get_creature_pool()
-            if not creature_pool:
-                raise ValueError("Creature pool is empty")
-            return random.choice(creature_pool)
+        def remove_creature(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("DELETE FROM creatures WHERE id = :id AND guild_id = :guild_id")
+                con.execute(sql, {"id": creature.id, "guild_id": self.id})
+                return creature
 
-        def remove_from_creature_pool(self, base_creature: BaseCreature):
-            sql = text("DELETE FROM BaseCreatures WHERE id = :id AND guild_id = :guild_id")
-            self.parent.engine.execute(sql, {'id': base_creature.id, 'guild_id': self.id})
+        def add_to_creature_pool(self, base_creature: BaseCreature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("INSERT INTO base_creatures (id, guild_id) VALUES (:id, :guild_id)")
+                con.execute(sql, {"id": base_creature.id, "guild_id": self.id})
 
-        def add_free_creature(self, base_creature: BaseCreature, channel_id: int, message_id: int, roller_id: int) -> Database.FreeCreature:
-            timestamp_protected = self.parent.timestamp_after(self.config["free_protection"])
-            timestamp_expires = self.parent.timestamp_after(self.config["free_expire"])
-            sql = text("""
-                INSERT INTO FreeCreatures (base_creature_id, guild_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires)
-                VALUES (:base_creature_id, :guild_id, :channel_id, :message_id, :roller_id, :timestamp_protected, :timestamp_expires)
-            """)
-            self.parent.engine.execute(sql, {
-                'base_creature_id': base_creature.id,
-                'guild_id': self.id,
-                'channel_id': channel_id,
-                'message_id': message_id,
-                'roller_id': roller_id,
-                'timestamp_protected': timestamp_protected,
-                'timestamp_expires': timestamp_expires
-            })
-            return PostgresDatabase.FreeCreature(self.parent, base_creature, self, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires)
+        def get_creature_pool(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("SELECT id FROM base_creatures WHERE guild_id = :guild_id")
+                results = con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [result[0] for result in results]
 
-        def get_free_creatures(self):
-            sql = text("SELECT * FROM FreeCreatures WHERE guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'guild_id': self.id}).fetchall()
-            return [PostgresDatabase.FreeCreature(self.parent, creatures[row['base_creature_id']], self, row['channel_id'], row['message_id'], row['roller_id'], row['timestamp_protected'], row['timestamp_expires']) for row in results]
+        def get_random_from_creature_pool(self, con=None) -> int:
+            with self.parent.transaction(con=con) as con:
+                creature_pool = self.get_creature_pool()
+                if not creature_pool:
+                    raise ValueError("Creature pool is empty")
+                return random.choice(creature_pool)
 
-        def get_free_creature(self, channel_id: int, message_id: int) -> Database.FreeCreature:
-            sql = text("SELECT * FROM FreeCreatures WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.id, 'channel_id': channel_id, 'message_id': message_id}).fetchone()
-            if not result:
-                raise CreatureNotFound("None or too many creatures with this id, needs to be unique")
-            return PostgresDatabase.FreeCreature(self.parent, creatures[result['base_creature_id']], self, result['channel_id'], result['message_id'], result['roller_id'], result['timestamp_protected'], result['timestamp_expires'])
+        def remove_from_creature_pool(self, base_creature: BaseCreature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text("DELETE FROM base_creatures WHERE id = :id AND guild_id = :guild_id")
+                con.execute(sql, {"id": base_creature.id, "guild_id": self.id})
 
-        def remove_free_creature(self, creature: Database.FreeCreature):
-            sql = text("DELETE FROM FreeCreatures WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id")
-            self.parent.engine.execute(sql, {'guild_id': self.id, 'channel_id': creature.channel_id, 'message_id': creature.message_id})
-            return creature
+        def add_free_creature(
+            self,
+            base_creature: BaseCreature,
+            channel_id: int,
+            message_id: int,
+            roller_id: int,
+            con=None,
+        ) -> Database.FreeCreature:
+            with self.parent.transaction(con=con) as con:
+                timestamp_protected = self.parent.timestamp_after(self.config["free_protection"])
+                timestamp_expires = self.parent.timestamp_after(self.config["free_expire"])
+                sql = text(
+                    """
+                    INSERT INTO free_creatures (base_creature_id, guild_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires)
+                    VALUES (:base_creature_id, :guild_id, :channel_id, :message_id, :roller_id, :timestamp_protected, :timestamp_expires)
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "base_creature_id": base_creature.id,
+                        "guild_id": self.id,
+                        "channel_id": channel_id,
+                        "message_id": message_id,
+                        "roller_id": roller_id,
+                        "timestamp_protected": timestamp_protected,
+                        "timestamp_expires": timestamp_expires,
+                    },
+                )
+                return PostgresDatabase.FreeCreature(
+                    self.parent,
+                    base_creature,
+                    self,
+                    channel_id,
+                    message_id,
+                    roller_id,
+                    timestamp_protected,
+                    timestamp_expires,
+                )
+
+        def get_free_creatures(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = """
+                    SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
+                    FROM free_creatures 
+                    WHERE guild_id = :guild_id
+                """
+                results = con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [
+                    PostgresDatabase.FreeCreature(
+                        self.parent, creatures[row[0]], self, row[1], row[2], row[3], row[4], row[5]
+                    )
+                    for row in results
+                ]
+
+        def get_free_creature(
+            self, channel_id: int, message_id: int, con=None
+        ) -> Database.FreeCreature:
+            with self.parent.transaction(con=con) as con:
+                sql = """
+                    SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
+                    FROM free_creatures 
+                    WHERE guild_id = :guild_id 
+                    AND channel_id = :channel_id 
+                    AND message_id = :message_id
+                """
+                result = con.execute(
+                    sql, {"guild_id": self.id, "channel_id": channel_id, "message_id": message_id}
+                ).fetchone()
+                if not result:
+                    raise CreatureNotFound(
+                        "None or too many creatures with this id, needs to be unique"
+                    )
+                return PostgresDatabase.FreeCreature(
+                    self.parent,
+                    creatures[result[0]],
+                    self,
+                    result[1],
+                    result[2],
+                    result[3],
+                    result[4],
+                    result[5],
+                )
+
+        def remove_free_creature(self, creature: Database.FreeCreature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "DELETE FROM free_creatures WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "guild_id": self.id,
+                        "channel_id": creature.channel_id,
+                        "message_id": creature.message_id,
+                    },
+                )
+                return creature
 
     class Region(Database.Region):
 
         def __init__(self, parent: Database, id: int, region: BaseRegion, guild: Database.Guild):
             super().__init__(parent, id, region, guild)
 
-        def occupy(self, creature: Database.Creature):
-            with self.parent.transaction():
-                if self.is_occupied():
+        def occupy(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(con=con) as con:
+                if self.is_occupied(con=con):
                     raise Exception("Trying to occupy an occupied region")
 
-                until = self.parent.timestamp_after(self.guild.get_config()["region_recharge"])
-                sql = text("""
-                    INSERT INTO Occupies (guild_id, creature_id, region_id, timestamp_occupied)
+                until = self.parent.timestamp_after(
+                    self.guild.get_config(con=con)["region_recharge"]
+                )
+                sql = text(
+                    """
+                    INSERT INTO occupies (guild_id, creature_id, region_id, timestamp_occupied)
                     VALUES (:guild_id, :creature_id, :region_id, :timestamp)
-                """)
-                self.parent.engine.execute(sql, {
-                    'guild_id': self.guild.id,
-                    'creature_id': creature.id,
-                    'region_id': self.id,
-                    'timestamp': until
-                })
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "guild_id": self.guild.id,
+                        "creature_id": creature.id,
+                        "region_id": self.id,
+                        "timestamp": until,
+                    },
+                )
 
-                event_id = self.parent.fresh_event_id(self.guild)
-                self.parent.add_event(Event(event_id, self.parent, until, self.guild))
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                self.parent.add_event(
+                    Database.Region.RegionRechargeEvent(
+                        self.parent, event_id, self.guild, until, self
+                    ),
+                    con=con,
+                )
 
-        def unoccupy(self, current: int):
-            with self.parent.transaction():
-                occupant, until = self.occupied()
+        def unoccupy(self, current: int, con=None):
+            with self.parent.transaction(con=con) as con:
+                occupant, until = self.occupied(con=con)
                 if occupant is None:
                     raise Exception("Trying to unoccupy an already free region")
                 if current < until:
                     raise Exception("Trying to unoccupy with too early timestamp")
 
-                sql = text("DELETE FROM Occupies WHERE guild_id = :guild_id AND region_id = :region_id")
-                self.parent.engine.execute(sql, {'guild_id': self.guild.id, 'region_id': self.id})
+                sql = text(
+                    "DELETE FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
+                )
+                con.execute(sql, {"guild_id": self.guild.id, "region_id": self.id})
                 self.occupant = None
 
-        def occupied(self) -> tuple[Database.Creature, int]:
-            sql = text("SELECT creature_id, timestamp_occupied FROM Occupies WHERE guild_id = :guild_id AND region_id = :region_id")
-            result = self.parent.engine.execute(sql, {'guild_id': self.guild.id, 'region_id': self.id}).fetchone()
-            if result:
-                creature = Database.Creature(self.parent, result['creature_id'], self.guild)
-                return (creature, result['timestamp_occupied'])
-            return (None, None)
+        def occupied(self, con=None) -> tuple[Database.Creature, int]:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT creature_id, timestamp_occupied FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
+                )
+                result = con.execute(
+                    sql, {"guild_id": self.guild.id, "region_id": self.id}
+                ).fetchone()
+                if result:
+                    creature = Database.Creature(self.parent, result[0], self.guild)
+                    return (creature, result[1])
+                return (None, None)
 
-        def is_occupied(self) -> bool:
-            sql = text("SELECT COUNT(*) FROM Occupies WHERE guild_id = :guild_id AND region_id = :region_id")
-            count = self.parent.engine.execute(sql, {'guild_id': self.guild.id, 'region_id': self.id}).scalar()
-            return count > 0
+        def is_occupied(self, con=None) -> bool:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT COUNT(*) FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
+                )
+                count = con.execute(sql, {"guild_id": self.guild.id, "region_id": self.id}).scalar()
+                return count > 0
 
     class Player(Database.Player):
-        def __init__(self, parent: Database, guild_id: int, user_id: int):
-            super().__init__(parent, guild_id, user_id)
+        def __init__(self, parent: Database, user_id: int, guild: Database.Guild):
+            super().__init__(parent, user_id, guild)
 
-        def get_resources(self):
-            sql = text("SELECT resource_type, quantity FROM Resources WHERE player_id = :player_id AND guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id}).fetchall()
-            return {Resource(result['resource_type']): result['quantity'] for result in results}
+        def get_resources(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT resource_type, quantity FROM resources WHERE player_id = :player_id AND guild_id = :guild_id"
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return {Resource(result[0]): result[1] for result in results}
 
-        def set_resources(self, resources: dict[Resource, int]):
-            with self.parent.transaction():
+        def set_resources(self, resources: dict[Resource, int], con=None):
+            with self.parent.transaction(con=con) as con:
                 for resource_type, quantity in resources.items():
-                    sql = text("""
+                    sql = text(
+                        """
                         UPDATE Resources SET quantity = :quantity 
                         WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type
-                    """)
-                    self.parent.engine.execute(sql, {'quantity': quantity, 'player_id': self.user_id, 'guild_id': self.guild_id, 'resource_type': int(resource_type)})
+                    """
+                    )
+                    con.execute(
+                        sql,
+                        {
+                            "quantity": quantity,
+                            "player_id": self.id,
+                            "guild_id": self.guild.id,
+                            "resource_type": resource_type.value,
+                        },
+                    )
 
-        def has(self, resource: Resource, amount: int) -> bool:
-            sql = text("SELECT quantity FROM Resources WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type")
-            result = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'resource_type': int(resource)}).scalar()
-            return result >= amount if result else False
+        def has(self, resource: Resource, amount: int, con=None) -> bool:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT quantity FROM resources WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type"
+                )
+                result = con.execute(
+                    sql,
+                    {
+                        "player_id": self.id,
+                        "guild_id": self.guild.id,
+                        "resource_type": resource.value,
+                    },
+                ).scalar()
+                return result >= amount if result else False
 
-        def give(self, resource: Resource, amount: int):
-            sql = text("""
-                UPDATE Resources SET quantity = quantity + :amount 
-                WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type
-            """)
-            self.parent.engine.execute(sql, {'amount': amount, 'player_id': self.user_id, 'guild_id': self.guild_id, 'resource_type': int(resource)})
+        def give(self, resource: Resource, amount: int, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    UPDATE Resources SET quantity = quantity + :amount 
+                    WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "amount": amount,
+                        "player_id": self.id,
+                        "guild_id": self.guild.id,
+                        "resource_type": resource.value,
+                    },
+                )
 
-        def get_deck(self):
-            sql = text("SELECT creature_id FROM Deck WHERE player_id = :player_id AND guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id}).fetchall()
-            return [result['creature_id'] for result in results]
+        def get_deck(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT creature_id FROM deck WHERE player_id = :player_id AND guild_id = :guild_id"
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return [result[0] for result in results]
 
-        def get_hand(self):
-            sql = text("SELECT creature_id FROM Hand WHERE player_id = :player_id AND guild_id = :guild_id ORDER BY order")
-            results = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id}).fetchall()
-            return [result['creature_id'] for result in results]
+        def get_hand(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT creature_id FROM played WHERE player_id = :player_id AND guild_id = :guild_id ORDER BY order"
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return [result[0] for result in results]
 
-        def get_discard(self):
-            sql = text("SELECT creature_id FROM Discard WHERE player_id = :player_id AND guild_id = :guild_id")
-            results = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id}).fetchall()
-            return [result['creature_id'] for result in results]
+        def get_discard(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "SELECT creature_id FROM discard WHERE player_id = :player_id AND guild_id = :guild_id"
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return [result[0] for result in results]
 
-        def draw_card_raw(self):
-            
-            with self.parent.transaction():
-                sql = text("""
-                    SELECT creature_id FROM Deck 
+        def draw_card_raw(self, con=None):
+
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    SELECT creature_id FROM deck 
                     WHERE player_id = :player_id AND guild_id = :guild_id 
                     ORDER BY RANDOM() 
                     LIMIT 1
-                """)
-                result = self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id}).fetchone()
+                """
+                )
+                result = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchone()
 
                 if not result:
                     raise EmptyDeckException()
 
-                drawn_card = result['creature_id']
+                drawn_card = result["creature_id"]
 
-                sql = text("""
-                    DELETE FROM Deck 
+                sql = text(
+                    """
+                    DELETE FROM deck 
                     WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id
-                """)
-                self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': drawn_card})
+                """
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card},
+                )
 
-                sql = text("""
-                    INSERT INTO Hand (player_id, guild_id, creature_id, order)
-                    VALUES (:player_id, :guild_id, :creature_id, (SELECT COALESCE(MAX(order), 0) + 1 FROM Hand WHERE player_id = :player_id AND guild_id = :guild_id))
-                """)
-                self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': drawn_card})
+                sql = text(
+                    """
+                    INSERT INTO hand (player_id, guild_id, creature_id, order)
+                    VALUES (:player_id, :guild_id, :creature_id, (SELECT COALESCE(MAX(order), 0) + 1 FROM played WHERE player_id = :player_id AND guild_id = :guild_id))
+                """
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card},
+                )
 
             return drawn_card
 
-        def reshuffle_discard(self):
-            with self.parent.transaction():
-                discard = self.get_discard()
+        def reshuffle_discard(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                discard = self.get_discard(con=con)
                 for creature_id in discard:
-                    sql = text("DELETE FROM Discard WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id")
-                    self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature_id})
-                    sql = text("INSERT INTO Deck (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)")
-                    self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature_id})
+                    sql = text(
+                        "DELETE FROM discard WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                    )
+                    con.execute(
+                        sql,
+                        {
+                            "player_id": self.id,
+                            "guild_id": self.guild.id,
+                            "creature_id": creature_id,
+                        },
+                    )
+                    sql = text(
+                        "INSERT INTO deck (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                    )
+                    con.execute(
+                        sql,
+                        {
+                            "player_id": self.id,
+                            "guild_id": self.guild.id,
+                            "creature_id": creature_id,
+                        },
+                    )
 
-        def delete_creature_from_hand(self, creature: Database.Creature):
-            sql = text("DELETE FROM Hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id")
-            self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature.id})
+        def delete_creature_from_hand(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
 
-        def play_creature(self, creature: Database.Creature):
-            sql = text("DELETE FROM Hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id")
-            self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature.id})
-            sql = text("INSERT INTO Played (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)")
-            self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature.id})
+        def play_creature(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+                sql = text(
+                    "INSERT INTO played (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
 
-        def add_to_discard(self, creature: Database.Creature):
-            sql = text("INSERT INTO Discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)")
-            self.parent.engine.execute(sql, {'player_id': self.user_id, 'guild_id': self.guild_id, 'creature_id': creature.id})
+        def add_to_discard(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
 
     class Creature(Database.Creature):
 
@@ -642,53 +1031,75 @@ class PostgresDatabase(Database):
             self.timestamp_protected = timestamp_protected
             self.timestamp_expires = timestamp_expires
 
-        def get_protected_timestamp(self) -> int:
-            sql = text("""
-                SELECT timestamp_protected FROM FreeCreatures
-                WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
-            """)
-            result = self.parent.engine.execute(sql, {
-                'guild_id': self.guild.id, 'channel_id': self.channel_id, 'message_id': self.message_id
-            }).scalar()
-            return result
+        def get_protected_timestamp(self, con=None) -> int:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    SELECT timestamp_protected FROM free_creatures
+                    WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
+                """
+                )
+                result = con.execute(
+                    sql,
+                    {
+                        "guild_id": self.guild.id,
+                        "channel_id": self.channel_id,
+                        "message_id": self.message_id,
+                    },
+                ).scalar()
+                return result
 
-        def get_expires_timestamp(self) -> int:
-            sql = text("""
-                SELECT timestamp_expires FROM FreeCreatures
-                WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
-            """)
-            result = self.parent.engine.execute(sql, {
-                'guild_id': self.guild.id, 'channel_id': self.channel_id, 'message_id': self.message_id
-            }).scalar()
-            return result
+        def get_expires_timestamp(self, con=None) -> int:
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    SELECT timestamp_expires FROM free_creatures
+                    WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
+                """
+                )
+                result = con.execute(
+                    sql,
+                    {
+                        "guild_id": self.guild.id,
+                        "channel_id": self.channel_id,
+                        "message_id": self.message_id,
+                    },
+                ).scalar()
+                return result
 
-        def claimed(self):
-            sql = text("""
-                DELETE FROM FreeCreatures
-                WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
-            """)
-            self.parent.engine.execute(sql, {
-                'guild_id': self.guild.id, 'channel_id': self.channel_id, 'message_id': self.message_id
-            })
-            self.remove_related_events()
+        def claimed(self, con=None):
+            with self.parent.transaction(con=con) as con:
+                sql = text(
+                    """
+                    DELETE FROM free_creatures
+                    WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
+                """
+                )
+                con.execute(
+                    sql,
+                    {
+                        "guild_id": self.guild.id,
+                        "channel_id": self.channel_id,
+                        "message_id": self.message_id,
+                    },
+                )
+                self.remove_related_events(con=con)
 
-        def remove_related_events(self):
-            with self.parent.transaction():
+        def remove_related_events(self, con=None):
+            with self.parent.transaction(con=con) as con:
 
-                sql_protected = text("""
-                    DELETE FROM FreeCreatureProtectedEvents
+                sql_protected = text(
+                    """
+                    DELETE FROM free_creature_protected_events
                     WHERE guild_id = :guild_id AND free_creature_id = :free_creature_id
-                """)
-                self.parent.engine.execute(sql_protected, {
-                    'guild_id': self.guild.id,
-                    'free_creature_id': self.id
-                })
+                """
+                )
+                con.execute(sql_protected, {"guild_id": self.guild.id, "free_creature_id": self.id})
 
-                sql_expires = text("""
-                    DELETE FROM FreeCreatureExpiresEvents
+                sql_expires = text(
+                    """
+                    DELETE FROM free_creature_expires_events
                     WHERE guild_id = :guild_id AND free_creature_id = :free_creature_id
-                """)
-                self.parent.engine.execute(sql_expires, {
-                    'guild_id': self.guild.id,
-                    'free_creature_id': self.id
-                })
+                """
+                )
+                con.execute(sql_expires, {"guild_id": self.guild.id, "free_creature_id": self.id})

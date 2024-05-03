@@ -25,13 +25,13 @@ def are_subsets(a: list, b: list):
             return False
     return True
 
+
 def test_postgres():
 
     with PostgresContainer("postgres:16") as postgres:
         engine = sqlalchemy.create_engine(postgres.get_connection_url())
         postgres_db = PostgresDatabase(start_condition, engine)
-        
-        
+        run_test_on_specific_db(postgres_db)
 
 
 def run_test_on_specific_db(test_db: Database):
