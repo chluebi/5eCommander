@@ -35,12 +35,12 @@ def test_postgres():
 
 
 def run_test_on_specific_db(test_db: Database):
-    guild_db = test_db.add_guild(1)
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     assert test_db.get_guild(guild_db.id) == guild_db
     assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
 
-    player1_db = guild_db.add_player(1)
+    player1_db: Database.Player = guild_db.add_player(1)
 
     assert guild_db.get_player(player1_db.id) == player1_db
     assert player1_db.has(Resource.GOLD, 0) == True
@@ -57,7 +57,7 @@ def run_test_on_specific_db(test_db: Database):
     guild_db.remove_player(player1_db)
     got_error = False
     try:
-        guild_db.get_player(player1_db)
+        guild_db.get_player(player1_db.id)
     except PlayerNotFound:
         got_error = True
 
@@ -172,7 +172,7 @@ def run_test_on_specific_db(test_db: Database):
     player7_db: PostgresDatabase.Player = guild_db.add_player(7)
     assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
-    creature1_db: PostgresDatabase.Creature = guild_db.add_creature(Commoner(), player7_db.id)
+    creature1_db: PostgresDatabase.Creature = guild_db.add_creature(Commoner(), player7_db)
     player7_db.add_to_discard(creature1_db)
 
     assert player7_db.get_discard() == [creature1_db]
@@ -199,7 +199,7 @@ def run_test_on_specific_db(test_db: Database):
     assert isinstance(creature2_db.creature, Commoner)
 
     region1_db: PostgresDatabase.Region = guild_db.get_regions()[0]
-    assert region1_db.occupied() is None
+    assert region1_db.occupied() == (None, None)
     assert isinstance(region1_db.region, Village)
 
     assert len(test_db.get_events(0, time.time() * 2)) == 0
@@ -243,7 +243,7 @@ def run_test_on_specific_db(test_db: Database):
     assert free_creature1_db.is_protected(time.time())
     assert not free_creature1_db.is_expired(time.time())
 
-    free_creature1_db.claim(time.time(), player8_db)
+    free_creature1_db.claim(time.time() + guild_db.get_config()['free_protection'], player8_db)
 
     resources[Resource.RALLY] -= 1
     assert player8_db.get_resources() == resources

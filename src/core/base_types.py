@@ -463,9 +463,6 @@ class Database:
         def get_hand(self, con=None):
             pass
 
-        def get_played(self, con=None):
-            pass
-
         def get_discard(self, con=None):
             pass
 
@@ -474,7 +471,6 @@ class Database:
                 return sorted(
                     self.get_deck(con=con)
                     + self.get_hand(con=con)
-                    + self.get_played(con=con)
                     + self.get_discard(con=None),
                     key=lambda x: str(x),
                 )
@@ -688,7 +684,7 @@ class Database:
 
                 self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
-                        self.parent.fresh_event_id(self.guild), self.parent, self.guild, until, self
+                        self.parent, self.parent.fresh_event_id(self.guild), self.guild, until, self
                     ),
                     con=con,
                 )

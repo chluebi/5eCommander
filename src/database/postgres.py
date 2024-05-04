@@ -55,14 +55,24 @@ class PostgresDatabase(Database):
             Column("free_expire", Integer, nullable=False, default=60),
         )
 
+        events_table = Table(
+            "events",
+            metadata,
+            Column("id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("timestamp", BigInteger, nullable=False),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
+            PrimaryKeyConstraint("id", "guild_id", name="pk_events")
+        )
+
         region_recharge_event_table = Table(
             "region_recharge_events",
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            Column("timestamp", BigInteger, nullable=False),
             Column("region_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(["region_id", "guild_id"], ["regions.id", "regions.guild_id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_region_recharge_events"),
         )
 
@@ -71,9 +81,9 @@ class PostgresDatabase(Database):
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            Column("timestamp", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(["creature_id", "guild_id"], ["creatures.id", "creatures.guild_id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_creature_recharge_events"),
         )
 
@@ -82,9 +92,10 @@ class PostgresDatabase(Database):
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            Column("timestamp", BigInteger, nullable=False),
-            Column("free_creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            Column("free_creature_channel_id", BigInteger, nullable=False),
+            Column("free_creature_message_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(["guild_id", "free_creature_channel_id", "free_creature_message_id"], ["free_creatures.guild_id", "free_creatures.channel_id", "free_creatures.message_id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_protected_events"),
         )
 
@@ -93,9 +104,10 @@ class PostgresDatabase(Database):
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            Column("timestamp", BigInteger, nullable=False),
-            Column("free_creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            Column("free_creature_channel_id", BigInteger, nullable=False),
+            Column("free_creature_message_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(["guild_id", "free_creature_channel_id", "free_creature_message_id"], ["free_creatures.guild_id", "free_creatures.channel_id", "free_creatures.message_id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_expires_events"),
         )
 
@@ -105,7 +117,7 @@ class PostgresDatabase(Database):
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("base_region_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_regions"),
         )
 
@@ -114,7 +126,7 @@ class PostgresDatabase(Database):
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_players"),
         )
 
@@ -123,7 +135,7 @@ class PostgresDatabase(Database):
             metadata,
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("id", "guild_id", name="pk_base_creatures"),
         )
 
@@ -134,10 +146,14 @@ class PostgresDatabase(Database):
             Column("guild_id", BigInteger, nullable=False),
             Column("owner_id", BigInteger, nullable=False),
             Column("base_creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id"], ["guilds.id"]),
-            ForeignKeyConstraint(["guild_id", "owner_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
             ForeignKeyConstraint(
-                ["guild_id", "base_creature_id"], ["base_creatures.guild_id", "base_creatures.id"]
+                ["guild_id", "owner_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "base_creature_id"],
+                ["base_creatures.guild_id", "base_creatures.id"],
+                ondelete="CASCADE",
             ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_creatures"),
         )
@@ -150,9 +166,13 @@ class PostgresDatabase(Database):
             Column("region_id", BigInteger, nullable=False),
             Column("timestamp_occupied", BigInteger, nullable=True),
             ForeignKeyConstraint(
-                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
             ),
-            ForeignKeyConstraint(["guild_id", "region_id"], ["regions.guild_id", "regions.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "region_id"], ["regions.guild_id", "regions.id"], ondelete="CASCADE"
+            ),
             PrimaryKeyConstraint("guild_id", "region_id", name="pk_occupies"),
         )
 
@@ -167,7 +187,9 @@ class PostgresDatabase(Database):
             Column("timestamp_protected", BigInteger, nullable=False),
             Column("timestamp_expires", BigInteger, nullable=False),
             ForeignKeyConstraint(
-                ["guild_id", "base_creature_id"], ["base_creatures.guild_id", "base_creatures.id"]
+                ["guild_id", "base_creature_id"],
+                ["base_creatures.guild_id", "base_creatures.id"],
+                ondelete="CASCADE",
             ),
             ForeignKeyConstraint(["guild_id", "roller_id"], ["players.guild_id", "players.id"]),
             PrimaryKeyConstraint("guild_id", "channel_id", "message_id", name="pk_free_creatures"),
@@ -180,7 +202,9 @@ class PostgresDatabase(Database):
             Column("guild_id", BigInteger, nullable=False),
             Column("resource_type", Integer, nullable=False),
             Column("quantity", Integer, nullable=False, default=0),
-            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
             PrimaryKeyConstraint("player_id", "guild_id", "resource_type", name="pk_resources"),
         )
 
@@ -190,9 +214,13 @@ class PostgresDatabase(Database):
             Column("player_id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
             ForeignKeyConstraint(
-                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
             ),
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_deck"),
         )
@@ -203,10 +231,14 @@ class PostgresDatabase(Database):
             Column("player_id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
-            Column("order", Integer, nullable=False),
-            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
+            Column("position", Integer, nullable=False),
             ForeignKeyConstraint(
-                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
             ),
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_hand"),
         )
@@ -217,9 +249,13 @@ class PostgresDatabase(Database):
             Column("player_id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["guild_id", "player_id"], ["players.guild_id", "players.id"]),
             ForeignKeyConstraint(
-                ["guild_id", "creature_id"], ["creatures.guild_id", "creatures.id"]
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
             ),
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_discard"),
         )
@@ -240,68 +276,75 @@ class PostgresDatabase(Database):
         con.rollback()
 
     def fresh_event_id(self, guild, con=None):
-        with self.parent.transaction(con=con) as con:
+        with self.transaction(con=con) as con:
             sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
-            result = con.execute(sql, {"guild_id": guild}).scalar()
+            result = con.execute(sql, {"guild_id": guild.id}).scalar()
             return result
 
     def add_event(self, event: Event, con=None):
-        with self.parent.transaction(con=con) as con:
+        with self.transaction(con=con) as con:
+            event_sql = text(
+                "INSERT INTO events (id, guild_id, timestamp) VALUES (:id, :guild_id, :timestamp)"
+            )
+            con.execute(
+                event_sql,
+                {
+                    "id": event.id,
+                    "guild_id": event.guild.id,
+                    "timestamp": event.timestamp
+                }
+            )
             if isinstance(event, Database.Region.RegionRechargeEvent):
                 sql = text(
-                    "INSERT INTO region_recharge_events (id, guild_id, timestamp, region_id) VALUES (:id, :guild_id, :timestamp, :region_id)"
+                    "INSERT INTO region_recharge_events (id, guild_id, region_id) VALUES (:id, :guild_id, :region_id)"
                 )
                 con.execute(
                     sql,
                     {
                         "id": event.id,
                         "guild_id": event.guild.id,
-                        "timestamp": event.timestamp,
                         "region_id": event.region.id,
-                    },
+                    }
                 )
             elif isinstance(event, Database.Creature.CreatureRechargeEvent):
                 sql = text(
-                    "INSERT INTO creature_recharge_events (id, guild_id, timestamp, creature_id) VALUES (:id, :guild_id, :timestamp, :creature_id)"
+                    "INSERT INTO creature_recharge_events (id, guild_id, creature_id) VALUES (:id, :guild_id, :creature_id)"
                 )
                 con.execute(
                     sql,
                     {
                         "id": event.id,
                         "guild_id": event.guild.id,
-                        "timestamp": event.timestamp,
                         "creature_id": event.creature.id,
-                    },
+                    }
                 )
             elif isinstance(event, Database.FreeCreature.FreeCreatureProtectedEvent):
                 sql = text(
-                    "INSERT INTO free_creature_protected_events (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)"
+                    "INSERT INTO free_creature_protected_events (id, guild_id, free_creature_id) VALUES (:id, :guild_id, :free_creature_id)"
                 )
                 con.execute(
                     sql,
                     {
                         "id": event.id,
                         "guild_id": event.guild.id,
-                        "timestamp": event.timestamp,
                         "free_creature_id": event.free_creature.id,
-                    },
+                    }
                 )
             elif isinstance(event, Database.FreeCreature.FreeCreatureExpiresEvent):
                 sql = text(
-                    "INSERT INTO free_creature_expires_events (id, guild_id, timestamp, free_creature_id) VALUES (:id, :guild_id, :timestamp, :free_creature_id)"
+                    "INSERT INTO free_creature_expires_events (id, guild_id, free_creature_id) VALUES (:id, :guild_id, :free_creature_id)"
                 )
                 con.execute(
                     sql,
                     {
                         "id": event.id,
                         "guild_id": event.guild.id,
-                        "timestamp": event.timestamp,
                         "free_creature_id": event.free_creature.id,
-                    },
+                    }
                 )
 
     def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
-        with self.parent.transaction(con=con) as con:
+        with self.transaction(con=con) as con:
             results = []
             tables = [
                 "region_recharge_events",
@@ -310,7 +353,11 @@ class PostgresDatabase(Database):
                 "free_creature_expires_events",
             ]
             for table in tables:
-                sql = text(f"SELECT * FROM {table} WHERE timestamp BETWEEN :start AND :end")
+                sql = text(f"""
+                    SELECT e.id, e.guild_id, e.timestamp, r.* FROM {table} r
+                    JOIN events e ON e.id = r.id AND e.guild_id = r.guild_id
+                    WHERE e.timestamp BETWEEN :start AND :end
+                """)
                 result = con.execute(
                     sql, {"start": timestamp_start, "end": timestamp_end}
                 ).fetchall()
@@ -387,7 +434,7 @@ class PostgresDatabase(Database):
 
     def remove_guild(self, guild: Database.Guild, con=None) -> Database.Guild:
         with self.transaction(con=con) as con:
-            sql = text("DELETE FROM guilds WHERE guild_id = :guild_id")
+            sql = text("DELETE FROM guilds WHERE id = :guild_id")
             con.execute(sql, {"guild_id": guild.id})
             return guild
 
@@ -423,10 +470,10 @@ class PostgresDatabase(Database):
         def get_config(self, con=None) -> dict:
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "SELECT region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE guild_id = :guild_id"
+                    "SELECT region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE id = :guild_id"
                 )
                 result = con.execute(sql, {"guild_id": self.id}).fetchone()
-                if result:
+                if result is not None:
                     self.config = {
                         "region_recharge": result[0],
                         "creature_recharge": result[1],
@@ -497,6 +544,24 @@ class PostgresDatabase(Database):
                 for base_creature in self.parent.start_condition.start_deck:
                     creature = self.add_creature(base_creature, player, con=con)
                     player.add_to_discard(creature, con=con)
+
+                player.reshuffle_discard()
+
+                for resource_type in BaseResources:
+                    sql = text(
+                        """
+                        INSERT INTO Resources (player_id, guild_id, resource_type, quantity) VALUES (:player_id, :guild_id, :resource_type, :quantity)
+                    """
+                    )
+                    con.execute(
+                        sql,
+                        {
+                            "quantity": 0,
+                            "player_id": player.id,
+                            "guild_id": self.id,
+                            "resource_type": resource_type.value,
+                        },
+                    )
 
             return player
 
@@ -623,7 +688,7 @@ class PostgresDatabase(Database):
             base_creature: BaseCreature,
             channel_id: int,
             message_id: int,
-            roller_id: int,
+            roller: Database.Player,
             con=None,
         ) -> Database.FreeCreature:
             with self.parent.transaction(con=con) as con:
@@ -642,7 +707,7 @@ class PostgresDatabase(Database):
                         "guild_id": self.id,
                         "channel_id": channel_id,
                         "message_id": message_id,
-                        "roller_id": roller_id,
+                        "roller_id": roller.id,
                         "timestamp_protected": timestamp_protected,
                         "timestamp_expires": timestamp_expires,
                     },
@@ -653,18 +718,18 @@ class PostgresDatabase(Database):
                     self,
                     channel_id,
                     message_id,
-                    roller_id,
+                    roller.id,
                     timestamp_protected,
                     timestamp_expires,
                 )
 
         def get_free_creatures(self, con=None):
             with self.parent.transaction(con=con) as con:
-                sql = """
+                sql = text("""
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
                     FROM free_creatures 
                     WHERE guild_id = :guild_id
-                """
+                """)
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
                 return [
                     PostgresDatabase.FreeCreature(
@@ -677,13 +742,13 @@ class PostgresDatabase(Database):
             self, channel_id: int, message_id: int, con=None
         ) -> Database.FreeCreature:
             with self.parent.transaction(con=con) as con:
-                sql = """
+                sql = text("""
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
                     FROM free_creatures 
                     WHERE guild_id = :guild_id 
                     AND channel_id = :channel_id 
                     AND message_id = :message_id
-                """
+                """)
                 result = con.execute(
                     sql, {"guild_id": self.id, "channel_id": channel_id, "message_id": message_id}
                 ).fetchone()
@@ -771,14 +836,18 @@ class PostgresDatabase(Database):
         def occupied(self, con=None) -> tuple[Database.Creature, int]:
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "SELECT creature_id, timestamp_occupied FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
+                    """
+                    SELECT c.id, c.base_creature_id, o.timestamp_occupied FROM occupies o
+                    JOIN creatures c ON c.id = o.creature_id AND c.guild_id = o.guild_id
+                    WHERE o.guild_id = :guild_id AND o.region_id = :region_id
+                """
                 )
                 result = con.execute(
                     sql, {"guild_id": self.guild.id, "region_id": self.id}
                 ).fetchone()
-                if result:
-                    creature = Database.Creature(self.parent, result[0], self.guild)
-                    return (creature, result[1])
+                if result is not None:
+                    creature = PostgresDatabase.Creature(self.parent, result[0], creatures[result[1]], self.guild, self)
+                    return (creature, result[2])
                 return (None, None)
 
         def is_occupied(self, con=None) -> bool:
@@ -835,7 +904,7 @@ class PostgresDatabase(Database):
                         "resource_type": resource.value,
                     },
                 ).scalar()
-                return result >= amount if result else False
+                return result >= amount if result is not None else False
 
         def give(self, resource: Resource, amount: int, con=None):
             with self.parent.transaction(con=con) as con:
@@ -858,40 +927,72 @@ class PostgresDatabase(Database):
         def get_deck(self, con=None):
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "SELECT creature_id FROM deck WHERE player_id = :player_id AND guild_id = :guild_id"
+                    """
+                    SELECT d.creature_id, c.base_creature_id 
+                    FROM deck d 
+                    JOIN creatures c ON d.creature_id = c.id 
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id
+                """
                 )
                 results = con.execute(
                     sql, {"player_id": self.id, "guild_id": self.guild.id}
                 ).fetchall()
-                return [result[0] for result in results]
+                return [
+                    PostgresDatabase.Creature(
+                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    )
+                    for result in results
+                ]
 
         def get_hand(self, con=None):
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "SELECT creature_id FROM played WHERE player_id = :player_id AND guild_id = :guild_id ORDER BY order"
+                    """
+                    SELECT h.creature_id, c.base_creature_id 
+                    FROM hand h 
+                    JOIN creatures c ON h.creature_id = c.id 
+                    WHERE h.player_id = :player_id AND h.guild_id = :guild_id
+                """
                 )
                 results = con.execute(
                     sql, {"player_id": self.id, "guild_id": self.guild.id}
                 ).fetchall()
-                return [result[0] for result in results]
+                return [
+                    PostgresDatabase.Creature(
+                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    )
+                    for result in results
+                ]
 
         def get_discard(self, con=None):
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "SELECT creature_id FROM discard WHERE player_id = :player_id AND guild_id = :guild_id"
+                    """
+                    SELECT d.creature_id, c.base_creature_id 
+                    FROM discard d 
+                    JOIN creatures c ON d.creature_id = c.id 
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id
+                """
                 )
                 results = con.execute(
                     sql, {"player_id": self.id, "guild_id": self.guild.id}
                 ).fetchall()
-                return [result[0] for result in results]
+                return [
+                    PostgresDatabase.Creature(
+                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    )
+                    for result in results
+                ]
 
         def draw_card_raw(self, con=None):
 
             with self.parent.transaction(con=con) as con:
                 sql = text(
                     """
-                    SELECT creature_id FROM deck 
-                    WHERE player_id = :player_id AND guild_id = :guild_id 
+                    SELECT d.creature_id, c.base_creature_id 
+                    FROM deck d
+                    JOIN creatures c ON d.creature_id = c.id
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id 
                     ORDER BY RANDOM() 
                     LIMIT 1
                 """
@@ -903,7 +1004,7 @@ class PostgresDatabase(Database):
                 if not result:
                     raise EmptyDeckException()
 
-                drawn_card = result["creature_id"]
+                drawn_card = PostgresDatabase.Creature(self.parent, result[0], creatures[result[1]], self.guild, self)
 
                 sql = text(
                     """
@@ -913,18 +1014,18 @@ class PostgresDatabase(Database):
                 )
                 con.execute(
                     sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card},
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card.id},
                 )
 
                 sql = text(
                     """
-                    INSERT INTO hand (player_id, guild_id, creature_id, order)
-                    VALUES (:player_id, :guild_id, :creature_id, (SELECT COALESCE(MAX(order), 0) + 1 FROM played WHERE player_id = :player_id AND guild_id = :guild_id))
+                    INSERT INTO hand (player_id, guild_id, creature_id, position)
+                    VALUES (:player_id, :guild_id, :creature_id, (SELECT COALESCE(MAX(position), -1) + 1 FROM hand WHERE player_id = :player_id AND guild_id = :guild_id))
                 """
                 )
                 con.execute(
                     sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card},
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": drawn_card.id},
                 )
 
             return drawn_card
@@ -932,7 +1033,7 @@ class PostgresDatabase(Database):
         def reshuffle_discard(self, con=None):
             with self.parent.transaction(con=con) as con:
                 discard = self.get_discard(con=con)
-                for creature_id in discard:
+                for creature in discard:
                     sql = text(
                         "DELETE FROM discard WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
                     )
@@ -941,7 +1042,7 @@ class PostgresDatabase(Database):
                         {
                             "player_id": self.id,
                             "guild_id": self.guild.id,
-                            "creature_id": creature_id,
+                            "creature_id": creature.id,
                         },
                     )
                     sql = text(
@@ -952,14 +1053,14 @@ class PostgresDatabase(Database):
                         {
                             "player_id": self.id,
                             "guild_id": self.guild.id,
-                            "creature_id": creature_id,
+                            "creature_id": creature.id,
                         },
                     )
 
         def delete_creature_from_hand(self, creature: Database.Creature, con=None):
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
                 )
                 con.execute(
                     sql,
@@ -969,14 +1070,14 @@ class PostgresDatabase(Database):
         def play_creature(self, creature: Database.Creature, con=None):
             with self.parent.transaction(con=con) as con:
                 sql = text(
-                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
                 )
                 con.execute(
                     sql,
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
                 sql = text(
-                    "INSERT INTO played (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
                 )
                 con.execute(
                     sql,
@@ -1090,16 +1191,26 @@ class PostgresDatabase(Database):
 
                 sql_protected = text(
                     """
-                    DELETE FROM free_creature_protected_events
-                    WHERE guild_id = :guild_id AND free_creature_id = :free_creature_id
+                    DELETE FROM events
+                    USING free_creature_protected_events f
+                    WHERE events.id = f.id 
+                        AND events.guild_id = f.guild_id
+                        AND f.guild_id = :guild_id 
+                        AND f.free_creature_channel_id = :free_creature_channel_id 
+                        AND f.free_creature_message_id = :free_creature_message_id
                 """
                 )
-                con.execute(sql_protected, {"guild_id": self.guild.id, "free_creature_id": self.id})
+                con.execute(sql_protected, {"guild_id": self.guild.id, "free_creature_channel_id": self.channel_id, "free_creature_message_id": self.message_id})
 
                 sql_expires = text(
                     """
-                    DELETE FROM free_creature_expires_events
-                    WHERE guild_id = :guild_id AND free_creature_id = :free_creature_id
+                    DELETE FROM events
+                    USING free_creature_expires_events f
+                    WHERE events.id = f.id 
+                        AND events.guild_id = f.guild_id
+                        AND f.guild_id = :guild_id 
+                        AND f.free_creature_channel_id = :free_creature_channel_id 
+                        AND f.free_creature_message_id = :free_creature_message_id
                 """
                 )
-                con.execute(sql_expires, {"guild_id": self.guild.id, "free_creature_id": self.id})
+                con.execute(sql_expires, {"guild_id": self.guild.id, "free_creature_channel_id": self.channel_id, "free_creature_message_id": self.message_id})
