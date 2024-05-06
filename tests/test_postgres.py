@@ -3,7 +3,7 @@ import time
 import sqlalchemy
 from testcontainers.postgres import PostgresContainer
 
-from src.core.base_types import Resource, BaseRegion, StartCondition, Database
+from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition, Database
 from src.core.base_types import (
     GuildNotFound,
     PlayerNotFound,
@@ -26,115 +26,143 @@ def are_subsets(a: list, b: list):
     return True
 
 
-def test_postgres():
-
-    with PostgresContainer("postgres:16") as postgres:
-        engine = sqlalchemy.create_engine(postgres.get_connection_url())
-        postgres_db = PostgresDatabase(start_condition, engine)
-        run_test_on_specific_db(postgres_db)
 
 
-def run_test_on_specific_db(test_db: Database):
-    guild_db: Database.Guild = test_db.add_guild(1)
+postgres = PostgresContainer("postgres:16").start()
+
+engine = sqlalchemy.create_engine(postgres.get_connection_url())
+test_db = PostgresDatabase(start_condition, engine)
+
+
+def test_guild_creation():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
 
     assert test_db.get_guild(guild_db.id) == guild_db
+    assert test_db.get_guilds() == [guild_db]
     assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
+    assert [c for c in guild_db.get_creature_pool()] == start_condition.start_available_creatures
 
+    test_db.remove_guild(guild_db)
+
+    try:
+        test_db.get_guild(guild_db.id)
+        assert False
+    except GuildNotFound:
+        pass
+
+    assert test_db.get_guilds() == []
+
+
+def test_player_creation():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
     player1_db: Database.Player = guild_db.add_player(1)
 
     assert guild_db.get_player(player1_db.id) == player1_db
-    assert player1_db.has(Resource.GOLD, 0) == True
-    assert player1_db.has(Resource.GOLD, 1) == False
+    assert guild_db.get_players() == [player1_db]
 
-    player1_db.give(Resource.GOLD, 1)
-    assert player1_db.has(Resource.GOLD, 0) == True
-    assert player1_db.has(Resource.GOLD, 1) == True
-
-    player1_db.remove(Resource.GOLD, 1)
-    assert player1_db.has(Resource.GOLD, 0) == True
-    assert player1_db.has(Resource.GOLD, 1) == False
+    player2_db: Database.Player = guild_db.add_player(2)
+    assert are_subsets(guild_db.get_players(), [player1_db, player2_db])
 
     guild_db.remove_player(player1_db)
-    got_error = False
     try:
         guild_db.get_player(player1_db.id)
+        assert False
     except PlayerNotFound:
-        got_error = True
+        pass
 
-    assert got_error
+    assert guild_db.get_players() == [player2_db]
 
     test_db.remove_guild(guild_db)
-    got_error = False
-    try:
-        test_db.get_guild(guild_db.id)
-    except GuildNotFound:
-        got_error = True
+    assert test_db.get_guilds() == []
 
-    assert got_error
 
-    guild_db = test_db.add_guild(1)
+def test_player_resources():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+    player1_db: Database.Player = guild_db.add_player(1)
 
-    # fulfills
+    for res in BaseResources:
+        assert player1_db.has(res, 0) == True
+        assert player1_db.has(res, 1) == False
 
-    player2_db: PostgresDatabase.Player = guild_db.add_player(2)
-    player2_db.give(Resource.GOLD, 1)
+    for i in [1, 2, 5, 100]:
+        for res in BaseResources:
+            player1_db.give(res, i)
+            for res2 in BaseResources:
+                if res2 == res:
+                    assert player1_db.has(res2, i) == True
+                    assert player1_db.has(res2, i+1) == False
+                else:
+                    assert player1_db.has(res2, i) == False
+            player1_db.remove(res, i)
 
-    price1 = [Price(Resource.GOLD, 1)]
+    test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []
 
-    assert player2_db.fulfills_price(price1)
 
-    player2_db.give(Resource.GOLD, 1)
-    assert player2_db.fulfills_price(price1)
+def test_player_prices():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+    player1_db: Database.Player = guild_db.add_player(1)
 
-    player2_db.remove(Resource.GOLD, 2)
-    assert not player2_db.fulfills_price(price1)
+    r = player1_db.get_resources()
+    for res in BaseResources:
+        assert r[res] == 0
 
-    price2 = [Price(Resource.GOLD, 1), Price(Resource.ARTEFACTS, 1)]
-    assert not player2_db.fulfills_price(price2)
+    for res in BaseResources:
+        assert player1_db.has(res, 0) == True
+        assert player1_db.has(res, 1) == False
 
-    player2_db.give(Resource.GOLD, 1)
-    assert not player2_db.fulfills_price(price2)
+    gains = [
+        [Gain(Resource.GOLD, 1)],
+        [Gain(Resource.GOLD, 2), Gain(Resource.ORDERS, 1)],
+        [Gain(Resource.STRENGTH, 100), Gain(Resource.ORDERS, 5)]
+    ]
 
-    player2_db.remove(Resource.GOLD, 1)
-    player2_db.give(Resource.ARTEFACTS, 1)
-    assert not player2_db.fulfills_price(price2)
+    prices = [
+        [Price(Resource.GOLD, 1)],
+        [Price(Resource.GOLD, 2), Price(Resource.ORDERS, 1)],
+        [Price(Resource.STRENGTH, 100), Price(Resource.ORDERS, 5)]
+    ]
 
-    player2_db.give(Resource.GOLD, 1)
-    assert player2_db.fulfills_price(price2)
+    r = player1_db.get_resources()
+    for res in BaseResources:
+        assert r[res] == 0
 
-    price3 = [Price(Resource.GOLD, 1), Price(Resource.GOLD, 1)]
+    player1_db.gain(gains[0])
+    assert player1_db.fulfills_price(prices[0])
+    assert not player1_db.fulfills_price(prices[1])
+    assert not player1_db.fulfills_price(prices[2])
+    player1_db.pay_price(prices[0])
 
-    assert not player2_db.fulfills_price(price3)
+    r = player1_db.get_resources()
+    for res in BaseResources:
+        assert r[res] == 0
 
-    player3_db: PostgresDatabase.Player = guild_db.add_player(3)
-    assert not player3_db.fulfills_price(price3)
+    player1_db.gain(gains[1])
+    assert player1_db.fulfills_price(prices[0])
+    assert player1_db.fulfills_price(prices[1])
+    assert not player1_db.fulfills_price(prices[2])
+    player1_db.pay_price(prices[1])
 
-    player3_db.give(Resource.GOLD, 1)
-    assert not player3_db.fulfills_price(price3)
+    r = player1_db.get_resources()
+    for res in BaseResources:
+        assert r[res] == 0
 
-    player3_db.give(Resource.GOLD, 1)
-    assert player3_db.fulfills_price(price3)
+    player1_db.gain(gains[2])
+    assert not player1_db.fulfills_price(prices[0])
+    assert not player1_db.fulfills_price(prices[1])
+    assert player1_db.fulfills_price(prices[2])
+    player1_db.pay_price(prices[2])
 
-    player3_db.remove(Resource.GOLD, 2)
-    assert not player3_db.fulfills_price(price3)
+    r = player1_db.get_resources()
+    for res in BaseResources:
+        assert r[res] == 0
 
-    player3_db.give(Resource.GOLD, 2)
-    assert player3_db.fulfills_price(price3)
+    test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []
 
-    # pay, gain
-    player4_db: PostgresDatabase.Player = guild_db.add_player(4)
 
-    for i in range(1, 100):
-        player4_db.gain([Gain(Resource.GOLD, 1) for j in range(i)])
-
-        assert player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i)])
-        assert player4_db.fulfills_price([Gain(Resource.GOLD, i)])
-        assert not player4_db.fulfills_price([Gain(Resource.GOLD, 1) for j in range(i + 1)])
-        assert not player4_db.fulfills_price([Gain(Resource.GOLD, i + 1)])
-
-        player4_db.pay_price([Gain(Resource.GOLD, 1) for j in range(i)])
-
-    # deck and drawing
+def test_deck():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
     player5_db: PostgresDatabase.Player = guild_db.add_player(5)
 
     assert [c.creature for c in player5_db.get_deck()] == start_condition.start_deck
@@ -146,9 +174,9 @@ def run_test_on_specific_db(test_db: Database):
         got_error = False
         try:
             player5_db.draw_card_raw()
+            assert False
         except EmptyDeckException:
-            got_error = True
-        assert got_error
+            pass
 
     for i in range(len(start_condition.start_deck) * 2):
         player6_db: PostgresDatabase.Player = guild_db.add_player(6)
@@ -186,7 +214,12 @@ def run_test_on_specific_db(test_db: Database):
     player7_db.draw_cards(N=1)
     assert len(player7_db.get_hand()) == len(start_condition.start_deck) + 1
 
-    # playing creatures
+    test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []
+
+
+def test_playing():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
     player8_db: PostgresDatabase.Player = guild_db.add_player(8)
     assert [c.creature for c in player8_db.get_deck()] == start_condition.start_deck
 
@@ -231,9 +264,17 @@ def run_test_on_specific_db(test_db: Database):
     resources[Resource.RALLY] += 1
     assert player8_db.get_resources() == resources
 
-    # claim creatures
+    test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []
 
-    assert player8_db.get_resources()[Resource.RALLY] >= 1
+
+def test_claim():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+    player8_db: PostgresDatabase.Player = guild_db.add_player(8)
+
+    player8_db.gain([Gain(Resource.RALLY, 1)])
+    
+    assert player8_db.get_resources()[Resource.RALLY] == 1
     resources: dict[Resource, int] = player8_db.get_resources()
 
     free_creature1_db: PostgresDatabase.FreeCreature = guild_db.add_free_creature(
@@ -247,3 +288,7 @@ def run_test_on_specific_db(test_db: Database):
 
     resources[Resource.RALLY] -= 1
     assert player8_db.get_resources() == resources
+
+
+    test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []

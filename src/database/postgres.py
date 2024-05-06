@@ -416,7 +416,7 @@ class PostgresDatabase(Database):
 
             if not result:
                 raise GuildNotFound(
-                    "None or too many guilds with this guild_id, needs to be unique"
+                    "No guilds with this guild_id"
                 )
 
             guild = PostgresDatabase.Guild(
@@ -521,7 +521,7 @@ class PostgresDatabase(Database):
                 result = con.execute(sql, {"id": region_id, "guild_id": self.id}).fetchone()
                 if not result:
                     raise RegionNotFound(
-                        "None or too many regions with this base region, needs to be unique"
+                        "No regions with this base region"
                     )
                 return PostgresDatabase.Region(self.parent, result[0], regions[result[1]], self)
 
@@ -577,7 +577,7 @@ class PostgresDatabase(Database):
                 result = con.execute(sql, {"guild_id": self.id, "player_id": player_id}).fetchone()
                 if not result:
                     raise PlayerNotFound(
-                        "None or too many players with this player_id, needs to be unique"
+                        "No players with this player_id"
                     )
                 return PostgresDatabase.Player(self.parent, result[0], self)
 
@@ -644,7 +644,7 @@ class PostgresDatabase(Database):
                 ).fetchone()
                 if not result:
                     raise CreatureNotFound(
-                        "None or too many creatures with this id, needs to be unique"
+                        "No creatures with this id"
                     )
                 return PostgresDatabase.Creature(
                     self.parent,
@@ -669,7 +669,7 @@ class PostgresDatabase(Database):
             with self.parent.transaction(con=con) as con:
                 sql = text("SELECT id FROM base_creatures WHERE guild_id = :guild_id")
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
-                return [result[0] for result in results]
+                return [creatures[result[0]] for result in results]
 
         def get_random_from_creature_pool(self, con=None) -> int:
             with self.parent.transaction(con=con) as con:
@@ -754,7 +754,7 @@ class PostgresDatabase(Database):
                 ).fetchone()
                 if not result:
                     raise CreatureNotFound(
-                        "None or too many creatures with this id, needs to be unique"
+                        "No creatures with this id"
                     )
                 return PostgresDatabase.FreeCreature(
                     self.parent,
