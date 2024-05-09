@@ -7,13 +7,17 @@ from src.core.regions import *
 def test_text():
     commoner = Commoner()
 
-    assert commoner.quest_ability_effect_text() == ""
-    assert commoner.campaign_ability_effect_text() == "gain 1 🚩rally"
+    assert commoner.quest_ability_effect_full_text() == ""
+    assert commoner.quest_ability_effect_short_text() == ""
+    assert commoner.campaign_ability_effect_full_text() == "gain 1 🚩rally"
+    assert commoner.campaign_ability_effect_short_text() == "+1🚩"
 
     village = Village()
 
-    assert village.quest_effect_text() == "gain 1 ⚒️worker"
+    assert village.quest_effect_full_text() == "gain 1 ⚒️worker"
+    assert village.quest_effect_short_text() == "+1⚒️"
 
     small_mine = SmallMine()
 
-    assert small_mine.quest_effect_text() == "pay 5 🪙gold -> gain 1 ⚒️worker"
+    assert small_mine.quest_effect_full_text() == "use 1 ⚒️worker. gain 5 🪙gold."
+    assert small_mine.quest_effect_short_text() == "-1⚒️ -> +5🪙"

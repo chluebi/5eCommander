@@ -291,7 +291,6 @@ def test_claim():
     assert test_db.get_guilds() == []
 
 
-
 def test_rollback():
     guild_db1: PostgresDatabase.Guild = test_db.add_guild(1)
     guild_db2: PostgresDatabase.Guild = test_db.add_guild(2)
@@ -301,8 +300,8 @@ def test_rollback():
 
     try:
         with test_db.transaction(con=None) as con:
-            test_db.remove_guild(guild_db1, con=con) # works
-            test_db.get_guild(guild_db2.id, con=con) # fails, whole transaction rolled back
+            test_db.remove_guild(guild_db1, con=con)  # works
+            test_db.get_guild(guild_db2.id, con=con)  # fails, whole transaction rolled back
     except GuildNotFound:
         pass
 

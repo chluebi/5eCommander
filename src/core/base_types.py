@@ -69,17 +69,7 @@ class ExpiredFreeCreature(Exception):
 
 Resource = Enum(
     "Resource",
-    [
-        "ORDERS",
-        "GOLD",
-        "ARTEFACTS",
-        "WORKERS",
-        "MAGIC",
-        "RALLY",
-        "STRENGTH",
-        "CREATURES_IN_HAND",
-        "DELETE_CREATURES",
-    ],
+    ["ORDERS", "GOLD", "ARTEFACTS", "WORKERS", "MAGIC", "RALLY", "STRENGTH"],
 )
 
 BaseResources = [
@@ -115,53 +105,90 @@ def resource_to_emoji(resource: Resource) -> str:
             return "🚩"
         case Resource.STRENGTH:
             return "⚔️"
-        case Resource.CREATURES_IN_HAND:
-            return "🃏"
-        case Resource.DELETE_CREATURES:
-            return "❎"
         case _:
             return "❓"
 
 
-def r_change_to_string(r_change: Union[Price | Gain]) -> str:
+def resource_change_to_string(resource_change: Union[Price | Gain]) -> str:
 
     change_text = ""
-    if r_change.resource == Resource.CREATURES_IN_HAND:
-        if isinstance(r_change, Price):
-            change_text = "draw {0} {1}"
-        else:
-            raise Exception("Creatures in hand can only be drawn not lost")
-    elif r_change.resource == Resource.DELETE_CREATURES:
-        change_text = "delete {0} {1} from your hand"
-    elif r_change.resource == Resource.WORKERS and isinstance(r_change, Price):
+    if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
         change_text = "use {0} {1}"
-    elif isinstance(r_change, Gain):
+    elif isinstance(resource_change, Gain):
         change_text = "gain {0} {1}"
-    elif isinstance(r_change, Price):
+    elif isinstance(resource_change, Price):
         change_text = "pay {0} {1}"
 
-    resource_text = ""
-    if r_change.resource == Resource.CREATURES_IN_HAND:
-        resource_text = "creatures"
-    elif r_change.resource == Resource.DELETE_CREATURES:
-        resource_text = "creatures"
-    else:
-        resource_text = r_change.resource.name.lower()
+    resource_text = resource_change.resource.name.lower()
 
-    if r_change.amount == 1 and resource_text.endswith("s"):
+    if resource_change.amount == 1 and resource_text.endswith("s"):
         resource_text = resource_text[:-1]
 
-    return change_text.format(r_change.amount, resource_to_emoji(r_change.resource) + resource_text)
+    return change_text.format(
+        resource_change.amount, resource_to_emoji(resource_change.resource) + resource_text
+    )
 
 
-def r_changes_to_string(r_changes: list[Price | Gain]) -> str:
-    r_changes = [r_change for r_change in r_changes if r_change.amount != 0]
+def resource_changes_to_string(resource_changes: list[Price | Gain]) -> str:
+    resource_changes = [
+        resource_change for resource_change in resource_changes if resource_change.amount != 0
+    ]
 
-    prices = [r_change for r_change in r_changes if isinstance(r_change, Price)]
-    gains = [r_change for r_change in r_changes if isinstance(r_change, Gain)]
+    prices = [
+        resource_change
+        for resource_change in resource_changes
+        if isinstance(resource_change, Price)
+    ]
+    gains = [
+        resource_change for resource_change in resource_changes if isinstance(resource_change, Gain)
+    ]
 
-    price_text = ", ".join([r_change_to_string(r_change) for r_change in prices])
-    gains_text = ", ".join([r_change_to_string(r_change) for r_change in gains])
+    price_text = ", ".join(
+        [resource_change_to_string(resource_change) for resource_change in prices]
+    )
+    gains_text = ", ".join(
+        [resource_change_to_string(resource_change) for resource_change in gains]
+    )
+
+    if len(price_text) == 0 and len(gains_text) == 0:
+        return ""
+    if len(price_text) == 0:
+        return f"{gains_text}"
+    if len(gains_text) == 0:
+        return f"{price_text}"
+
+    return f"{price_text}. {gains_text}."
+
+
+def resource_change_to_short_string(resource_change: Union[Price | Gain]) -> str:
+    if isinstance(resource_change, Gain):
+        change_text = "+{0}{1}"
+    elif isinstance(resource_change, Price):
+        change_text = "-{0}{1}"
+
+    return change_text.format(resource_change.amount, resource_to_emoji(resource_change.resource))
+
+
+def resource_changes_to_short_string(resource_changes: list[Price | Gain]) -> str:
+    resource_changes = [
+        resource_change for resource_change in resource_changes if resource_change.amount != 0
+    ]
+
+    prices = [
+        resource_change
+        for resource_change in resource_changes
+        if isinstance(resource_change, Price)
+    ]
+    gains = [
+        resource_change for resource_change in resource_changes if isinstance(resource_change, Gain)
+    ]
+
+    price_text = ", ".join(
+        [resource_change_to_short_string(resource_change) for resource_change in prices]
+    )
+    gains_text = ", ".join(
+        [resource_change_to_short_string(resource_change) for resource_change in gains]
+    )
 
     if len(price_text) == 0 and len(gains_text) == 0:
         return ""
@@ -193,12 +220,17 @@ class BaseRegion:
             return self.id == other.id
         return False
 
-    def quest_effect_text(self) -> str:
-        price, gains = self.quest_effect()
-        return r_changes_to_string(price + gains)
+    def quest_effect_short_text(self) -> str:
+        return ""
 
-    def quest_effect(self) -> tuple[list[Price], list[Gain]]:
-        return [], []
+    def quest_effect_full_text(self) -> str:
+        return ""
+
+    def quest_effect_price(self, region_db, creature_db, con=None, extra_data={}):
+        return
+
+    def quest_effect(self, region_db, creature_db, con=None, extra_data={}):
+        return
 
 
 class BaseCreature:
@@ -220,20 +252,30 @@ class BaseCreature:
         return False
 
     # questing
-    def quest_ability_effect_text(self) -> str:
-        price, gains = self.quest_ability_effect()
-        return r_changes_to_string(price + gains)
+    def quest_ability_effect_short_text(self) -> str:
+        return ""
 
-    def quest_ability_effect(self) -> tuple[list[Price], list[Gain]]:
-        return [], []
+    def quest_ability_effect_full_text(self) -> str:
+        return ""
+
+    def quest_ability_effect_price(self, region_db, creature_db, con=None, extra_data={}):
+        return
+
+    def quest_ability_effect(self, region_db, creature_db, con=None, extra_data={}):
+        return
 
     # campaigning
-    def campaign_ability_effect_text(self) -> str:
-        price, gains = self.campaign_ability_effect()
-        return r_changes_to_string(price + gains)
+    def campaign_ability_effect_short_text(self) -> str:
+        return ""
 
-    def campaign_ability_effect(self) -> tuple[list[Price], list[Gain]]:
-        return [], []
+    def campaign_ability_effect_full_text(self) -> str:
+        return ""
+
+    def campaign_ability_effect_price(self, creature_db, con=None, extra_data={}):
+        return
+
+    def campaign_ability_effect(self, creature_db, con=None, extra_data={}):
+        return
 
 
 class StartCondition:
@@ -561,7 +603,7 @@ class Database:
                 for c in creatures_to_delete:
                     self.delete_creature_from_hand(c)
 
-        def gain(self, gain: list[Gain], in_trans=False, extra_data={}, con=None) -> None:
+        def gain(self, gain: list[Gain], con=None, extra_data={}) -> None:
             merged_gains = defaultdict(lambda: 0)
             for g in gain:
                 if g.amount == 0:
@@ -586,7 +628,7 @@ class Database:
 
                 self.set_resources(resources, con=con)
 
-        def pay_price(self, price: list[Price], in_trans=False, extra_data={}, con=None) -> None:
+        def pay_price(self, price: list[Price], con=None, extra_data={}) -> None:
             merged_price = defaultdict(lambda: 0)
             for p in price:
                 if p.amount == 0:
@@ -651,36 +693,32 @@ class Database:
                     f"Region is {region.region.category} but creature can only go to {creature.creature.quest_region_categories}"
                 )
 
-            price, gain = region.region.quest_effect()
-            creature_price, creature_gain = creature.creature.quest_ability_effect()
+            base_region: BaseRegion = region.region
+            base_creature: BaseCreature = creature.creature
 
             with self.parent.transaction(con=con) as con:
                 self.pay_price([Price(Resource.ORDERS, 1)], con=con)
-                self.pay_price(price, con=con, extra_data=extra_data)
-                if len(creature_price) > 0 and "pay_creature_price" in extra_data:
-                    self.pay_price(creature_price, con=con, extra_data=extra_data)
+                base_creature.quest_ability_effect_price(
+                    region, creature, con=con, extra_data=extra_data
+                )
+                base_region.quest_effect_price(region, creature, con=con, extra_data=extra_data)
                 self.play_creature(creature, con=con)
                 region: Database.Region = region
                 region.occupy(creature, con=con)
                 creature.play(con=con)
-                self.gain(gain, con=con, extra_data=extra_data)
-                if len(creature_price) == 0 or (
-                    len(creature_price) > 0 and "pay_creature_price" in extra_data
-                ):
-                    self.gain(creature_gain, con=con, extra_data=extra_data)
+                base_region.quest_effect(region, creature, con=con, extra_data=extra_data)
+                base_creature.quest_ability_effect(region, creature, con=con, extra_data=extra_data)
 
         def play_creature_to_campaign(self, creature, con=None, extra_data={}):
 
-            creature_price, creature_gain = creature.creature.campaign_ability_effect()
+            base_creature: BaseCreature = creature.creature
 
             with self.parent.transaction(con=con) as con:
-                if len(creature_price) > 0 and "pay_creature_price" in extra_data:
-                    self.pay_price(creature_price, con=con, extra_data=extra_data)
+                base_creature.campaign_ability_effect_price(
+                    creature, con=con, extra_data=extra_data
+                )
                 self.play_creature(creature, con=con)
-                if len(creature_price) == 0 or (
-                    len(creature_price) > 0 and "pay_creature_price" in extra_data
-                ):
-                    self.gain(creature_gain, con=con, extra_data=extra_data)
+                base_creature.campaign_ability_effect(creature, con=con, extra_data=extra_data)
 
     class Creature:
 
@@ -709,7 +747,11 @@ class Database:
 
                 self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
-                        self.parent, self.parent.fresh_event_id(self.guild, con=con), self.guild, until, self
+                        self.parent,
+                        self.parent.fresh_event_id(self.guild, con=con),
+                        self.guild,
+                        until,
+                        self,
                     ),
                     con=con,
                 )
