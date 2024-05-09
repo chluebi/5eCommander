@@ -26,8 +26,6 @@ def are_subsets(a: list, b: list):
     return True
 
 
-
-
 postgres = PostgresContainer("postgres:16").start()
 
 engine = sqlalchemy.create_engine(postgres.get_connection_url())
@@ -90,7 +88,7 @@ def test_player_resources():
             for res2 in BaseResources:
                 if res2 == res:
                     assert player1_db.has(res2, i) == True
-                    assert player1_db.has(res2, i+1) == False
+                    assert player1_db.has(res2, i + 1) == False
                 else:
                     assert player1_db.has(res2, i) == False
             player1_db.remove(res, i)
@@ -114,13 +112,13 @@ def test_player_prices():
     gains = [
         [Gain(Resource.GOLD, 1)],
         [Gain(Resource.GOLD, 2), Gain(Resource.ORDERS, 1)],
-        [Gain(Resource.STRENGTH, 100), Gain(Resource.ORDERS, 5)]
+        [Gain(Resource.STRENGTH, 100), Gain(Resource.ORDERS, 5)],
     ]
 
     prices = [
         [Price(Resource.GOLD, 1)],
         [Price(Resource.GOLD, 2), Price(Resource.ORDERS, 1)],
-        [Price(Resource.STRENGTH, 100), Price(Resource.ORDERS, 5)]
+        [Price(Resource.STRENGTH, 100), Price(Resource.ORDERS, 5)],
     ]
 
     r = player1_db.get_resources()
@@ -273,7 +271,7 @@ def test_claim():
     player8_db: PostgresDatabase.Player = guild_db.add_player(8)
 
     player8_db.gain([Gain(Resource.RALLY, 1)])
-    
+
     assert player8_db.get_resources()[Resource.RALLY] == 1
     resources: dict[Resource, int] = player8_db.get_resources()
 
@@ -284,11 +282,33 @@ def test_claim():
     assert free_creature1_db.is_protected(time.time())
     assert not free_creature1_db.is_expired(time.time())
 
-    free_creature1_db.claim(time.time() + guild_db.get_config()['free_protection'], player8_db)
+    free_creature1_db.claim(time.time() + guild_db.get_config()["free_protection"], player8_db)
 
     resources[Resource.RALLY] -= 1
     assert player8_db.get_resources() == resources
 
-
     test_db.remove_guild(guild_db)
+    assert test_db.get_guilds() == []
+
+
+
+def test_rollback():
+    guild_db1: PostgresDatabase.Guild = test_db.add_guild(1)
+    guild_db2: PostgresDatabase.Guild = test_db.add_guild(2)
+    test_db.remove_guild(guild_db2)
+
+    # now only guild 1 is in there
+
+    try:
+        with test_db.transaction(con=None) as con:
+            test_db.remove_guild(guild_db1, con=con) # works
+            test_db.get_guild(guild_db2.id, con=con) # fails, whole transaction rolled back
+    except GuildNotFound:
+        pass
+
+    # guild 1 should now still exist
+
+    assert test_db.get_guild(guild_db1.id)
+
+    test_db.remove_guild(guild_db1)
     assert test_db.get_guilds() == []

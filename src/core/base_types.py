@@ -285,25 +285,34 @@ class Database:
 
     class TransactionManager:
 
-        def __init__(self, parent, con):
+        def __init__(self, parent, con, trans):
             self.parent = parent
             self.con = con
+            self.trans = trans
 
         def __enter__(self):
             return self.con
 
         def __exit__(self, exc_type, exc_value, traceback):
-            if exc_type is not None:
-                self.parent.rollback_connection(self.con)
-                return False
-            self.parent.commit_connection(self.con)
-            return True
+            if self.trans is None:
+                if exc_type is not None:
+                    return False
+                return True
+            else:
+                if exc_type is not None:
+                    self.parent.rollback_transaction(self.trans)
+                    return False
+
+                self.parent.commit_transaction(self.trans)
+                return True
 
     def transaction(self, con=None):
+        is_top = con is None
+        trans = None
         if con is None:
-            con = self.start_connection()
+            con, trans = self.start_connection()
 
-        return Database.TransactionManager(self, con)
+        return Database.TransactionManager(self, con, trans)
 
     def fresh_event_id(self, guild, con=None):
         pass
@@ -700,7 +709,7 @@ class Database:
 
                 self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
-                        self.parent, self.parent.fresh_event_id(self.guild), self.guild, until, self
+                        self.parent, self.parent.fresh_event_id(self.guild, con=con), self.guild, until, self
                     ),
                     con=con,
                 )

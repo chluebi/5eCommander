@@ -2,6 +2,7 @@ import random
 from copy import deepcopy
 
 from sqlalchemy import (
+    RootTransaction,
     Transaction,
     Connection,
     Engine,
@@ -294,16 +295,18 @@ class PostgresDatabase(Database):
 
     # transaction stuff
     def start_connection(self):
-        return self.engine.connect()
+        con = self.engine.connect()
+        trans = con.begin()
+        return con, trans
 
     def end_connection(self, con: Connection):
         con.close()
 
-    def commit_connection(self, con: Connection):
-        con.commit()
+    def commit_transaction(self, trans: RootTransaction):
+        trans.commit()
 
-    def rollback_connection(self, con: Connection):
-        con.rollback()
+    def rollback_transaction(self, trans: RootTransaction):
+        trans.rollback()
 
     def fresh_event_id(self, guild, con=None):
         with self.transaction(con=con) as con:
@@ -397,7 +400,6 @@ class PostgresDatabase(Database):
         guild = PostgresDatabase.Guild(self, guild_id, self.start_condition.start_config)
 
         with self.transaction(con=con) as con:
-
             sql_guild = text(
                 """
                 INSERT INTO guilds (id, region_recharge, creature_recharge, free_protection, free_expire)
@@ -569,7 +571,7 @@ class PostgresDatabase(Database):
                     creature = self.add_creature(base_creature, player, con=con)
                     player.add_to_discard(creature, con=con)
 
-                player.reshuffle_discard()
+                player.reshuffle_discard(con=con)
 
                 for resource_type in BaseResources:
                     sql = text(
@@ -621,7 +623,7 @@ class PostgresDatabase(Database):
             self, creature: BaseCreature, owner: Database.Player, con=None
         ) -> Database.Creature:
             with self.parent.transaction(con=con) as con:
-                creature_id = self.fresh_creature_id()
+                creature_id = self.fresh_creature_id(con=con)
                 sql = text(
                     """
                     INSERT INTO creatures (id, guild_id, base_creature_id, owner_id)
