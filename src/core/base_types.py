@@ -31,8 +31,28 @@ class EmptyDeckException(Exception):
     pass
 
 
-class NoCreaturesToDeleteProvided(Exception):
-    pass
+class MissingExtraData(Exception):
+
+    def __init__(self, message="", extra_data=None):
+        super().__init__(message)
+        self.extra_data = extra_data if extra_data is not None else {}
+
+    def __str__(self):
+        if self.extra_data:
+            return f"{super().__str__()} (Extra data: {self.extra_data})"
+        return super().__str__()
+
+
+class BadExtraData(Exception):
+
+    def __init__(self, message="", extra_data=None):
+        super().__init__(message)
+        self.extra_data = extra_data if extra_data is not None else {}
+
+    def __str__(self):
+        if self.extra_data:
+            return f"{super().__str__()} (Extra data: {self.extra_data})"
+        return super().__str__()
 
 
 class CreatureCannotQuestHere(Exception):
@@ -469,9 +489,7 @@ class Database:
         def get_full_deck(self, con=None):
             with self.parent.transaction(con=con) as con:
                 return sorted(
-                    self.get_deck(con=con)
-                    + self.get_hand(con=con)
-                    + self.get_discard(con=None),
+                    self.get_deck(con=con) + self.get_hand(con=con) + self.get_discard(con=None),
                     key=lambda x: str(x),
                 )
 
@@ -509,29 +527,27 @@ class Database:
             return True
 
         def _delete_creatures(self, hand_size: int, a: int, extra_data: dict, con=None):
-            if hand_size < a:
-                raise NoCreaturesToDeleteProvided(
-                    "Need to delete {} creatures, only have {} creatures in hand".format(
-                        a, hand_size
-                    )
-                )
+
+            expected_extra_data = {
+                "creatures_to_delete": {"text": "creatures to delete", "type": "list creature"}
+            }
 
             try:
                 creatures_to_delete = extra_data["creatures_to_delete"]
             except KeyError:
-                raise NoCreaturesToDeleteProvided()
+                raise MissingExtraData(extra_data=expected_extra_data)
 
-            if len(creatures_to_delete) < a:
-                raise NoCreaturesToDeleteProvided(
-                    "Expected at least {} creatures to delete, only got {}".format(
-                        a, len(creatures_to_delete)
-                    )
-                )
+            try:
+                assert len(set(creatures_to_delete)) >= a
+                for creature_id in creatures_to_delete:
+                    assert self.guild.get_creature(creature_id, con=con).owner == self
+            except Exception as e:
+                BadExtraData(str(e), extra_data=expected_extra_data)
 
             # like this extra_data can be further propagated
-            extra_data["creatures_to_delete"] -= a
-
             creatures_to_delete = creatures_to_delete[:a]
+            extra_data["creatures_to_delete"] = creatures_to_delete
+
             with self.parent.transaction(con=con) as con:
                 for c in creatures_to_delete:
                     self.delete_creature_from_hand(c)

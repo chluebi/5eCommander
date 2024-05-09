@@ -62,7 +62,7 @@ class PostgresDatabase(Database):
             Column("guild_id", BigInteger, nullable=False),
             Column("timestamp", BigInteger, nullable=False),
             ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
-            PrimaryKeyConstraint("id", "guild_id", name="pk_events")
+            PrimaryKeyConstraint("id", "guild_id", name="pk_events"),
         )
 
         region_recharge_event_table = Table(
@@ -71,8 +71,12 @@ class PostgresDatabase(Database):
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("region_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
-            ForeignKeyConstraint(["region_id", "guild_id"], ["regions.id", "regions.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["region_id", "guild_id"], ["regions.id", "regions.guild_id"], ondelete="CASCADE"
+            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_region_recharge_events"),
         )
 
@@ -82,8 +86,14 @@ class PostgresDatabase(Database):
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
-            ForeignKeyConstraint(["creature_id", "guild_id"], ["creatures.id", "creatures.guild_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["creature_id", "guild_id"],
+                ["creatures.id", "creatures.guild_id"],
+                ondelete="CASCADE",
+            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_creature_recharge_events"),
         )
 
@@ -94,8 +104,18 @@ class PostgresDatabase(Database):
             Column("guild_id", BigInteger, nullable=False),
             Column("free_creature_channel_id", BigInteger, nullable=False),
             Column("free_creature_message_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
-            ForeignKeyConstraint(["guild_id", "free_creature_channel_id", "free_creature_message_id"], ["free_creatures.guild_id", "free_creatures.channel_id", "free_creatures.message_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "free_creature_channel_id", "free_creature_message_id"],
+                [
+                    "free_creatures.guild_id",
+                    "free_creatures.channel_id",
+                    "free_creatures.message_id",
+                ],
+                ondelete="CASCADE",
+            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_protected_events"),
         )
 
@@ -106,8 +126,18 @@ class PostgresDatabase(Database):
             Column("guild_id", BigInteger, nullable=False),
             Column("free_creature_channel_id", BigInteger, nullable=False),
             Column("free_creature_message_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"),
-            ForeignKeyConstraint(["guild_id", "free_creature_channel_id", "free_creature_message_id"], ["free_creatures.guild_id", "free_creatures.channel_id", "free_creatures.message_id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "free_creature_channel_id", "free_creature_message_id"],
+                [
+                    "free_creatures.guild_id",
+                    "free_creatures.channel_id",
+                    "free_creatures.message_id",
+                ],
+                ondelete="CASCADE",
+            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_expires_events"),
         )
 
@@ -288,11 +318,7 @@ class PostgresDatabase(Database):
             )
             con.execute(
                 event_sql,
-                {
-                    "id": event.id,
-                    "guild_id": event.guild.id,
-                    "timestamp": event.timestamp
-                }
+                {"id": event.id, "guild_id": event.guild.id, "timestamp": event.timestamp},
             )
             if isinstance(event, Database.Region.RegionRechargeEvent):
                 sql = text(
@@ -304,7 +330,7 @@ class PostgresDatabase(Database):
                         "id": event.id,
                         "guild_id": event.guild.id,
                         "region_id": event.region.id,
-                    }
+                    },
                 )
             elif isinstance(event, Database.Creature.CreatureRechargeEvent):
                 sql = text(
@@ -316,7 +342,7 @@ class PostgresDatabase(Database):
                         "id": event.id,
                         "guild_id": event.guild.id,
                         "creature_id": event.creature.id,
-                    }
+                    },
                 )
             elif isinstance(event, Database.FreeCreature.FreeCreatureProtectedEvent):
                 sql = text(
@@ -328,7 +354,7 @@ class PostgresDatabase(Database):
                         "id": event.id,
                         "guild_id": event.guild.id,
                         "free_creature_id": event.free_creature.id,
-                    }
+                    },
                 )
             elif isinstance(event, Database.FreeCreature.FreeCreatureExpiresEvent):
                 sql = text(
@@ -340,7 +366,7 @@ class PostgresDatabase(Database):
                         "id": event.id,
                         "guild_id": event.guild.id,
                         "free_creature_id": event.free_creature.id,
-                    }
+                    },
                 )
 
     def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
@@ -353,11 +379,13 @@ class PostgresDatabase(Database):
                 "free_creature_expires_events",
             ]
             for table in tables:
-                sql = text(f"""
+                sql = text(
+                    f"""
                     SELECT e.id, e.guild_id, e.timestamp, r.* FROM {table} r
                     JOIN events e ON e.id = r.id AND e.guild_id = r.guild_id
                     WHERE e.timestamp BETWEEN :start AND :end
-                """)
+                """
+                )
                 result = con.execute(
                     sql, {"start": timestamp_start, "end": timestamp_end}
                 ).fetchall()
@@ -415,9 +443,7 @@ class PostgresDatabase(Database):
             result = con.execute(sql, {"id": guild_id}).fetchone()
 
             if not result:
-                raise GuildNotFound(
-                    "No guilds with this guild_id"
-                )
+                raise GuildNotFound("No guilds with this guild_id")
 
             guild = PostgresDatabase.Guild(
                 self,
@@ -520,9 +546,7 @@ class PostgresDatabase(Database):
                 )
                 result = con.execute(sql, {"id": region_id, "guild_id": self.id}).fetchone()
                 if not result:
-                    raise RegionNotFound(
-                        "No regions with this base region"
-                    )
+                    raise RegionNotFound("No regions with this base region")
                 return PostgresDatabase.Region(self.parent, result[0], regions[result[1]], self)
 
         def remove_region(self, region: Database.Region, con=None) -> Database.Region:
@@ -576,9 +600,7 @@ class PostgresDatabase(Database):
                 sql = text("SELECT id FROM players WHERE guild_id = :guild_id AND id = :player_id")
                 result = con.execute(sql, {"guild_id": self.id, "player_id": player_id}).fetchone()
                 if not result:
-                    raise PlayerNotFound(
-                        "No players with this player_id"
-                    )
+                    raise PlayerNotFound("No players with this player_id")
                 return PostgresDatabase.Player(self.parent, result[0], self)
 
         def remove_player(self, player: Database.Player, con=None) -> Database.Player:
@@ -643,9 +665,7 @@ class PostgresDatabase(Database):
                     sql, {"creature_id": creature_id, "guild_id": self.id}
                 ).fetchone()
                 if not result:
-                    raise CreatureNotFound(
-                        "No creatures with this id"
-                    )
+                    raise CreatureNotFound("No creatures with this id")
                 return PostgresDatabase.Creature(
                     self.parent,
                     result[0],
@@ -725,11 +745,13 @@ class PostgresDatabase(Database):
 
         def get_free_creatures(self, con=None):
             with self.parent.transaction(con=con) as con:
-                sql = text("""
+                sql = text(
+                    """
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
                     FROM free_creatures 
                     WHERE guild_id = :guild_id
-                """)
+                """
+                )
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
                 return [
                     PostgresDatabase.FreeCreature(
@@ -742,20 +764,20 @@ class PostgresDatabase(Database):
             self, channel_id: int, message_id: int, con=None
         ) -> Database.FreeCreature:
             with self.parent.transaction(con=con) as con:
-                sql = text("""
+                sql = text(
+                    """
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
                     FROM free_creatures 
                     WHERE guild_id = :guild_id 
                     AND channel_id = :channel_id 
                     AND message_id = :message_id
-                """)
+                """
+                )
                 result = con.execute(
                     sql, {"guild_id": self.id, "channel_id": channel_id, "message_id": message_id}
                 ).fetchone()
                 if not result:
-                    raise CreatureNotFound(
-                        "No creatures with this id"
-                    )
+                    raise CreatureNotFound("No creatures with this id")
                 return PostgresDatabase.FreeCreature(
                     self.parent,
                     creatures[result[0]],
@@ -846,7 +868,9 @@ class PostgresDatabase(Database):
                     sql, {"guild_id": self.guild.id, "region_id": self.id}
                 ).fetchone()
                 if result is not None:
-                    creature = PostgresDatabase.Creature(self.parent, result[0], creatures[result[1]], self.guild, self)
+                    creature = PostgresDatabase.Creature(
+                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    )
                     return (creature, result[2])
                 return (None, None)
 
@@ -1004,7 +1028,9 @@ class PostgresDatabase(Database):
                 if not result:
                     raise EmptyDeckException()
 
-                drawn_card = PostgresDatabase.Creature(self.parent, result[0], creatures[result[1]], self.guild, self)
+                drawn_card = PostgresDatabase.Creature(
+                    self.parent, result[0], creatures[result[1]], self.guild, self
+                )
 
                 sql = text(
                     """
@@ -1200,7 +1226,14 @@ class PostgresDatabase(Database):
                         AND f.free_creature_message_id = :free_creature_message_id
                 """
                 )
-                con.execute(sql_protected, {"guild_id": self.guild.id, "free_creature_channel_id": self.channel_id, "free_creature_message_id": self.message_id})
+                con.execute(
+                    sql_protected,
+                    {
+                        "guild_id": self.guild.id,
+                        "free_creature_channel_id": self.channel_id,
+                        "free_creature_message_id": self.message_id,
+                    },
+                )
 
                 sql_expires = text(
                     """
@@ -1213,4 +1246,11 @@ class PostgresDatabase(Database):
                         AND f.free_creature_message_id = :free_creature_message_id
                 """
                 )
-                con.execute(sql_expires, {"guild_id": self.guild.id, "free_creature_channel_id": self.channel_id, "free_creature_message_id": self.message_id})
+                con.execute(
+                    sql_expires,
+                    {
+                        "guild_id": self.guild.id,
+                        "free_creature_channel_id": self.channel_id,
+                        "free_creature_message_id": self.message_id,
+                    },
+                )
