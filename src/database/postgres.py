@@ -26,7 +26,7 @@ from src.core.base_types import (
     BaseRegion,
     BaseCreature,
     StartCondition,
-    Event
+    Event,
 )
 
 from src.database.database import Database
@@ -250,12 +250,11 @@ class PostgresDatabase(Database):
 
         def rollback_transaction(self):
             self.trans.rollback()
-            
+
         def execute(self, *args):
             return self.con.execute(*args)
 
-
-    def transaction(self, parent:TransactionManager=None):
+    def transaction(self, parent: TransactionManager = None):
         return self.TransactionManager(self, parent)
 
     # transaction stuff

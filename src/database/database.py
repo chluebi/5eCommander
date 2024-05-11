@@ -40,7 +40,7 @@ class Database:
 
             self.con = None
             self.trans = None
-            
+
         def __enter__(self):
             if self.parent_manager is None:
                 con, trans = self.start_connection()
@@ -48,7 +48,7 @@ class Database:
                 con = self.parent_manager.con
                 trans = self.parent_manager.trans
                 self.parent_manager.children.append(self)
-        
+
             self.con = con
             self.trans = trans
 
@@ -59,7 +59,7 @@ class Database:
                 if exc_type is not None:
                     self.rollback_transaction()
                     return False
-                
+
                 for e in self.get_events():
                     self.parent.add_event(e, con=self)
 
@@ -70,7 +70,7 @@ class Database:
                 if exc_type is not None:
                     return False
                 return True
-            
+
         def start_connection(self):
             pass
 
@@ -82,7 +82,7 @@ class Database:
 
         def rollback_transaction(self):
             pass
-            
+
         def execute(self, *args):
             pass
 
@@ -94,8 +94,7 @@ class Database:
         def get_events(self):
             return self.events + sum([c.get_events() for c in self.children], [])
 
-
-    def transaction(self, parent:TransactionManager=None):
+    def transaction(self, parent: TransactionManager = None):
         return self.TransactionManager(self, parent)
 
     def fresh_event_id(self, guild, con=None):
@@ -504,7 +503,7 @@ class Database:
             with self.parent.transaction(parent=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
-                con.add_event(
+                self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
                         self.parent.fresh_event_id(self.guild, con=con),
