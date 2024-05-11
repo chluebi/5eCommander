@@ -33,10 +33,15 @@ class Database:
     class TransactionManager:
 
         def __init__(self, parent, parent_manager):
-            self.parent = parent
+            self.parent: Database = parent
             self.parent_manager = parent_manager
-            self.children = []
+            self.children: list[Database.TransactionManager] = []
+            self.events: list[Event] = []
 
+            self.con = None
+            self.trans = None
+            
+        def __enter__(self):
             if self.parent_manager is None:
                 con, trans = self.start_connection()
             else:
@@ -47,7 +52,6 @@ class Database:
             self.con = con
             self.trans = trans
 
-        def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc_value, traceback):
@@ -55,6 +59,10 @@ class Database:
                 if exc_type is not None:
                     self.rollback_transaction()
                     return False
+                
+                for e in self.get_events():
+                    self.parent.add_event(e, con=self)
+
                 self.commit_transaction()
                 self.end_connection()
                 return True
@@ -77,6 +85,14 @@ class Database:
             
         def execute(self, *args):
             pass
+
+        def add_event(self, event: Event):
+            if self.parent_manager and self.parent_manager.events != []:
+                event.parent_event = self.parent_manager.events[-1]
+            self.events.append(event)
+
+        def get_events(self):
+            return self.events + sum([c.get_events() for c in self.children], [])
 
 
     def transaction(self, parent:TransactionManager=None):
@@ -488,7 +504,7 @@ class Database:
             with self.parent.transaction(parent=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
-                self.parent.add_event(
+                con.add_event(
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
                         self.parent.fresh_event_id(self.guild, con=con),
