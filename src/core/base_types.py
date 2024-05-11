@@ -1,4 +1,5 @@
 import time
+import json
 from typing import Union
 from enum import Enum
 from collections import namedtuple, defaultdict
@@ -295,11 +296,23 @@ class StartCondition:
 
 class Event:
 
-    def __init__(self, parent, id: int, timestamp: int, guild):
+    event_type = "base_event"
+
+    def __init__(self, parent, id: int, timestamp: int, parent_event, guild):
         self.parent = parent
         self.id = id
         self.timestamp = timestamp
+        self.parent_event = parent_event
         self.guild = guild
+
+    def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+        return Event(parent, id, timestamp, parent_event, guild)
+
+    def extra_data(self) -> str:
+        return json.dumps({})
+
+    def text(self) -> str:
+        return ""
 
     def resolve(self, con=None):
         pass
@@ -362,9 +375,6 @@ class Database:
     def add_event(self, event: Event, con=None):
         pass
 
-    def get_events(self, timestamp_start: int, timestamp_end: int, con=None):
-        pass
-
     def add_guild(self, guild_id: int, con=None):
         pass
 
@@ -390,6 +400,9 @@ class Database:
 
         def __repr__(self) -> str:
             return f"<DatabaseGuild: {self.id}>"
+        
+        def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
+            pass
 
         def set_config(self, config: dict, con=None):
             pass
@@ -406,7 +419,7 @@ class Database:
         def get_regions(self, con=None):
             pass
 
-        def get_region(self, region: BaseRegion, con=None):
+        def get_region(self, region_id: int, con=None):
             pass
 
         def remove_region(self, region: BaseRegion, con=None):
@@ -496,12 +509,23 @@ class Database:
 
         class RegionRechargeEvent(Event):
 
-            def __init__(self, parent, id: int, guild, timestamp: int, region):
-                super().__init__(parent, id, timestamp, guild)
-                self.region = region
+            event_type = "region_recharge"
+
+            def __init__(self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.region_id = region_id
+
+            def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+                return Database.Region.RegionRechargeEvent(parent, id, timestamp, parent_event, guild, extra_data['region_id'])
+
+            def extra_data(self) -> str:
+                return json.dumps({"region_id": self.region_id})
+
+            def text(self) -> str:
+                return "{region_id} has recharged"
 
             def resolve(self, con=None):
-                self.region.unoccupy(self.timestamp, con=con)
+                self.guild.get_region(self.region_id).unoccupy(self.timestamp, con=con)
 
     class Player:
 
@@ -741,7 +765,7 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
-        def play(self, con=None):
+        def play(self, parent_event=None, con=None):
             with self.parent.transaction(con=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
@@ -749,21 +773,35 @@ class Database:
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
                         self.parent.fresh_event_id(self.guild, con=con),
-                        self.guild,
                         until,
-                        self,
+                        parent_event,
+                        self.guild,
+                        self.id,
                     ),
                     con=con,
                 )
 
         class CreatureRechargeEvent(Event):
 
-            def __init__(self, parent, id: int, guild, timestamp: int, creature):
-                super().__init__(parent, id, timestamp, guild)
-                self.creature = creature
+            event_type = "creature_recharge"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, creature_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.creature_id = creature_id
+
+            def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+                return Database.Creature.CreatureRechargeEvent(parent, id, timestamp, parent_event, guild, extra_data['creature_id'])
+
+            def extra_data(self) -> str:
+                return json.dumps({"creature_id": self.creature_id})
+
+            def text(self) -> str:
+                return "{creature_id} has recharged"
 
             def resolve(self, con=None):
-                self.creature.owner.add_to_discard(self.creature, con=con)
+                self.guild.get_creature(self.creature_id).owner.add_to_discard(self.creature, con=con)
 
     class FreeCreature:
 
@@ -834,15 +872,41 @@ class Database:
 
         class FreeCreatureProtectedEvent(Event):
 
-            def __init__(self, parent, id: int, guild, timestamp: int, free_creature):
-                super().__init__(parent, id, timestamp, guild)
-                self.free_creature = free_creature
+            event_type = "free_creature_protected"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, free_creature_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.free_creature_id = free_creature_id
+
+            def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+                return Database.FreeCreature.FreeCreatureProtectedEvent(parent, id, timestamp, parent_event, guild, extra_data['free_creature_id'])
+
+            def extra_data(self) -> str:
+                return json.dumps({"free_creature_id": self.free_creature_id})
+
+            def text(self) -> str:
+                return "{free_creature_id} is no longer protected"
 
         class FreeCreatureExpiresEvent(Event):
 
-            def __init__(self, parent, id: int, guild, timestamp: int, free_creature):
-                super().__init__(parent, id, timestamp, guild)
-                self.free_creature = free_creature
+            event_type = "free_creature_expires"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, free_creature_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.free_creature_id = free_creature_id
+
+            def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+                return Database.FreeCreature.FreeCreatureProtectedEvent(parent, id, timestamp, parent_event, guild, extra_data['free_creature_id'])
+
+            def extra_data(self) -> str:
+                return json.dumps({"free_creature_id": self.free_creature_id})
+
+            def text(self) -> str:
+                return "{free_creature_id} has expired"
 
             def resolve(self, con=None):
-                self.guild.remove_free_creature(self.free_creature, con=con)
+                self.guild.remove_free_creature(self.free_creature_id, con=con)

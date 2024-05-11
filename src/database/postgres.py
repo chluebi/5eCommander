@@ -1,4 +1,5 @@
 import random
+import json
 from copy import deepcopy
 
 from sqlalchemy import (
@@ -11,9 +12,11 @@ from sqlalchemy import (
     Table,
     Column,
     Integer,
+    BigInteger,
+    JSON,
+    String,
     ForeignKeyConstraint,
     PrimaryKeyConstraint,
-    BigInteger,
 )
 
 from src.core.base_types import (
@@ -62,84 +65,16 @@ class PostgresDatabase(Database):
             Column("id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("timestamp", BigInteger, nullable=False),
+            Column("parent_event_id", BigInteger, nullable=True),
+            Column("event_type", String, nullable=False),
+            Column("extra_data", JSON, nullable=True),
             ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["parent_event_id", "guild_id"],
+                ["events.id", "events.guild_id"],
+                ondelete="CASCADE",
+            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_events"),
-        )
-
-        region_recharge_event_table = Table(
-            "region_recharge_events",
-            metadata,
-            Column("id", BigInteger, nullable=False),
-            Column("guild_id", BigInteger, nullable=False),
-            Column("region_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(
-                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
-            ),
-            ForeignKeyConstraint(
-                ["region_id", "guild_id"], ["regions.id", "regions.guild_id"], ondelete="CASCADE"
-            ),
-            PrimaryKeyConstraint("id", "guild_id", name="pk_region_recharge_events"),
-        )
-
-        creature_recharge_event_table = Table(
-            "creature_recharge_events",
-            metadata,
-            Column("id", BigInteger, nullable=False),
-            Column("guild_id", BigInteger, nullable=False),
-            Column("creature_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(
-                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
-            ),
-            ForeignKeyConstraint(
-                ["creature_id", "guild_id"],
-                ["creatures.id", "creatures.guild_id"],
-                ondelete="CASCADE",
-            ),
-            PrimaryKeyConstraint("id", "guild_id", name="pk_creature_recharge_events"),
-        )
-
-        free_creature_protected_event_table = Table(
-            "free_creature_protected_events",
-            metadata,
-            Column("id", BigInteger, nullable=False),
-            Column("guild_id", BigInteger, nullable=False),
-            Column("free_creature_channel_id", BigInteger, nullable=False),
-            Column("free_creature_message_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(
-                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
-            ),
-            ForeignKeyConstraint(
-                ["guild_id", "free_creature_channel_id", "free_creature_message_id"],
-                [
-                    "free_creatures.guild_id",
-                    "free_creatures.channel_id",
-                    "free_creatures.message_id",
-                ],
-                ondelete="CASCADE",
-            ),
-            PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_protected_events"),
-        )
-
-        free_creature_expires_event_table = Table(
-            "free_creature_expires_events",
-            metadata,
-            Column("id", BigInteger, nullable=False),
-            Column("guild_id", BigInteger, nullable=False),
-            Column("free_creature_channel_id", BigInteger, nullable=False),
-            Column("free_creature_message_id", BigInteger, nullable=False),
-            ForeignKeyConstraint(
-                ["id", "guild_id"], ["events.id", "events.guild_id"], ondelete="CASCADE"
-            ),
-            ForeignKeyConstraint(
-                ["guild_id", "free_creature_channel_id", "free_creature_message_id"],
-                [
-                    "free_creatures.guild_id",
-                    "free_creatures.channel_id",
-                    "free_creatures.message_id",
-                ],
-                ondelete="CASCADE",
-            ),
-            PrimaryKeyConstraint("id", "guild_id", name="pk_free_creature_expires_events"),
         )
 
         region_table = Table(
@@ -317,87 +252,23 @@ class PostgresDatabase(Database):
     def add_event(self, event: Event, con=None):
         with self.transaction(con=con) as con:
             event_sql = text(
-                "INSERT INTO events (id, guild_id, timestamp) VALUES (:id, :guild_id, :timestamp)"
+                "INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data) VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data)"
             )
             con.execute(
                 event_sql,
-                {"id": event.id, "guild_id": event.guild.id, "timestamp": event.timestamp},
+                {
+                    "id": event.id,
+                    "guild_id": event.guild.id,
+                    "timestamp": event.timestamp,
+                    "parent_event_id": event.parent_event.id if event.parent_event else None,
+                    "event_type": event.event_type,
+                    "extra_data": event.extra_data(),
+                },
             )
-            if isinstance(event, Database.Region.RegionRechargeEvent):
-                sql = text(
-                    "INSERT INTO region_recharge_events (id, guild_id, region_id) VALUES (:id, :guild_id, :region_id)"
-                )
-                con.execute(
-                    sql,
-                    {
-                        "id": event.id,
-                        "guild_id": event.guild.id,
-                        "region_id": event.region.id,
-                    },
-                )
-            elif isinstance(event, Database.Creature.CreatureRechargeEvent):
-                sql = text(
-                    "INSERT INTO creature_recharge_events (id, guild_id, creature_id) VALUES (:id, :guild_id, :creature_id)"
-                )
-                con.execute(
-                    sql,
-                    {
-                        "id": event.id,
-                        "guild_id": event.guild.id,
-                        "creature_id": event.creature.id,
-                    },
-                )
-            elif isinstance(event, Database.FreeCreature.FreeCreatureProtectedEvent):
-                sql = text(
-                    "INSERT INTO free_creature_protected_events (id, guild_id, free_creature_id) VALUES (:id, :guild_id, :free_creature_id)"
-                )
-                con.execute(
-                    sql,
-                    {
-                        "id": event.id,
-                        "guild_id": event.guild.id,
-                        "free_creature_id": event.free_creature.id,
-                    },
-                )
-            elif isinstance(event, Database.FreeCreature.FreeCreatureExpiresEvent):
-                sql = text(
-                    "INSERT INTO free_creature_expires_events (id, guild_id, free_creature_id) VALUES (:id, :guild_id, :free_creature_id)"
-                )
-                con.execute(
-                    sql,
-                    {
-                        "id": event.id,
-                        "guild_id": event.guild.id,
-                        "free_creature_id": event.free_creature.id,
-                    },
-                )
-
-    def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
-        with self.transaction(con=con) as con:
-            results = []
-            tables = [
-                "region_recharge_events",
-                "creature_recharge_events",
-                "free_creature_protected_events",
-                "free_creature_expires_events",
-            ]
-            for table in tables:
-                sql = text(
-                    f"""
-                    SELECT e.id, e.guild_id, e.timestamp, r.* FROM {table} r
-                    JOIN events e ON e.id = r.id AND e.guild_id = r.guild_id
-                    WHERE e.timestamp BETWEEN :start AND :end
-                """
-                )
-                result = con.execute(
-                    sql, {"start": timestamp_start, "end": timestamp_end}
-                ).fetchall()
-                results.extend(result)
-            return results
 
     def add_guild(self, guild_id: int, con=None) -> Database.Guild:
 
-        guild = PostgresDatabase.Guild(self, guild_id, self.start_condition.start_config)
+        guild = PostgresDatabase.Guild(self, guild_id)
 
         with self.transaction(con=con) as con:
             sql_guild = text(
@@ -419,19 +290,13 @@ class PostgresDatabase(Database):
     def get_guilds(self, con=None):
         with self.transaction(con=con) as con:
             sql = text(
-                "SELECT id, region_recharge, creature_recharge, free_protection, free_expire FROM guilds"
+                "SELECT id FROM guilds"
             )
             result = con.execute(sql)
             guilds = [
                 PostgresDatabase.Guild(
                     self,
-                    row[0],
-                    {
-                        "region_recharge": row[1],
-                        "creature_recharge": row[2],
-                        "free_protection": row[3],
-                        "free_expire": row[4],
-                    },
+                    row[0]
                 )
                 for row in result
             ]
@@ -440,7 +305,7 @@ class PostgresDatabase(Database):
     def get_guild(self, guild_id: int, con=None) -> Database.Guild:
         with self.transaction(con=con) as con:
             sql = text(
-                "SELECT id, region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE id = :id"
+                "SELECT id FROM guilds WHERE id = :id"
             )
             result = con.execute(sql, {"id": guild_id}).fetchone()
 
@@ -449,13 +314,7 @@ class PostgresDatabase(Database):
 
             guild = PostgresDatabase.Guild(
                 self,
-                result[0],
-                {
-                    "region_recharge": result[1],
-                    "creature_recharge": result[2],
-                    "free_protection": result[3],
-                    "free_expire": result[4],
-                },
+                result[0]
             )
 
             return guild
@@ -468,9 +327,47 @@ class PostgresDatabase(Database):
 
     class Guild(Database.Guild):
 
-        def __init__(self, parent: Database, guild_id: int, config: dict):
+        def __init__(self, parent: Database, guild_id: int):
             super().__init__(parent, guild_id)
-            self.config = config
+
+        def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
+            with self.parent.transaction(con=con) as con:
+                event_classes: list[type[Event]] = [
+                    Database.Region.RegionRechargeEvent,
+                    Database.Creature.CreatureRechargeEvent,
+                    Database.FreeCreature.FreeCreatureProtectedEvent,
+                    Database.FreeCreature.FreeCreatureExpiresEvent,
+                ]
+
+                sql = text(
+                    f"""
+                    SELECT * FROM events
+                    WHERE guild_id = :guild_id
+                    AND timestamp BETWEEN :start AND :end
+                """
+                )
+
+                results = con.execute(
+                    sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end}
+                ).fetchall()
+
+                events = []
+                for r in results:
+                    event = None
+                    extra_data = r[5]
+
+                    for event_class in event_classes:
+
+                        if r[4] == event_class.event_type:
+                            event = event_class.from_extra_data(
+                                self.parent, r[0], r[2], r[3], self, extra_data
+                            )
+                            break
+                    
+                    assert event is not None
+                    events.append(event)
+
+                return events
 
         def set_config(self, config: dict, con=None) -> None:
             with self.parent.transaction(con=con) as con:
@@ -502,13 +399,13 @@ class PostgresDatabase(Database):
                 )
                 result = con.execute(sql, {"guild_id": self.id}).fetchone()
                 if result is not None:
-                    self.config = {
+                    config = {
                         "region_recharge": result[0],
                         "creature_recharge": result[1],
                         "free_protection": result[2],
                         "free_expire": result[3],
                     }
-                return self.config
+                return config
 
         def fresh_region_id(self, con=None) -> int:
             with self.parent.transaction(con=con) as con:
@@ -714,8 +611,9 @@ class PostgresDatabase(Database):
             con=None,
         ) -> Database.FreeCreature:
             with self.parent.transaction(con=con) as con:
-                timestamp_protected = self.parent.timestamp_after(self.config["free_protection"])
-                timestamp_expires = self.parent.timestamp_after(self.config["free_expire"])
+                config = self.get_config(con=con)
+                timestamp_protected = self.parent.timestamp_after(config["free_protection"])
+                timestamp_expires = self.parent.timestamp_after(config["free_expire"])
                 sql = text(
                     """
                     INSERT INTO free_creatures (base_creature_id, guild_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires)
@@ -838,7 +736,7 @@ class PostgresDatabase(Database):
                 event_id = self.parent.fresh_event_id(self.guild, con=con)
                 self.parent.add_event(
                     Database.Region.RegionRechargeEvent(
-                        self.parent, event_id, self.guild, until, self
+                        self.parent, event_id, until, None, self.guild, self.id
                     ),
                     con=con,
                 )
@@ -1210,49 +1108,5 @@ class PostgresDatabase(Database):
                         "guild_id": self.guild.id,
                         "channel_id": self.channel_id,
                         "message_id": self.message_id,
-                    },
-                )
-                self.remove_related_events(con=con)
-
-        def remove_related_events(self, con=None):
-            with self.parent.transaction(con=con) as con:
-
-                sql_protected = text(
-                    """
-                    DELETE FROM events
-                    USING free_creature_protected_events f
-                    WHERE events.id = f.id 
-                        AND events.guild_id = f.guild_id
-                        AND f.guild_id = :guild_id 
-                        AND f.free_creature_channel_id = :free_creature_channel_id 
-                        AND f.free_creature_message_id = :free_creature_message_id
-                """
-                )
-                con.execute(
-                    sql_protected,
-                    {
-                        "guild_id": self.guild.id,
-                        "free_creature_channel_id": self.channel_id,
-                        "free_creature_message_id": self.message_id,
-                    },
-                )
-
-                sql_expires = text(
-                    """
-                    DELETE FROM events
-                    USING free_creature_expires_events f
-                    WHERE events.id = f.id 
-                        AND events.guild_id = f.guild_id
-                        AND f.guild_id = :guild_id 
-                        AND f.free_creature_channel_id = :free_creature_channel_id 
-                        AND f.free_creature_message_id = :free_creature_message_id
-                """
-                )
-                con.execute(
-                    sql_expires,
-                    {
-                        "guild_id": self.guild.id,
-                        "free_creature_channel_id": self.channel_id,
-                        "free_creature_message_id": self.message_id,
                     },
                 )

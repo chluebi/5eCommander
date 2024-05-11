@@ -233,7 +233,7 @@ def test_playing():
     assert region1_db.occupied() == (None, None)
     assert isinstance(region1_db.region, Village)
 
-    assert len(test_db.get_events(0, time.time() * 2)) == 0
+    assert len(guild_db.get_events(0, time.time() * 2)) == 0
 
     resources: dict[Resource, int] = player8_db.get_resources()
 
@@ -244,8 +244,8 @@ def test_playing():
     resources[Resource.WORKERS] += 1
     assert player8_db.get_resources() == resources
 
-    assert len(test_db.get_events(0, time.time() * 2)) == 2
-    assert test_db.get_events(0, time.time() * 2)[0].timestamp > time.time()
+    assert len(guild_db.get_events(0, time.time() * 2)) == 2
+    assert guild_db.get_events(0, time.time() * 2)[0].timestamp > time.time()
 
     assert region1_db.occupied()[0] == creature2_db
     assert len(player8_db.get_hand()) == 4
