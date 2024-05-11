@@ -45,7 +45,7 @@ class SimpleRegion(BaseRegion):
         if price == []:
             return
 
-        with region_db.parent.transaction(con=con) as con:
+        with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.pay_price(price, con=con, extra_data=extra_data)
 
@@ -55,7 +55,7 @@ class SimpleRegion(BaseRegion):
         if gain == []:
             return
 
-        with region_db.parent.transaction(con=con) as con:
+        with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.gain(gain, con=con, extra_data=extra_data)
 

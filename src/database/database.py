@@ -30,48 +30,57 @@ class Database:
     def timestamp_after(self, seconds: int):
         return int(time.time() + seconds)
 
-    def start_connection(self):
-        pass
-
-    def end_connection(self, con):
-        pass
-
-    def commit_connection(self, con):
-        pass
-
-    def rollback_connection(self, con):
-        pass
-
     class TransactionManager:
 
-        def __init__(self, parent, con, trans):
+        def __init__(self, parent, parent_manager):
             self.parent = parent
+            self.parent_manager = parent_manager
+            self.children = []
+
+            if self.parent_manager is None:
+                con, trans = self.start_connection()
+            else:
+                con = self.parent_manager.con
+                trans = self.parent_manager.trans
+                self.parent_manager.children.append(self)
+        
             self.con = con
             self.trans = trans
 
         def __enter__(self):
-            return self.con
+            return self
 
         def __exit__(self, exc_type, exc_value, traceback):
-            if self.trans is None:
+            if self.parent_manager is None:
                 if exc_type is not None:
+                    self.rollback_transaction()
                     return False
+                self.commit_transaction()
+                self.end_connection()
                 return True
             else:
                 if exc_type is not None:
-                    self.parent.rollback_transaction(self.trans)
                     return False
-
-                self.parent.commit_transaction(self.trans)
                 return True
+            
+        def start_connection(self):
+            pass
 
-    def transaction(self, con=None):
-        is_top = con is None
-        trans = None
-        if con is None:
-            con, trans = self.start_connection()
+        def end_connection(self):
+            pass
 
-        return Database.TransactionManager(self, con, trans)
+        def commit_transaction(self):
+            pass
+
+        def rollback_transaction(self):
+            pass
+            
+        def execute(self, *args):
+            pass
+
+
+    def transaction(self, parent:TransactionManager=None):
+        return self.TransactionManager(self, parent)
 
     def fresh_event_id(self, guild, con=None):
         pass
@@ -272,7 +281,7 @@ class Database:
             pass
 
         def get_full_deck(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 return sorted(
                     self.get_deck(con=con) + self.get_hand(con=con) + self.get_discard(con=None),
                     key=lambda x: str(x),
@@ -298,7 +307,7 @@ class Database:
             if len(merged_prices) == 0:
                 return True
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 resources: dict[Resource, int] = self.get_resources(con=con)
                 hand_size: list = len(self.get_hand(con=con))
 
@@ -333,7 +342,7 @@ class Database:
             creatures_to_delete = creatures_to_delete[:a]
             extra_data["creatures_to_delete"] = creatures_to_delete
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 for c in creatures_to_delete:
                     self.delete_creature_from_hand(c)
 
@@ -347,7 +356,7 @@ class Database:
             if len(merged_gains) == 0:
                 return
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
 
                 resources: dict[Resource, int] = self.get_resources(con=con)
                 hand_size: list = len(self.get_hand(con=con))
@@ -372,7 +381,7 @@ class Database:
             if len(merged_price) == 0:
                 return
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
 
                 resources: dict[Resource, int] = self.get_resources(con=con)
                 hand_size: list = len(self.get_hand(con=con))
@@ -395,7 +404,7 @@ class Database:
             pass
 
         def draw_cards(self, N=1, con=None) -> tuple[int, bool]:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 cards_drawn = []
                 discard_reshuffled = False
                 for _ in range(N):
@@ -430,7 +439,7 @@ class Database:
             base_region: BaseRegion = region.region
             base_creature: BaseCreature = creature.creature
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 self.pay_price([Price(Resource.ORDERS, 1)], con=con)
                 base_creature.quest_ability_effect_price(
                     region, creature, con=con, extra_data=extra_data
@@ -447,7 +456,7 @@ class Database:
 
             base_creature: BaseCreature = creature.creature
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 base_creature.campaign_ability_effect_price(
                     creature, con=con, extra_data=extra_data
                 )
@@ -476,7 +485,7 @@ class Database:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
         def play(self, parent_event=None, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
                 self.parent.add_event(
@@ -580,7 +589,7 @@ class Database:
                     f"This creature is protected until {self.get_protected_timestamp()}"
                 )
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 owner.pay_price([Price(Resource.RALLY, self.creature.claim_cost)], con=con)
                 guild.remove_free_creature(self, con=con)
                 guild.add_creature(self.creature, owner, con=con)

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Connection,
     Engine,
     text,
+    TextClause,
     MetaData,
     Table,
     Column,
@@ -230,6 +231,33 @@ class PostgresDatabase(Database):
 
         metadata.create_all(self.engine)
 
+    class TransactionManager(Database.TransactionManager):
+
+        def __init__(self, parent, parent_manager):
+            super().__init__(parent, parent_manager)
+
+        def start_connection(self):
+            parent: PostgresDatabase = self.parent
+            con = parent.engine.connect()
+            trans = con.begin()
+            return con, trans
+
+        def end_connection(self):
+            self.con.close()
+
+        def commit_transaction(self):
+            self.trans.commit()
+
+        def rollback_transaction(self):
+            self.trans.rollback()
+            
+        def execute(self, *args):
+            return self.con.execute(*args)
+
+
+    def transaction(self, parent:TransactionManager=None):
+        return self.TransactionManager(self, parent)
+
     # transaction stuff
     def start_connection(self):
         con = self.engine.connect()
@@ -246,13 +274,13 @@ class PostgresDatabase(Database):
         trans.rollback()
 
     def fresh_event_id(self, guild, con=None):
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
             result = con.execute(sql, {"guild_id": guild.id}).scalar()
             return result
 
     def add_event(self, event: Event, con=None):
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             event_sql = text(
                 "INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data) VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data)"
             )
@@ -272,7 +300,7 @@ class PostgresDatabase(Database):
 
         guild = PostgresDatabase.Guild(self, guild_id)
 
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             sql_guild = text(
                 """
                 INSERT INTO guilds (id, region_recharge, creature_recharge, free_protection, free_expire)
@@ -290,14 +318,14 @@ class PostgresDatabase(Database):
         return guild
 
     def get_guilds(self, con=None):
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             sql = text("SELECT id FROM guilds")
             result = con.execute(sql)
             guilds = [PostgresDatabase.Guild(self, row[0]) for row in result]
             return guilds
 
     def get_guild(self, guild_id: int, con=None) -> Database.Guild:
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             sql = text("SELECT id FROM guilds WHERE id = :id")
             result = con.execute(sql, {"id": guild_id}).fetchone()
 
@@ -309,7 +337,7 @@ class PostgresDatabase(Database):
             return guild
 
     def remove_guild(self, guild: Database.Guild, con=None) -> Database.Guild:
-        with self.transaction(con=con) as con:
+        with self.transaction(parent=con) as con:
             sql = text("DELETE FROM guilds WHERE id = :guild_id")
             con.execute(sql, {"guild_id": guild.id})
             return guild
@@ -320,7 +348,7 @@ class PostgresDatabase(Database):
             super().__init__(parent, guild_id)
 
         def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 event_classes: list[type[Event]] = [
                     Database.Region.RegionRechargeEvent,
                     Database.Creature.CreatureRechargeEvent,
@@ -359,7 +387,7 @@ class PostgresDatabase(Database):
                 return events
 
         def set_config(self, config: dict, con=None) -> None:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     UPDATE Guilds SET 
@@ -382,7 +410,7 @@ class PostgresDatabase(Database):
                 )
 
         def get_config(self, con=None) -> dict:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE id = :guild_id"
                 )
@@ -397,7 +425,7 @@ class PostgresDatabase(Database):
                 return config
 
         def fresh_region_id(self, con=None) -> int:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
                 )
@@ -405,7 +433,7 @@ class PostgresDatabase(Database):
                 return result
 
         def add_region(self, base_region: BaseRegion, con=None) -> Database.Region:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 region_id = self.fresh_region_id(con=con)
                 sql = text(
                     """
@@ -419,7 +447,7 @@ class PostgresDatabase(Database):
                 return PostgresDatabase.Region(self.parent, region_id, base_region, self)
 
         def get_regions(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("SELECT id, base_region_id FROM regions WHERE guild_id = :guild_id")
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
                 return [
@@ -428,7 +456,7 @@ class PostgresDatabase(Database):
                 ]
 
         def get_region(self, region_id: int, con=None) -> Database.Region:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT id, base_region_id FROM regions WHERE id = :id AND guild_id = :guild_id"
                 )
@@ -438,7 +466,7 @@ class PostgresDatabase(Database):
                 return PostgresDatabase.Region(self.parent, result[0], regions[result[1]], self)
 
         def remove_region(self, region: Database.Region, con=None) -> Database.Region:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("DELETE FROM regions WHERE id = :id AND guild_id = :guild_id")
                 con.execute(sql, {"id": region.id, "guild_id": self.id})
                 return region
@@ -446,7 +474,7 @@ class PostgresDatabase(Database):
         def add_player(self, player_id: int, con=None) -> Database.Player:
             player = PostgresDatabase.Player(self.parent, player_id, self)
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql_player = text(
                     "INSERT INTO players (id, guild_id) VALUES (:player_id, :guild_id)"
                 )
@@ -478,13 +506,13 @@ class PostgresDatabase(Database):
             return player
 
         def get_players(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("SELECT id FROM players WHERE guild_id = :guild_id")
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
                 return [PostgresDatabase.Player(self.parent, row[0], self) for row in results]
 
         def get_player(self, player_id: int, con=None) -> Database.Player:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("SELECT id FROM players WHERE guild_id = :guild_id AND id = :player_id")
                 result = con.execute(sql, {"guild_id": self.id, "player_id": player_id}).fetchone()
                 if not result:
@@ -492,13 +520,13 @@ class PostgresDatabase(Database):
                 return PostgresDatabase.Player(self.parent, result[0], self)
 
         def remove_player(self, player: Database.Player, con=None) -> Database.Player:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("DELETE FROM players WHERE guild_id = :guild_id AND id = :player_id")
                 con.execute(sql, {"guild_id": self.id, "player_id": player.id})
                 return player
 
         def fresh_creature_id(self, con=None) -> int:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 FROM creatures WHERE guild_id = :guild_id"
                 )
@@ -508,7 +536,7 @@ class PostgresDatabase(Database):
         def add_creature(
             self, creature: BaseCreature, owner: Database.Player, con=None
         ) -> Database.Creature:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 creature_id = self.fresh_creature_id(con=con)
                 sql = text(
                     """
@@ -528,7 +556,7 @@ class PostgresDatabase(Database):
                 return PostgresDatabase.Creature(self.parent, creature_id, creature, self, owner)
 
         def get_creatures(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT id, base_creature_id, owner_id FROM creatures WHERE guild_id = :guild_id"
                 )
@@ -545,7 +573,7 @@ class PostgresDatabase(Database):
                 ]
 
         def get_creature(self, creature_id: int, con=None) -> Database.Creature:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT id, base_creature_id, owner_id FROM creatures WHERE id = :creature_id AND guild_id = :guild_id"
                 )
@@ -563,31 +591,31 @@ class PostgresDatabase(Database):
                 )
 
         def remove_creature(self, creature: Database.Creature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("DELETE FROM creatures WHERE id = :id AND guild_id = :guild_id")
                 con.execute(sql, {"id": creature.id, "guild_id": self.id})
                 return creature
 
         def add_to_creature_pool(self, base_creature: BaseCreature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("INSERT INTO base_creatures (id, guild_id) VALUES (:id, :guild_id)")
                 con.execute(sql, {"id": base_creature.id, "guild_id": self.id})
 
         def get_creature_pool(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("SELECT id FROM base_creatures WHERE guild_id = :guild_id")
                 results = con.execute(sql, {"guild_id": self.id}).fetchall()
                 return [creatures[result[0]] for result in results]
 
         def get_random_from_creature_pool(self, con=None) -> int:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 creature_pool = self.get_creature_pool()
                 if not creature_pool:
                     raise ValueError("Creature pool is empty")
                 return random.choice(creature_pool)
 
         def remove_from_creature_pool(self, base_creature: BaseCreature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text("DELETE FROM base_creatures WHERE id = :id AND guild_id = :guild_id")
                 con.execute(sql, {"id": base_creature.id, "guild_id": self.id})
 
@@ -599,7 +627,7 @@ class PostgresDatabase(Database):
             roller: Database.Player,
             con=None,
         ) -> Database.FreeCreature:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 config = self.get_config(con=con)
                 timestamp_protected = self.parent.timestamp_after(config["free_protection"])
                 timestamp_expires = self.parent.timestamp_after(config["free_expire"])
@@ -633,7 +661,7 @@ class PostgresDatabase(Database):
                 )
 
         def get_free_creatures(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
@@ -652,7 +680,7 @@ class PostgresDatabase(Database):
         def get_free_creature(
             self, channel_id: int, message_id: int, con=None
         ) -> Database.FreeCreature:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT base_creature_id, channel_id, message_id, roller_id, timestamp_protected, timestamp_expires 
@@ -679,7 +707,7 @@ class PostgresDatabase(Database):
                 )
 
         def remove_free_creature(self, creature: Database.FreeCreature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "DELETE FROM free_creatures WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id"
                 )
@@ -699,7 +727,7 @@ class PostgresDatabase(Database):
             super().__init__(parent, id, region, guild)
 
         def occupy(self, creature: Database.Creature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 if self.is_occupied(con=con):
                     raise Exception("Trying to occupy an occupied region")
 
@@ -731,7 +759,7 @@ class PostgresDatabase(Database):
                 )
 
         def unoccupy(self, current: int, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 occupant, until = self.occupied(con=con)
                 if occupant is None:
                     raise Exception("Trying to unoccupy an already free region")
@@ -745,7 +773,7 @@ class PostgresDatabase(Database):
                 self.occupant = None
 
         def occupied(self, con=None) -> tuple[Database.Creature, int]:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT c.id, c.base_creature_id, o.timestamp_occupied FROM occupies o
@@ -764,7 +792,7 @@ class PostgresDatabase(Database):
                 return (None, None)
 
         def is_occupied(self, con=None) -> bool:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT COUNT(*) FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
                 )
@@ -776,7 +804,7 @@ class PostgresDatabase(Database):
             super().__init__(parent, user_id, guild)
 
         def get_resources(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT resource_type, quantity FROM resources WHERE player_id = :player_id AND guild_id = :guild_id"
                 )
@@ -786,7 +814,7 @@ class PostgresDatabase(Database):
                 return {Resource(result[0]): result[1] for result in results}
 
         def set_resources(self, resources: dict[Resource, int], con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 for resource_type, quantity in resources.items():
                     sql = text(
                         """
@@ -805,7 +833,7 @@ class PostgresDatabase(Database):
                     )
 
         def has(self, resource: Resource, amount: int, con=None) -> bool:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "SELECT quantity FROM resources WHERE player_id = :player_id AND guild_id = :guild_id AND resource_type = :resource_type"
                 )
@@ -820,7 +848,7 @@ class PostgresDatabase(Database):
                 return result >= amount if result is not None else False
 
         def give(self, resource: Resource, amount: int, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     UPDATE Resources SET quantity = quantity + :amount 
@@ -838,7 +866,7 @@ class PostgresDatabase(Database):
                 )
 
         def get_deck(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT d.creature_id, c.base_creature_id 
@@ -858,7 +886,7 @@ class PostgresDatabase(Database):
                 ]
 
         def get_hand(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT h.creature_id, c.base_creature_id 
@@ -878,7 +906,7 @@ class PostgresDatabase(Database):
                 ]
 
         def get_discard(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT d.creature_id, c.base_creature_id 
@@ -899,7 +927,7 @@ class PostgresDatabase(Database):
 
         def draw_card_raw(self, con=None):
 
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT d.creature_id, c.base_creature_id 
@@ -946,7 +974,7 @@ class PostgresDatabase(Database):
             return drawn_card
 
         def reshuffle_discard(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 discard = self.get_discard(con=con)
                 for creature in discard:
                     sql = text(
@@ -973,7 +1001,7 @@ class PostgresDatabase(Database):
                     )
 
         def delete_creature_from_hand(self, creature: Database.Creature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
                 )
@@ -983,7 +1011,7 @@ class PostgresDatabase(Database):
                 )
 
         def play_creature(self, creature: Database.Creature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
                 )
@@ -1000,7 +1028,7 @@ class PostgresDatabase(Database):
                 )
 
         def add_to_discard(self, creature: Database.Creature, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
                 )
@@ -1048,7 +1076,7 @@ class PostgresDatabase(Database):
             self.timestamp_expires = timestamp_expires
 
         def get_protected_timestamp(self, con=None) -> int:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT timestamp_protected FROM free_creatures
@@ -1066,7 +1094,7 @@ class PostgresDatabase(Database):
                 return result
 
         def get_expires_timestamp(self, con=None) -> int:
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     SELECT timestamp_expires FROM free_creatures
@@ -1084,7 +1112,7 @@ class PostgresDatabase(Database):
                 return result
 
         def claimed(self, con=None):
-            with self.parent.transaction(con=con) as con:
+            with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
                     DELETE FROM free_creatures

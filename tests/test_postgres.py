@@ -300,7 +300,7 @@ def test_rollback():
     # now only guild 1 is in there
 
     try:
-        with test_db.transaction(con=None) as con:
+        with test_db.transaction(parent=None) as con:
             test_db.remove_guild(guild_db1, con=con)  # works
             test_db.get_guild(guild_db2.id, con=con)  # fails, whole transaction rolled back
     except GuildNotFound:
