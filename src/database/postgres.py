@@ -25,10 +25,12 @@ from src.core.base_types import (
     BaseRegion,
     BaseCreature,
     StartCondition,
-    Event,
-    Database,
+    Event
 )
-from src.core.base_types import (
+
+from src.database.database import Database
+
+from src.core.exceptions import (
     GuildNotFound,
     PlayerNotFound,
     CreatureNotFound,
@@ -289,33 +291,20 @@ class PostgresDatabase(Database):
 
     def get_guilds(self, con=None):
         with self.transaction(con=con) as con:
-            sql = text(
-                "SELECT id FROM guilds"
-            )
+            sql = text("SELECT id FROM guilds")
             result = con.execute(sql)
-            guilds = [
-                PostgresDatabase.Guild(
-                    self,
-                    row[0]
-                )
-                for row in result
-            ]
+            guilds = [PostgresDatabase.Guild(self, row[0]) for row in result]
             return guilds
 
     def get_guild(self, guild_id: int, con=None) -> Database.Guild:
         with self.transaction(con=con) as con:
-            sql = text(
-                "SELECT id FROM guilds WHERE id = :id"
-            )
+            sql = text("SELECT id FROM guilds WHERE id = :id")
             result = con.execute(sql, {"id": guild_id}).fetchone()
 
             if not result:
                 raise GuildNotFound("No guilds with this guild_id")
 
-            guild = PostgresDatabase.Guild(
-                self,
-                result[0]
-            )
+            guild = PostgresDatabase.Guild(self, result[0])
 
             return guild
 
@@ -363,7 +352,7 @@ class PostgresDatabase(Database):
                                 self.parent, r[0], r[2], r[3], self, extra_data
                             )
                             break
-                    
+
                     assert event is not None
                     events.append(event)
 

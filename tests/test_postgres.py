@@ -3,14 +3,15 @@ import time
 import sqlalchemy
 from testcontainers.postgres import PostgresContainer
 
-from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition, Database
-from src.core.base_types import (
+from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition
+from src.core.exceptions import (
     GuildNotFound,
     PlayerNotFound,
     NotEnoughResourcesException,
     EmptyDeckException,
 )
 from src.core.start_condition import start_condition
+from src.database.database import Database
 from src.database.postgres import PostgresDatabase
 from src.core.creatures import *
 from src.core.regions import *

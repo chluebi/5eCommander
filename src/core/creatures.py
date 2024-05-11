@@ -1,5 +1,4 @@
 from src.core.base_types import (
-    Database,
     BaseCreature,
     Resource,
     Price,
@@ -9,6 +8,7 @@ from src.core.base_types import (
     resource_changes_to_string,
     resource_changes_to_short_string,
 )
+from src.database.database import Database
 from src.core.regions import RegionCategories
 
 
