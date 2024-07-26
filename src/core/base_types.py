@@ -243,6 +243,9 @@ class Event:
         self.parent_event = parent_event
         self.guild = guild
 
+    def __repr__(self) -> str:
+        return f"<event: {self.event_type}#{self.id}, timestamp: {self.timestamp}, {self.text()}>"
+
     def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
         return Event(parent, id, timestamp, parent_event, guild)
 

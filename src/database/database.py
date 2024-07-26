@@ -94,6 +94,11 @@ class Database:
         def get_events(self):
             return self.events + sum([c.get_events() for c in self.children], [])
 
+        def get_root(self):
+            if self.parent_manager is None:
+                return self
+            return self.parent_manager.get_root()
+
     def transaction(self, parent: TransactionManager = None):
         return self.TransactionManager(self, parent)
 
@@ -150,7 +155,7 @@ class Database:
         def get_region(self, region_id: int, con=None):
             pass
 
-        def remove_region(self, region: BaseRegion, con=None):
+        def remove_region(self, region, con=None):
             pass
 
         def add_player(self, player_id: int, con=None):
@@ -206,6 +211,98 @@ class Database:
         def remove_free_creature(self, creature, con=None):
             pass
 
+        class RegionAddedEvent(Event):
+
+            event_type = "region_added"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.region_id = region_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Guild.RegionAddedEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["region_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"region_id": self.region_id})
+
+            def text(self) -> str:
+                return f"<region:{self.region_id}> has been added"
+
+        class RegionRemovedEvent(Event):
+
+            event_type = "region_removed"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.region_id = region_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Guild.RegionEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["region_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"region_id": self.region_id})
+
+            def text(self) -> str:
+                return f"<region:{self.region_id}> has been remvoed"
+
+        class PlayerAddedEvent(Event):
+
+            event_type = "player_added"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, player_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Guild.PlayerAddedEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> has joined"
+
+        class PlayerRemovedEvent(Event):
+
+            event_type = "player_removed"
+
+            def __init__(
+                self, parent, id: int, timestamp: int, parent_event: Event, guild, player_id: int
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Guild.PlayerRemovedEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> has left"
+
     class Region:
 
         def __init__(self, parent, id: int, region: BaseRegion, guild):
@@ -256,7 +353,7 @@ class Database:
                 return json.dumps({"region_id": self.region_id})
 
             def text(self) -> str:
-                return "{region_id} has recharged"
+                return f"{self.region_id} has recharged"
 
             def resolve(self, con=None):
                 self.guild.get_region(self.region_id).unoccupy(self.timestamp, con=con)
@@ -503,7 +600,7 @@ class Database:
             with self.parent.transaction(parent=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
-                self.parent.add_event(
+                con.add_event(
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
                         self.parent.fresh_event_id(self.guild, con=con),
@@ -512,7 +609,6 @@ class Database:
                         self.guild,
                         self.id,
                     ),
-                    con=con,
                 )
 
         class CreatureRechargeEvent(Event):

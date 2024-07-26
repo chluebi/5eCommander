@@ -3,7 +3,7 @@ import time
 import sqlalchemy
 from testcontainers.postgres import PostgresContainer
 
-from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition
+from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition, Event
 from src.core.exceptions import (
     GuildNotFound,
     PlayerNotFound,
@@ -17,6 +17,13 @@ from src.core.creatures import *
 from src.core.regions import *
 
 
+def is_subset(a: list, b: list):
+    for e in a:
+        if e not in b:
+            return False
+    return True
+
+
 def are_subsets(a: list, b: list):
     for e in a:
         if e not in b:
@@ -25,6 +32,10 @@ def are_subsets(a: list, b: list):
         if e not in a:
             return False
     return True
+
+
+def events_by_type(guild_db: PostgresDatabase.Guild, t: str) -> Event:
+    return [e for e in guild_db.get_events(time.time() - 10, time.time()) if e.event_type == t]
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -54,13 +65,34 @@ def test_guild_creation():
 
 def test_player_creation():
     guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
-    player1_db: Database.Player = guild_db.add_player(1)
+    assert are_subsets(
+        [
+            guild_db.get_region(e.region_id).region
+            for e in events_by_type(guild_db, PostgresDatabase.Guild.RegionAddedEvent.event_type)
+        ],
+        start_condition.start_active_regions,
+    )
 
+    player1_db: Database.Player = guild_db.add_player(1)
     assert guild_db.get_player(player1_db.id) == player1_db
     assert guild_db.get_players() == [player1_db]
+    assert are_subsets(
+        [
+            guild_db.get_player(e.player_id)
+            for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type)
+        ],
+        [player1_db],
+    )
 
     player2_db: Database.Player = guild_db.add_player(2)
     assert are_subsets(guild_db.get_players(), [player1_db, player2_db])
+    assert are_subsets(
+        [
+            guild_db.get_player(e.player_id)
+            for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type)
+        ],
+        [player1_db, player2_db],
+    )
 
     guild_db.remove_player(player1_db)
     try:
@@ -68,6 +100,13 @@ def test_player_creation():
         assert False
     except PlayerNotFound:
         pass
+    assert are_subsets(
+        [
+            e.player_id
+            for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerRemovedEvent.event_type)
+        ],
+        [player1_db.id],
+    )
 
     assert guild_db.get_players() == [player2_db]
 

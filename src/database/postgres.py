@@ -1,5 +1,6 @@
 import random
 import json
+import time
 from copy import deepcopy
 
 from sqlalchemy import (
@@ -275,7 +276,9 @@ class PostgresDatabase(Database):
     def fresh_event_id(self, guild, con=None):
         with self.transaction(parent=con) as con:
             sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
-            result = con.execute(sql, {"guild_id": guild.id}).scalar()
+            result = con.execute(sql, {"guild_id": guild.id}).scalar() + (
+                len(con.get_root().get_events()) if con else 0
+            )
             return result
 
     def add_event(self, event: Event, con=None):
@@ -349,6 +352,10 @@ class PostgresDatabase(Database):
         def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
             with self.parent.transaction(parent=con) as con:
                 event_classes: list[type[Event]] = [
+                    Database.Guild.RegionAddedEvent,
+                    Database.Guild.RegionRemovedEvent,
+                    Database.Guild.PlayerAddedEvent,
+                    Database.Guild.PlayerRemovedEvent,
                     Database.Region.RegionRechargeEvent,
                     Database.Creature.CreatureRechargeEvent,
                     Database.FreeCreature.FreeCreatureProtectedEvent,
@@ -428,11 +435,15 @@ class PostgresDatabase(Database):
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
                 )
-                result = con.execute(sql, {"guild_id": self.id}).scalar()
+                result = con.execute(sql, {"guild_id": self.id}).scalar() + (
+                    len(con.get_root().get_events()) if con else 0
+                )
                 return result
 
         def add_region(self, base_region: BaseRegion, con=None) -> Database.Region:
             with self.parent.transaction(parent=con) as con:
+                super().add_region(base_region, con=con)
+
                 region_id = self.fresh_region_id(con=con)
                 sql = text(
                     """
@@ -442,6 +453,13 @@ class PostgresDatabase(Database):
                 )
                 con.execute(
                     sql, {"id": region_id, "guild_id": self.id, "base_region_id": base_region.id}
+                )
+
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Guild.RegionAddedEvent(
+                        self.parent, event_id, time.time(), None, self, region_id
+                    ),
                 )
                 return PostgresDatabase.Region(self.parent, region_id, base_region, self)
 
@@ -461,13 +479,22 @@ class PostgresDatabase(Database):
                 )
                 result = con.execute(sql, {"id": region_id, "guild_id": self.id}).fetchone()
                 if not result:
-                    raise RegionNotFound("No regions with this base region")
+                    raise RegionNotFound("No regions with this id")
                 return PostgresDatabase.Region(self.parent, result[0], regions[result[1]], self)
 
         def remove_region(self, region: Database.Region, con=None) -> Database.Region:
             with self.parent.transaction(parent=con) as con:
+                super().remove_region(region, con=con)
+
                 sql = text("DELETE FROM regions WHERE id = :id AND guild_id = :guild_id")
                 con.execute(sql, {"id": region.id, "guild_id": self.id})
+
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Guild.RegionRemovedEvent(
+                        self.parent, event_id, time.time(), None, self, region.id
+                    ),
+                )
                 return region
 
         def add_player(self, player_id: int, con=None) -> Database.Player:
@@ -502,6 +529,13 @@ class PostgresDatabase(Database):
                         },
                     )
 
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Guild.PlayerAddedEvent(
+                        self.parent, event_id, time.time(), None, self, player_id
+                    ),
+                )
+
             return player
 
         def get_players(self, con=None):
@@ -520,8 +554,17 @@ class PostgresDatabase(Database):
 
         def remove_player(self, player: Database.Player, con=None) -> Database.Player:
             with self.parent.transaction(parent=con) as con:
+                super().remove_player(player, con=con)
+
                 sql = text("DELETE FROM players WHERE guild_id = :guild_id AND id = :player_id")
                 con.execute(sql, {"guild_id": self.id, "player_id": player.id})
+
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Guild.PlayerRemovedEvent(
+                        self.parent, event_id, time.time(), None, self, player.id
+                    ),
+                )
                 return player
 
         def fresh_creature_id(self, con=None) -> int:
@@ -529,7 +572,9 @@ class PostgresDatabase(Database):
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 FROM creatures WHERE guild_id = :guild_id"
                 )
-                result = con.execute(sql, {"guild_id": self.id}).scalar()
+                result = con.execute(sql, {"guild_id": self.id}).scalar() + (
+                    len(con.get_root().get_events()) if con else 0
+                )
                 return result
 
         def add_creature(
