@@ -35,7 +35,7 @@ def are_subsets(a: list, b: list):
 
 
 def events_by_type(guild_db: PostgresDatabase.Guild, t: str) -> Event:
-    return [e for e in guild_db.get_events(time.time() - 10, time.time()) if e.event_type == t]
+    return [e for e in guild_db.get_events(time.time() - 60, time.time()+10) if e.event_type == t]
 
 
 postgres = PostgresContainer("postgres:16").start()
