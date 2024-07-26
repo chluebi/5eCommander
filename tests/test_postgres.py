@@ -35,7 +35,7 @@ def are_subsets(a: list, b: list):
 
 
 def events_by_type(guild_db: PostgresDatabase.Guild, t: str) -> Event:
-    return [e for e in guild_db.get_events(time.time() - 60, time.time()+10) if e.event_type == t]
+    return [e for e in guild_db.get_events(time.time() - 60, time.time() + 10) if e.event_type == t]
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -51,7 +51,9 @@ def test_guild_creation():
         assert test_db.get_guild(guild_db.id) == guild_db
         assert test_db.get_guilds() == [guild_db]
         assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
-        assert [c for c in guild_db.get_creature_pool()] == start_condition.start_available_creatures
+        assert [
+            c for c in guild_db.get_creature_pool()
+        ] == start_condition.start_available_creatures
     finally:
         test_db.remove_guild(guild_db)
 
@@ -71,7 +73,9 @@ def test_player_creation():
         assert are_subsets(
             [
                 guild_db.get_region(e.region_id).region
-                for e in events_by_type(guild_db, PostgresDatabase.Guild.RegionAddedEvent.event_type)
+                for e in events_by_type(
+                    guild_db, PostgresDatabase.Guild.RegionAddedEvent.event_type
+                )
             ],
             start_condition.start_active_regions,
         )
@@ -82,7 +86,9 @@ def test_player_creation():
         assert are_subsets(
             [
                 guild_db.get_player(e.player_id)
-                for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type)
+                for e in events_by_type(
+                    guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type
+                )
             ],
             [player1_db],
         )
@@ -92,7 +98,9 @@ def test_player_creation():
         assert are_subsets(
             [
                 guild_db.get_player(e.player_id)
-                for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type)
+                for e in events_by_type(
+                    guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type
+                )
             ],
             [player1_db, player2_db],
         )
@@ -106,7 +114,9 @@ def test_player_creation():
         assert are_subsets(
             [
                 e.player_id
-                for e in events_by_type(guild_db, PostgresDatabase.Guild.PlayerRemovedEvent.event_type)
+                for e in events_by_type(
+                    guild_db, PostgresDatabase.Guild.PlayerRemovedEvent.event_type
+                )
             ],
             [player1_db.id],
         )
@@ -277,7 +287,9 @@ def test_playing():
         assert [c.creature for c in player8_db.get_deck()] == start_condition.start_deck
 
         player8_db.draw_cards(5)
-        assert are_subsets([c.creature for c in player8_db.get_full_deck()], start_condition.start_deck)
+        assert are_subsets(
+            [c.creature for c in player8_db.get_full_deck()], start_condition.start_deck
+        )
         for c in player8_db.get_hand():
             assert c.creature in start_condition.start_deck
 

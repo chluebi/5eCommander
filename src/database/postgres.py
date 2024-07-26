@@ -273,7 +273,7 @@ class PostgresDatabase(Database):
     def rollback_transaction(self, trans: RootTransaction):
         trans.rollback()
 
-    def fresh_event_id(self, guild, con=None):
+    def fresh_event_id(self, guild: Database.Guild, con=None):
         with self.transaction(parent=con) as con:
             sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
             result = con.execute(sql, {"guild_id": guild.id}).scalar() + (
@@ -360,6 +360,8 @@ class PostgresDatabase(Database):
                     Database.Creature.CreatureRechargeEvent,
                     Database.FreeCreature.FreeCreatureProtectedEvent,
                     Database.FreeCreature.FreeCreatureExpiresEvent,
+                    Database.Player.PlayerGainEvent,
+                    Database.Player.PlayerPayEvent,
                 ]
 
                 sql = text(
@@ -442,8 +444,6 @@ class PostgresDatabase(Database):
 
         def add_region(self, base_region: BaseRegion, con=None) -> Database.Region:
             with self.parent.transaction(parent=con) as con:
-                super().add_region(base_region, con=con)
-
                 region_id = self.fresh_region_id(con=con)
                 sql = text(
                     """
@@ -484,8 +484,6 @@ class PostgresDatabase(Database):
 
         def remove_region(self, region: Database.Region, con=None) -> Database.Region:
             with self.parent.transaction(parent=con) as con:
-                super().remove_region(region, con=con)
-
                 sql = text("DELETE FROM regions WHERE id = :id AND guild_id = :guild_id")
                 con.execute(sql, {"id": region.id, "guild_id": self.id})
 
@@ -554,8 +552,6 @@ class PostgresDatabase(Database):
 
         def remove_player(self, player: Database.Player, con=None) -> Database.Player:
             with self.parent.transaction(parent=con) as con:
-                super().remove_player(player, con=con)
-
                 sql = text("DELETE FROM players WHERE guild_id = :guild_id AND id = :player_id")
                 con.execute(sql, {"guild_id": self.id, "player_id": player.id})
 

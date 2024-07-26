@@ -1,5 +1,6 @@
 import time
 import json
+from typing import List, Tuple
 from collections import defaultdict
 
 from src.core.base_types import (
@@ -11,6 +12,8 @@ from src.core.base_types import (
     BaseRegion,
     Event,
     StartCondition,
+    resource_changes_to_string,
+    resource_changes_to_short_string,
 )
 from src.core.exceptions import (
     MissingExtraData,
@@ -34,7 +37,7 @@ class Database:
 
         def __init__(self, parent, parent_manager):
             self.parent: Database = parent
-            self.parent_manager = parent_manager
+            self.parent_manager: Database.TransactionManager = parent_manager
             self.children: list[Database.TransactionManager] = []
             self.events: list[Event] = []
 
@@ -87,8 +90,13 @@ class Database:
             pass
 
         def add_event(self, event: Event):
-            if self.parent_manager and self.parent_manager.events != []:
-                event.parent_event = self.parent_manager.events[-1]
+            if self.parent_manager:
+                parent = self.parent_manager
+                while parent.events == [] and parent.parent_manager:
+                    parent = parent.parent_manager
+
+                if parent.events != []:
+                    event.parent_event = parent.events[-1]
             self.events.append(event)
 
         def get_events(self):
@@ -469,6 +477,18 @@ class Database:
                 return
 
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerGainEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        [(g.resource.value, g.amount) for g in gain],
+                    ),
+                )
 
                 resources: dict[Resource, int] = self.get_resources(con=con)
                 hand_size: list = len(self.get_hand(con=con))
@@ -494,6 +514,18 @@ class Database:
                 return
 
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerPayEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        [(p.resource.value, p.amount) for p in price],
+                    ),
+                )
 
                 resources: dict[Resource, int] = self.get_resources(con=con)
                 hand_size: list = len(self.get_hand(con=con))
@@ -574,6 +606,88 @@ class Database:
                 )
                 self.play_creature(creature, con=con)
                 base_creature.campaign_ability_effect(creature, con=con, extra_data=extra_data)
+
+        class PlayerGainEvent(Event):
+
+            event_type = "player_gain"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+                changes: List[Tuple[int, int]],
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+                self.changes = changes
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerGainEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["changes"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id, "changes": self.changes})
+
+            def text(self) -> str:
+                gain_list = list(
+                    map(lambda x: Gain(resource=Resource(x[0]), amount=x[1]), self.changes)
+                )
+                gain_string = resource_changes_to_string(gain_string, third_person=True)
+                return f"<player:{self.player_id}> {gain_string}"
+
+        class PlayerPayEvent(Event):
+
+            event_type = "player_pay"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+                changes: List[Tuple[int, int]],
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+                self.changes = changes
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerPayEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["changes"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id, "changes": self.changes})
+
+            def text(self) -> str:
+                gain_list = list(
+                    map(lambda x: Price(resource=Resource(x[0]), amount=x[1]), self.changes)
+                )
+                gain_string = resource_changes_to_string(gain_string, third_person=True)
+                return f"<player:{self.player_id}> {gain_string}"
 
     class Creature:
 

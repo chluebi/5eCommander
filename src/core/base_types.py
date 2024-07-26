@@ -48,15 +48,24 @@ def resource_to_emoji(resource: Resource) -> str:
             return "❓"
 
 
-def resource_change_to_string(resource_change: Union[Price | Gain]) -> str:
+def resource_change_to_string(resource_change: Union[Price | Gain], third_person=False) -> str:
 
     change_text = ""
-    if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
-        change_text = "use {0} {1}"
-    elif isinstance(resource_change, Gain):
-        change_text = "gain {0} {1}"
-    elif isinstance(resource_change, Price):
-        change_text = "pay {0} {1}"
+
+    if third_person:
+        if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
+            change_text = "uses {0} {1}"
+        elif isinstance(resource_change, Gain):
+            change_text = "gains {0} {1}"
+        elif isinstance(resource_change, Price):
+            change_text = "pays {0} {1}"
+    else:
+        if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
+            change_text = "use {0} {1}"
+        elif isinstance(resource_change, Gain):
+            change_text = "gain {0} {1}"
+        elif isinstance(resource_change, Price):
+            change_text = "pay {0} {1}"
 
     resource_text = resource_change.resource.name.lower()
 
@@ -68,7 +77,7 @@ def resource_change_to_string(resource_change: Union[Price | Gain]) -> str:
     )
 
 
-def resource_changes_to_string(resource_changes: list[Price | Gain]) -> str:
+def resource_changes_to_string(resource_changes: list[Price | Gain], third_person=False) -> str:
     resource_changes = [
         resource_change for resource_change in resource_changes if resource_change.amount != 0
     ]
@@ -83,10 +92,16 @@ def resource_changes_to_string(resource_changes: list[Price | Gain]) -> str:
     ]
 
     price_text = ", ".join(
-        [resource_change_to_string(resource_change) for resource_change in prices]
+        [
+            resource_change_to_string(resource_change, third_person=third_person)
+            for resource_change in prices
+        ]
     )
     gains_text = ", ".join(
-        [resource_change_to_string(resource_change) for resource_change in gains]
+        [
+            resource_change_to_string(resource_change, third_person=third_person)
+            for resource_change in gains
+        ]
     )
 
     if len(price_text) == 0 and len(gains_text) == 0:
