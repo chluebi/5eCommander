@@ -435,9 +435,6 @@ class Database:
                 if r in BaseResources:
                     if resources[r] < a:
                         return False
-                elif r == Resource.DELETE_CREATURES:
-                    if hand_size < a:
-                        return False
             return True
 
         def _delete_creatures(self, hand_size: int, a: int, extra_data: dict, con=None):
@@ -496,10 +493,6 @@ class Database:
                 for r, a in merged_gains.items():
                     if r in BaseResources:
                         resources[r] += a
-                    elif r == Resource.CREATURES_IN_HAND:
-                        self.draw_cards(N=a, con=con)
-                    elif r == Resource.DELETE_CREATURES:
-                        self._delete_creatures(hand_size, a, extra_data, con=con)
 
                 self.set_resources(resources, con=con)
 
@@ -537,8 +530,6 @@ class Database:
                                 "Player is paying {} {} but only has {}".format(a, r, resources[r])
                             )
                         resources[r] -= a
-                    elif r == Resource.DELETE_CREATURES:
-                        self._delete_creatures(hand_size, a, extra_data, con=con)
                 self.set_resources(resources, con=con)
 
         def draw_card_raw(self, con=None) -> BaseCreature:
