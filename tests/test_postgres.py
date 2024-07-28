@@ -34,6 +34,14 @@ def are_subsets(a: list, b: list):
     return True
 
 
+def subtract(a: list, b: list):
+    new = []
+    for e in a:
+        if e not in b:
+            new.append(e)
+    return new
+
+
 def events_by_type(guild_db: PostgresDatabase.Guild, t: str) -> Event:
     return [e for e in guild_db.get_events(time.time() - 60, time.time() + 10) if e.event_type == t]
 
@@ -132,22 +140,43 @@ def test_player_resources():
     guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
 
     try:
-        player1_db: Database.Player = guild_db.add_player(1)
+        player1_db: PostgresDatabase.Player = guild_db.add_player(1)
 
         for res in BaseResources:
             assert player1_db.has(res, 0) == True
             assert player1_db.has(res, 1) == False
 
+        get_events = lambda: events_by_type(guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type) + events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)
+        assert len(get_events()) == 0
+
         for i in [1, 2, 5, 100]:
             for res in BaseResources:
+                prev_events = get_events()
+
                 player1_db.give(res, i)
+
+                new_events = subtract(get_events(), prev_events)
+                assert len(new_events) == 1
+                assert new_events[0].event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
+                assert new_events[0].player_id == player1_db.id
+                assert new_events[0].changes == [(res.value, i)]
+
                 for res2 in BaseResources:
                     if res2 == res:
                         assert player1_db.has(res2, i) == True
                         assert player1_db.has(res2, i + 1) == False
                     else:
                         assert player1_db.has(res2, i) == False
+
+                prev_events = get_events()
+
                 player1_db.remove(res, i)
+
+                new_events = subtract(get_events(), prev_events)
+                assert len(new_events) == 1
+                assert new_events[0].event_type == PostgresDatabase.Player.PlayerPayEvent.event_type
+                assert new_events[0].player_id == player1_db.id
+                assert new_events[0].changes == [(res.value, i)]
 
     finally:
         test_db.remove_guild(guild_db)

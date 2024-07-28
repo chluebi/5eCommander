@@ -889,6 +889,19 @@ class PostgresDatabase(Database):
 
         def give(self, resource: Resource, amount: int, con=None):
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerGainEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        [(resource.value, amount)],
+                    ),
+                )
+
                 sql = text(
                     """
                     UPDATE Resources SET quantity = quantity + :amount 

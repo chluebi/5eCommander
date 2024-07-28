@@ -261,6 +261,11 @@ class Event:
     def __repr__(self) -> str:
         return f"<event: {self.event_type}#{self.id}, timestamp: {self.timestamp}, {self.text()}>"
 
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Event):
+            return self.id == other.id
+        return False
+
     def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
         return Event(parent, id, timestamp, parent_event, guild)
 

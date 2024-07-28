@@ -414,7 +414,7 @@ class Database:
             self.gain([Gain(resource, amount)], con=con)
 
         def remove(self, resource: Resource, amount: int, con=None) -> None:
-            self.give(resource, -amount, con=con)
+            self.pay_price([Price(resource, amount)], con=con)
 
         def fulfills_price(self, price: list[Price], con=None) -> bool:
             merged_prices = defaultdict(lambda: 0)
@@ -540,6 +540,19 @@ class Database:
 
         def draw_cards(self, N=1, con=None) -> tuple[int, bool]:
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerDrawEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        N
+                    ),
+                )
+
                 cards_drawn = []
                 discard_reshuffled = False
                 for _ in range(N):
@@ -598,6 +611,45 @@ class Database:
                 self.play_creature(creature, con=con)
                 base_creature.campaign_ability_effect(creature, con=con, extra_data=extra_data)
 
+
+        class PlayerDrawEvent(Event):
+
+            event_type = "player_draw"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+                num_cards: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+                self.num_cards = num_cards
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerDrawEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["num_cards"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id, "num_cards": self.num_cards})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> draws {self.num_cards} cards"
+
+
         class PlayerGainEvent(Event):
 
             event_type = "player_gain"
@@ -626,7 +678,7 @@ class Database:
                     parent_event,
                     guild,
                     extra_data["player_id"],
-                    extra_data["changes"],
+                    list(map(tuple, extra_data["changes"])),
                 )
 
             def extra_data(self) -> str:
@@ -636,7 +688,7 @@ class Database:
                 gain_list = list(
                     map(lambda x: Gain(resource=Resource(x[0]), amount=x[1]), self.changes)
                 )
-                gain_string = resource_changes_to_string(gain_string, third_person=True)
+                gain_string = resource_changes_to_string(gain_list, third_person=True)
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerPayEvent(Event):
@@ -667,7 +719,7 @@ class Database:
                     parent_event,
                     guild,
                     extra_data["player_id"],
-                    extra_data["changes"],
+                    list(map(tuple, extra_data["changes"])),
                 )
 
             def extra_data(self) -> str:
@@ -677,7 +729,7 @@ class Database:
                 gain_list = list(
                     map(lambda x: Price(resource=Resource(x[0]), amount=x[1]), self.changes)
                 )
-                gain_string = resource_changes_to_string(gain_string, third_person=True)
+                gain_string = resource_changes_to_string(gain_list, third_person=True)
                 return f"<player:{self.player_id}> {gain_string}"
 
     class Creature:
