@@ -364,6 +364,7 @@ class PostgresDatabase(Database):
                     Database.FreeCreature.FreeCreatureExpiresEvent,
                     Database.Player.PlayerGainEvent,
                     Database.Player.PlayerPayEvent,
+                    Database.Player.PlayerDrawEvent,
                 ]
 
                 sql = text(

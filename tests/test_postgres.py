@@ -258,13 +258,16 @@ def test_deck():
     try:
         player5_db: PostgresDatabase.Player = guild_db.add_player(5)
 
-        assert [c.creature for c in player5_db.get_deck()] == start_condition.start_deck
+        assert are_subsets([c.creature for c in player5_db.get_deck()], start_condition.start_deck)
+
+        get_events = lambda: events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerDrawEvent.event_type
+        )
 
         for _ in start_condition.start_deck:
             assert player5_db.draw_card_raw().creature in start_condition.start_deck
 
         for _ in range(10):
-            got_error = False
             try:
                 player5_db.draw_card_raw()
                 assert False
@@ -272,11 +275,23 @@ def test_deck():
                 pass
 
         for i in range(len(start_condition.start_deck) * 2):
+
+            prev_events = get_events()
+            assert len(prev_events) == i
+
             player6_db: PostgresDatabase.Player = guild_db.add_player(6)
 
             assert [c.creature for c in player6_db.get_deck()] == start_condition.start_deck
 
             cards_drawn, reshuffled = player6_db.draw_cards(N=i)
+
+            all_events = get_events()
+            assert len(all_events) == i + 1
+            new_events = subtract(all_events, prev_events)
+            assert len(new_events) == 1
+            assert new_events[0].event_type == PostgresDatabase.Player.PlayerDrawEvent.event_type
+            assert guild_db.get_player(new_events[0].player_id) == player6_db
+            assert new_events[0].num_cards == len(cards_drawn)
 
             assert len(cards_drawn) == min(i, len(start_condition.start_deck))
             if i <= len(start_condition.start_deck):

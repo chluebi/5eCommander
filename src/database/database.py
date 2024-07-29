@@ -540,13 +540,6 @@ class Database:
 
         def draw_cards(self, N=1, con=None) -> tuple[int, bool]:
             with self.parent.transaction(parent=con) as con:
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
-                    Database.Player.PlayerDrawEvent(
-                        self.parent, event_id, time.time(), None, self.guild, self.id, N
-                    ),
-                )
-
                 cards_drawn = []
                 discard_reshuffled = False
                 for _ in range(N):
@@ -555,10 +548,23 @@ class Database:
                         discard_reshuffled = True
 
                         if len(self.get_deck(con=con)) == 0:
-                            return cards_drawn, discard_reshuffled
+                            break
 
                     card = self.draw_card_raw(con=con)
                     cards_drawn.append(card)
+
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerDrawEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        len(cards_drawn),
+                    ),
+                )
 
                 return cards_drawn, discard_reshuffled
 
