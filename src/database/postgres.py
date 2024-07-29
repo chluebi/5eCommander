@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     ForeignKeyConstraint,
     PrimaryKeyConstraint,
+    UniqueConstraint,
 )
 
 from src.core.base_types import (
@@ -211,6 +212,7 @@ class PostgresDatabase(Database):
                 ondelete="CASCADE",
             ),
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_hand"),
+            UniqueConstraint("player_id", "guild_id", "position", name="uq_hand_position"),
         )
 
         discard_table = Table(
