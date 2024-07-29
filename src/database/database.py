@@ -543,13 +543,7 @@ class Database:
                 event_id = self.parent.fresh_event_id(self.guild, con=con)
                 con.add_event(
                     Database.Player.PlayerDrawEvent(
-                        self.parent,
-                        event_id,
-                        time.time(),
-                        None,
-                        self.guild,
-                        self.id,
-                        N
+                        self.parent, event_id, time.time(), None, self.guild, self.id, N
                     ),
                 )
 
@@ -611,7 +605,6 @@ class Database:
                 self.play_creature(creature, con=con)
                 base_creature.campaign_ability_effect(creature, con=con, extra_data=extra_data)
 
-
         class PlayerDrawEvent(Event):
 
             event_type = "player_draw"
@@ -648,7 +641,6 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> draws {self.num_cards} cards"
-
 
         class PlayerGainEvent(Event):
 

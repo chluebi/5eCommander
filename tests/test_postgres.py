@@ -146,7 +146,9 @@ def test_player_resources():
             assert player1_db.has(res, 0) == True
             assert player1_db.has(res, 1) == False
 
-        get_events = lambda: events_by_type(guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type) + events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)
+        get_events = lambda: events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type
+        ) + events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)
         assert len(get_events()) == 0
 
         for i in [1, 2, 5, 100]:
@@ -157,7 +159,9 @@ def test_player_resources():
 
                 new_events = subtract(get_events(), prev_events)
                 assert len(new_events) == 1
-                assert new_events[0].event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
+                assert (
+                    new_events[0].event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
+                )
                 assert new_events[0].player_id == player1_db.id
                 assert new_events[0].changes == [(res.value, i)]
 
