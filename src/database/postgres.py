@@ -362,9 +362,10 @@ class PostgresDatabase(Database):
                     Database.Creature.CreatureRechargeEvent,
                     Database.FreeCreature.FreeCreatureProtectedEvent,
                     Database.FreeCreature.FreeCreatureExpiresEvent,
+                    Database.Player.PlayerDrawEvent,
                     Database.Player.PlayerGainEvent,
                     Database.Player.PlayerPayEvent,
-                    Database.Player.PlayerDrawEvent,
+                    Database.Player.PlayerPlayToRegionEvent,
                 ]
 
                 sql = text(
@@ -794,11 +795,10 @@ class PostgresDatabase(Database):
                 )
 
                 event_id = self.parent.fresh_event_id(self.guild, con=con)
-                self.parent.add_event(
+                con.add_event(
                     Database.Region.RegionRechargeEvent(
                         self.parent, event_id, until, None, self.guild, self.id
                     ),
-                    con=con,
                 )
 
         def unoccupy(self, current: int, con=None):

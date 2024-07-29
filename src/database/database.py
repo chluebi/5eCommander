@@ -588,6 +588,21 @@ class Database:
             base_creature: BaseCreature = creature.creature
 
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerPlayToRegionEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        creature.id,
+                        region.id,
+                        extra_data,
+                    )
+                )
+
                 self.pay_price([Price(Resource.ORDERS, 1)], con=con)
                 base_creature.quest_ability_effect_price(
                     region, creature, con=con, extra_data=extra_data
@@ -596,6 +611,7 @@ class Database:
                 self.play_creature(creature, con=con)
                 region: Database.Region = region
                 region.occupy(creature, con=con)
+                creature: Database.Creature = creature
                 creature.play(con=con)
                 base_region.quest_effect(region, creature, con=con, extra_data=extra_data)
                 base_creature.quest_ability_effect(region, creature, con=con, extra_data=extra_data)
@@ -730,6 +746,56 @@ class Database:
                 gain_string = resource_changes_to_string(gain_list, third_person=True)
                 return f"<player:{self.player_id}> {gain_string}"
 
+        class PlayerPlayToRegionEvent(Event):
+
+            event_type = "player_play_to_region"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+                creature_id: int,
+                region_id: int,
+                play_extra_data: dict,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+                self.creature_id = creature_id
+                self.region_id = region_id
+                self.play_extra_data = play_extra_data
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerPlayToRegionEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["creature_id"],
+                    extra_data["region_id"],
+                    extra_data["play_extra_data"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps(
+                    {
+                        "player_id": self.player_id,
+                        "creature_id": self.creature_id,
+                        "region_id": self.region_id,
+                        "play_extra_data": self.play_extra_data,
+                    }
+                )
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> plays <creature:{self.creature_id}> to <region:{self.region_id}>"
+
     class Creature:
 
         def __init__(self, parent, id: int, creature: BaseCreature, guild, owner):
@@ -755,15 +821,16 @@ class Database:
             with self.parent.transaction(parent=con) as con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
                 con.add_event(
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
-                        self.parent.fresh_event_id(self.guild, con=con),
+                        event_id,
                         until,
-                        parent_event,
+                        None,
                         self.guild,
                         self.id,
-                    ),
+                    )
                 )
 
         class CreatureRechargeEvent(Event):

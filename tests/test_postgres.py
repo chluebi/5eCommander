@@ -352,7 +352,62 @@ def test_playing():
 
         # needs an order to actually be able to play it
         player8_db.gain([Gain(Resource.ORDERS, 1)])
+
+        prev_gain_events = events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type
+        )
+        assert len(prev_gain_events) == 1
+        assert len(events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)) == 0
+        assert (
+            len(
+                events_by_type(guild_db, PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type)
+            )
+            == 0
+        )
+        assert (
+            len(
+                events_by_type(guild_db, PostgresDatabase.Creature.CreatureRechargeEvent.event_type)
+            )
+            == 0
+        )
+
         player8_db.play_creature_to_region(creature2_db, region1_db)
+
+        new_gain_event: PostgresDatabase.Player.PlayerGainEvent = subtract(
+            events_by_type(guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type),
+            prev_gain_events,
+        )[0]
+        assert new_gain_event.event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
+        assert new_gain_event.changes == [(Resource.WORKERS.value, 1)]
+
+        new_pay_event: PostgresDatabase.Player.PlayerPayEvent = events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type
+        )[0]
+        assert new_pay_event.event_type == PostgresDatabase.Player.PlayerPayEvent.event_type
+        assert new_pay_event.changes == [(Resource.ORDERS.value, 1)]
+
+        new_play_event: PostgresDatabase.Player.PlayerPlayToRegionEvent = events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type
+        )[0]
+        assert (
+            new_play_event.event_type == PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type
+        )
+        assert guild_db.get_player(new_play_event.player_id) == player8_db
+        assert guild_db.get_creature(new_play_event.creature_id) == creature2_db
+        assert guild_db.get_region(new_play_event.region_id) == region1_db
+        assert new_play_event.play_extra_data == {}
+
+        new_creature_recharge_event: PostgresDatabase.Creature.CreatureRechargeEvent = (
+            events_by_type(guild_db, PostgresDatabase.Creature.CreatureRechargeEvent.event_type)[0]
+        )
+        assert guild_db.get_creature(new_creature_recharge_event.creature_id) == creature2_db
+        assert new_creature_recharge_event.timestamp > new_play_event.timestamp
+
+        new_region_recharge_event: PostgresDatabase.Region.RegionRechargeEvent = events_by_type(
+            guild_db, PostgresDatabase.Region.RegionRechargeEvent.event_type
+        )[0]
+        assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
+        assert new_region_recharge_event.timestamp > new_play_event.timestamp
 
         resources[Resource.WORKERS] += 1
         assert player8_db.get_resources() == resources
