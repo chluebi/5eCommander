@@ -58,10 +58,7 @@ class PostgresDatabase(Database):
             "guilds",
             metadata,
             Column("id", BigInteger, primary_key=True),
-            Column("region_recharge", Integer, nullable=False, default=10),
-            Column("creature_recharge", Integer, nullable=False, default=10),
-            Column("free_protection", Integer, nullable=False, default=5),
-            Column("free_expire", Integer, nullable=False, default=60),
+            Column("config", JSON, nullable=False),
         )
 
         events_table = Table(
@@ -327,11 +324,14 @@ class PostgresDatabase(Database):
         with self.transaction(parent=con) as con:
             sql_guild = text(
                 """
-                INSERT INTO guilds (id, region_recharge, creature_recharge, free_protection, free_expire)
-                VALUES (:guild_id, 10, 10, 5, 60)
+                INSERT INTO guilds (id, config)
+                VALUES (:guild_id, :config)
             """
             )
-            con.execute(sql_guild, {"guild_id": guild_id})
+            con.execute(
+                sql_guild,
+                {"guild_id": guild_id, "config": json.dumps(self.start_condition.start_config)},
+            )
 
             for base_region in self.start_condition.start_active_regions:
                 guild.add_region(base_region, con=con)
@@ -424,39 +424,20 @@ class PostgresDatabase(Database):
             with self.parent.transaction(parent=con) as con:
                 sql = text(
                     """
-                    UPDATE Guilds SET 
-                        region_recharge = :region_recharge, 
-                        creature_recharge = :creature_recharge, 
-                        free_protection = :free_protection, 
-                        free_expire = :free_expire 
+                    UPDATE Guilds SET config = :config 
                     WHERE guild_id = :guild_id
                 """
                 )
                 con.execute(
                     sql,
-                    {
-                        "guild_id": self.id,
-                        "region_recharge": config["region_recharge"],
-                        "creature_recharge": config["creature_recharge"],
-                        "free_protection": config["free_protection"],
-                        "free_expire": config["free_expire"],
-                    },
+                    {"guild_id": self.id, "config": json.dumps(config)},
                 )
 
         def get_config(self, con=None) -> dict:
             with self.parent.transaction(parent=con) as con:
-                sql = text(
-                    "SELECT region_recharge, creature_recharge, free_protection, free_expire FROM guilds WHERE id = :guild_id"
-                )
+                sql = text("SELECT config FROM guilds WHERE id = :guild_id")
                 result = con.execute(sql, {"guild_id": self.id}).fetchone()
-                if result is not None:
-                    config = {
-                        "region_recharge": result[0],
-                        "creature_recharge": result[1],
-                        "free_protection": result[2],
-                        "free_expire": result[3],
-                    }
-                return config
+                return result[0]
 
         def fresh_region_id(self, con=None) -> int:
             with self.parent.transaction(parent=con) as con:
@@ -1105,6 +1086,23 @@ class PostgresDatabase(Database):
             with self.parent.transaction(parent=con) as con:
                 sql = text(
                     "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
+        def discard_creature_from_hand(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(parent=con) as con:
+                sql = text(
+                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+                sql = text(
+                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
                 )
                 con.execute(
                     sql,

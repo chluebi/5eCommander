@@ -287,8 +287,9 @@ def test_deck():
             player6_db: PostgresDatabase.Player = guild_db.add_player(6)
 
             assert [c.creature for c in player6_db.get_deck()] == start_condition.start_deck
+            assert player6_db.get_hand() == []
 
-            cards_drawn, reshuffled = player6_db.draw_cards(N=i)
+            cards_drawn, reshuffled, hand_full = player6_db.draw_cards(N=i)
 
             all_events = get_events()
             assert len(all_events) == i + 1
@@ -298,14 +299,18 @@ def test_deck():
             assert guild_db.get_player(new_events[0].player_id) == player6_db
             assert new_events[0].num_cards == len(cards_drawn)
 
-            assert len(cards_drawn) == min(i, len(start_condition.start_deck))
-            if i <= len(start_condition.start_deck):
-                assert not reshuffled
-            else:
-                assert reshuffled
+            if i <= guild_db.get_config()["max_cards"]:
+                assert len(cards_drawn) == min(i, len(start_condition.start_deck))
+                if i <= len(start_condition.start_deck):
+                    assert not reshuffled
+                else:
+                    assert reshuffled
 
-            for card in cards_drawn:
-                assert card.creature in start_condition.start_deck
+                for card in cards_drawn:
+                    assert card.creature in start_condition.start_deck
+            else:
+                assert hand_full
+                assert len(cards_drawn) == guild_db.get_config()["max_cards"]
 
             guild_db.remove_player(player6_db)
 
@@ -313,19 +318,41 @@ def test_deck():
         player7_db: PostgresDatabase.Player = guild_db.add_player(7)
         assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
-        creature1_db: PostgresDatabase.Creature = guild_db.add_creature(Commoner(), player7_db)
-        player7_db.add_to_discard(creature1_db)
-
-        assert player7_db.get_discard() == [creature1_db]
-
         # draw entire deck
-        cards_drawn, reshuffled = player7_db.draw_cards(N=len(start_condition.start_deck))
+        cards_drawn, reshuffled, hand_full = player7_db.draw_cards(
+            N=len(start_condition.start_deck)
+        )
 
         assert len(cards_drawn) == len(start_condition.start_deck)
         assert len(player7_db.get_deck()) == 0
 
-        player7_db.draw_cards(N=1)
-        assert len(player7_db.get_hand()) == len(start_condition.start_deck) + 1
+        # hand full
+        cards_drawn, reshuffled, hand_full = player7_db.draw_cards(N=1)
+        assert cards_drawn == []
+        assert hand_full
+
+        # remove a creature to make space
+        player7_db.delete_creature_from_hand(player7_db.get_hand()[0])
+        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 1
+
+        # deck empty
+        cards_drawn, reshuffled, hand_full = player7_db.draw_cards(N=1)
+        assert cards_drawn == []
+        assert player7_db.get_deck() == []
+
+        # discard a creature
+        creature_to_discard = player7_db.get_hand()[0]
+        player7_db.discard_creature_from_hand(creature_to_discard)
+        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 2
+        assert player7_db.get_deck() == []
+
+        # now drawing works as the discarded creature is reshuffled
+        cards_drawn, reshuffled, hand_full = player7_db.draw_cards(N=1)
+        assert reshuffled
+        assert cards_drawn == [creature_to_discard]
+        assert player7_db.get_deck() == []
+
+        assert is_subset([c.creature for c in player7_db.get_hand()], start_condition.start_deck)
 
     finally:
         test_db.remove_guild(guild_db)

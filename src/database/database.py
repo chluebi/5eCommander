@@ -545,9 +545,19 @@ class Database:
 
         def draw_cards(self, N=1, con=None) -> tuple[int, bool]:
             with self.parent.transaction(parent=con) as con:
+                max_cards = self.guild.get_config(con=con)["max_cards"]
+                current_cards = len(self.get_hand(con=con))
+
                 cards_drawn = []
                 discard_reshuffled = False
+                hand_full = False
                 for _ in range(N):
+                    assert current_cards + len(cards_drawn) <= max_cards
+
+                    if current_cards + len(cards_drawn) == max_cards:
+                        hand_full = True
+                        break
+
                     if len(self.get_deck(con=con)) == 0:
                         self.reshuffle_discard(con=con)
                         discard_reshuffled = True
@@ -571,7 +581,7 @@ class Database:
                     ),
                 )
 
-                return cards_drawn, discard_reshuffled
+                return cards_drawn, discard_reshuffled, hand_full
 
         def delete_creature_from_hand(self, creature, con=None) -> None:
             pass

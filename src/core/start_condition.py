@@ -3,7 +3,18 @@ from src.core.regions import *
 from src.core.creatures import *
 
 start_condition = StartCondition(
-    {"region_recharge": 10, "creature_recharge": 10, "free_protection": 5, "free_expire": 60},
+    {
+        "max_orders": 5,
+        "order_recharge": 5,
+        "max_magic": 10,
+        "magic_recharge": 10,
+        "max_cards": 10,
+        "card_recharge": 3,
+        "region_recharge": 10,
+        "creature_recharge": 10,
+        "free_protection": 5,
+        "free_expire": 60,
+    },
     [Village(), SmallMine()],
     [Commoner()],
     [Commoner() for i in range(10)],
