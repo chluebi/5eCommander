@@ -10,14 +10,14 @@ BASE_HANDS_SIZE = 5
 
 Resource = Enum(
     "Resource",
-    ["ORDERS", "GOLD", "ARTEFACTS", "WORKERS", "MAGIC", "RALLY", "STRENGTH"],
+    ["ORDERS", "GOLD", "ARTEFACTS", "SUPPLIES", "MAGIC", "RALLY", "STRENGTH"],
 )
 
 BaseResources = [
     Resource.ORDERS,
     Resource.GOLD,
     Resource.ARTEFACTS,
-    Resource.WORKERS,
+    Resource.SUPPLIES,
     Resource.MAGIC,
     Resource.RALLY,
     Resource.STRENGTH,
@@ -36,8 +36,8 @@ def resource_to_emoji(resource: Resource) -> str:
             return "🪙"
         case Resource.ARTEFACTS:
             return "🔮"
-        case Resource.WORKERS:
-            return "⚒️"
+        case Resource.SUPPLIES:
+            return "🍖"
         case Resource.MAGIC:
             return "✨"
         case Resource.RALLY:
@@ -53,16 +53,12 @@ def resource_change_to_string(resource_change: Union[Price | Gain], third_person
     change_text = ""
 
     if third_person:
-        if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
-            change_text = "uses {0} {1}"
-        elif isinstance(resource_change, Gain):
+        if isinstance(resource_change, Gain):
             change_text = "gains {0} {1}"
         elif isinstance(resource_change, Price):
             change_text = "pays {0} {1}"
     else:
-        if resource_change.resource == Resource.WORKERS and isinstance(resource_change, Price):
-            change_text = "use {0} {1}"
-        elif isinstance(resource_change, Gain):
+        if isinstance(resource_change, Gain):
             change_text = "gain {0} {1}"
         elif isinstance(resource_change, Price):
             change_text = "pay {0} {1}"
@@ -70,7 +66,10 @@ def resource_change_to_string(resource_change: Union[Price | Gain], third_person
     resource_text = resource_change.resource.name.lower()
 
     if resource_change.amount == 1 and resource_text.endswith("s"):
-        resource_text = resource_text[:-1]
+        if resource_text.endswith("ies"):
+            resource_text = resource_text[:-3] + "y"
+        else:
+            resource_text = resource_text[:-1]
 
     return change_text.format(
         resource_change.amount, resource_to_emoji(resource_change.resource) + resource_text

@@ -23,7 +23,7 @@ from src.core.exceptions import (
     CreatureCannotQuestHere,
     ExpiredFreeCreature,
     ProtectedFreeCreature,
-    CreatureNotFound
+    CreatureNotFound,
 )
 
 
@@ -968,7 +968,7 @@ class Database:
                         None,
                         self.guild,
                         self.channel_id,
-                        self.message_id
+                        self.message_id,
                     )
                 )
 
@@ -981,7 +981,7 @@ class Database:
                         None,
                         self.guild,
                         self.channel_id,
-                        self.message_id
+                        self.message_id,
                     )
                 )
 
@@ -1022,7 +1022,15 @@ class Database:
                 event_id = self.parent.fresh_event_id(self.guild, con=con)
                 con.add_event(
                     Database.FreeCreature.FreeCreatureClaimedEvent(
-                        self.parent, event_id, time.time(), None, self.guild, self.channel_id, self.message_id, owner.id, creature.id
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.channel_id,
+                        self.message_id,
+                        owner.id,
+                        creature.id,
                     )
                 )
 
@@ -1038,7 +1046,7 @@ class Database:
                 parent_event: Event,
                 guild,
                 channel_id: int,
-                message_id: int
+                message_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.channel_id = channel_id
@@ -1048,14 +1056,22 @@ class Database:
                 parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
             ):
                 return Database.FreeCreature.FreeCreatureProtectedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["channel_id"], extra_data["message_id"]
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["channel_id"],
+                    extra_data["message_id"],
                 )
 
             def extra_data(self) -> str:
                 return json.dumps({"channel_id": self.channel_id, "message_id": self.message_id})
 
             def text(self) -> str:
-                return f"<free_creature:({self.channel_id},{self.message_id})> is no longer protected"
+                return (
+                    f"<free_creature:({self.channel_id},{self.message_id})> is no longer protected"
+                )
 
         class FreeCreatureExpiresEvent(Event):
 
@@ -1069,7 +1085,7 @@ class Database:
                 parent_event: Event,
                 guild,
                 channel_id: int,
-                message_id: int
+                message_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.channel_id = channel_id
@@ -1079,7 +1095,13 @@ class Database:
                 parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
             ):
                 return Database.FreeCreature.FreeCreatureExpiresEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["channel_id"], extra_data["message_id"]
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["channel_id"],
+                    extra_data["message_id"],
                 )
 
             def extra_data(self) -> str:
@@ -1090,7 +1112,9 @@ class Database:
 
             def resolve(self, con=None):
                 try:
-                    free_creature: Database.FreeCreature = self.guild.get_free_creature(self.channel_id, self.message_id, con=con)
+                    free_creature: Database.FreeCreature = self.guild.get_free_creature(
+                        self.channel_id, self.message_id, con=con
+                    )
                     self.guild.remove_free_creature(free_creature, con=con)
                 except CreatureNotFound:
                     pass

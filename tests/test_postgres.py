@@ -47,7 +47,7 @@ def events_by_type(guild_db: PostgresDatabase.Guild, t: str, start=None, end=Non
         start = time.time() - 60
     if end is None:
         end = time.time() + 10
-        
+
     return [e for e in guild_db.get_events(start, end) if e.event_type == t]
 
 
@@ -383,7 +383,7 @@ def test_playing():
             prev_gain_events,
         )[0]
         assert new_gain_event.event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
-        assert new_gain_event.changes == [(Resource.WORKERS.value, 1)]
+        assert new_gain_event.changes == [(Resource.SUPPLIES.value, 1)]
 
         new_pay_event: PostgresDatabase.Player.PlayerPayEvent = events_by_type(
             guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type
@@ -414,7 +414,7 @@ def test_playing():
         assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
         assert new_region_recharge_event.timestamp > new_play_event.timestamp
 
-        resources[Resource.WORKERS] += 1
+        resources[Resource.SUPPLIES] += 1
         assert player8_db.get_resources() == resources
 
         assert region1_db.occupied()[0] == creature2_db
@@ -465,13 +465,17 @@ def test_claim():
 
         assert (
             events_by_type(
-                guild_db, PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type, end=time.time()*2
+                guild_db,
+                PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type,
+                end=time.time() * 2,
             )
             == []
         )
         assert (
             events_by_type(
-                guild_db, PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type, end=time.time()*2
+                guild_db,
+                PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type,
+                end=time.time() * 2,
             )
             == []
         )
@@ -479,15 +483,25 @@ def test_claim():
         free_creature1_db.create_events()
 
         protected_event: PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent = events_by_type(
-            guild_db, PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type, end=time.time()*2
+            guild_db,
+            PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type,
+            end=time.time() * 2,
         )[0]
-        assert guild_db.get_free_creature(protected_event.channel_id, protected_event.message_id) == free_creature1_db
+        assert (
+            guild_db.get_free_creature(protected_event.channel_id, protected_event.message_id)
+            == free_creature1_db
+        )
         assert protected_event.timestamp == free_creature1_db.get_protected_timestamp()
 
         expires_event: PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent = events_by_type(
-            guild_db, PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type, end=time.time()*2
+            guild_db,
+            PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type,
+            end=time.time() * 2,
         )[0]
-        assert guild_db.get_free_creature(expires_event.channel_id, protected_event.message_id) == free_creature1_db
+        assert (
+            guild_db.get_free_creature(expires_event.channel_id, protected_event.message_id)
+            == free_creature1_db
+        )
         assert expires_event.timestamp == free_creature1_db.get_expires_timestamp()
 
         assert free_creature1_db.is_protected(time.time())
@@ -505,7 +519,10 @@ def test_claim():
         claimed_event: PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent = events_by_type(
             guild_db, PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent.event_type
         )[0]
-        assert guild_db.get_free_creature(claimed_event.channel_id, claimed_event.message_id) == free_creature1_db
+        assert (
+            guild_db.get_free_creature(claimed_event.channel_id, claimed_event.message_id)
+            == free_creature1_db
+        )
         assert guild_db.get_player(claimed_event.player_id) == player8_db
         assert guild_db.get_creature(claimed_event.creature_id) in player8_db.get_full_deck()
 

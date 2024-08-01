@@ -162,7 +162,9 @@ class PostgresDatabase(Database):
                 ["base_creatures.guild_id", "base_creatures.id"],
                 ondelete="CASCADE",
             ),
-            ForeignKeyConstraint(["guild_id", "roller_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"),
+            ForeignKeyConstraint(
+                ["guild_id", "roller_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
             PrimaryKeyConstraint("guild_id", "channel_id", "message_id", name="pk_free_creatures"),
         )
 

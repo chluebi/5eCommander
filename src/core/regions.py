@@ -67,7 +67,7 @@ class Village(SimpleRegion):
     category = RegionCategories.settlement
 
     def quest_gain(self) -> list[Gain]:
-        return [Gain(Resource.WORKERS, 1)]
+        return [Gain(Resource.SUPPLIES, 1)]
 
 
 class SmallMine(SimpleRegion):
@@ -77,7 +77,7 @@ class SmallMine(SimpleRegion):
     category = RegionCategories.mine
 
     def quest_price(self) -> list[Price]:
-        return [Price(Resource.WORKERS, 1)]
+        return [Price(Resource.SUPPLIES, 1)]
 
     def quest_gain(self) -> list[Gain]:
         return [Gain(Resource.GOLD, 5)]
