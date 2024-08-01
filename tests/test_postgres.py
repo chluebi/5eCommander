@@ -427,6 +427,9 @@ def test_playing():
 
         resources: dict[Resource, int] = player8_db.get_resources()
 
+        assert player8_db.get_campaign() == []
+        old_deck = player8_db.get_full_deck()
+
         assert (
             events_by_type(guild_db, PostgresDatabase.Player.PlayerPlayToCampaignEvent.event_type)
             == []
@@ -439,6 +442,9 @@ def test_playing():
         )[0]
         assert guild_db.get_creature(campaign_event.creature_id) == creature3_db
         assert guild_db.get_player(campaign_event.player_id) == player8_db
+
+        assert player8_db.get_campaign() == [(creature3_db, 0)]
+        assert are_subsets(subtract(old_deck, [creature3_db]), player8_db.get_full_deck())
 
         resources[Resource.RALLY] += 1
         assert player8_db.get_resources() == resources

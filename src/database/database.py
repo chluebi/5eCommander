@@ -409,6 +409,9 @@ class Database:
                     key=lambda x: str(x),
                 )
 
+        def get_campaign(self, con=None):
+            pass
+
         def has(self, resource: Resource, amount: int, con=None) -> bool:
             return self.fulfills_price([Price(resource, amount)], con=con)
 
@@ -576,6 +579,9 @@ class Database:
         def play_creature(self, creature, con=None) -> None:
             pass
 
+        def campaign_creature(self, creature, strength: int, con=None) -> None:
+            pass
+
         def add_to_discard(self, creature, con=None) -> None:
             pass
 
@@ -640,8 +646,10 @@ class Database:
                 base_creature.campaign_ability_effect_price(
                     creature, con=con, extra_data=extra_data
                 )
-                self.play_creature(creature, con=con)
-                base_creature.campaign_ability_effect(creature, con=con, extra_data=extra_data)
+                strength = base_creature.campaign_ability_effect(
+                    creature, con=con, extra_data=extra_data
+                )
+                self.campaign_creature(creature, strength, con=con)
 
         class PlayerDrawEvent(Event):
 

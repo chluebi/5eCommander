@@ -56,3 +56,7 @@ class ProtectedFreeCreature(Exception):
 
 class ExpiredFreeCreature(Exception):
     pass
+
+
+class CreatureCannotCampaign(Exception):
+    pass

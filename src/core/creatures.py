@@ -10,6 +10,7 @@ from src.core.base_types import (
 )
 from src.database.database import Database
 from src.core.regions import RegionCategories
+from src.core.exceptions import CreatureCannotCampaign
 
 
 class SimpleCreature(BaseCreature):
@@ -75,15 +76,22 @@ class SimpleCreature(BaseCreature):
             owner: Database.Player = creature_db.owner
             owner.pay_price(price, con=con, extra_data=extra_data)
 
-    def campaign_ability_effect(self, creature_db, con=None, extra_data={}):
+    def campaign_ability_effect(self, creature_db, con=None, extra_data={}) -> int:
         gain = self.campaign_gain()
 
         if gain == []:
             return
 
+        strength = 0
+        for g in gain:
+            if g.resource == Resource.STRENGTH:
+                strength += g.amount
+
         with creature_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.gain(gain, con=con, extra_data=extra_data)
+
+        return strength
 
 
 class Commoner(SimpleCreature):

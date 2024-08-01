@@ -234,6 +234,24 @@ class PostgresDatabase(Database):
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_discard"),
         )
 
+        campaign_table = Table(
+            "campaign",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            Column("strength", BigInteger, nullable=False),
+            ForeignKeyConstraint(
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
+            ),
+            PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_campaign"),
+        )
+
         metadata.create_all(self.engine)
 
     class TransactionManager(Database.TransactionManager):
@@ -985,6 +1003,29 @@ class PostgresDatabase(Database):
                     for result in results
                 ]
 
+        def get_campaign(self, con=None):
+            with self.parent.transaction(parent=con) as con:
+                sql = text(
+                    """
+                    SELECT ca.creature_id, c.base_creature_id, ca.strength 
+                    FROM campaign ca 
+                    JOIN creatures c ON ca.creature_id = c.id 
+                    WHERE ca.player_id = :player_id AND ca.guild_id = :guild_id
+                """
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return [
+                    (
+                        PostgresDatabase.Creature(
+                            self.parent, result[0], creatures[result[1]], self.guild, self
+                        ),
+                        result[2],
+                    )
+                    for result in results
+                ]
+
         def draw_card_raw(self, con=None):
 
             with self.parent.transaction(parent=con) as con:
@@ -1085,6 +1126,28 @@ class PostgresDatabase(Database):
                 con.execute(
                     sql,
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
+        def campaign_creature(self, creature: Database.Creature, strength: int, con=None):
+            with self.parent.transaction(parent=con) as con:
+                sql = text(
+                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+                sql = text(
+                    "INSERT INTO campaign (player_id, guild_id, creature_id, strength) VALUES (:player_id, :guild_id, :creature_id, :strength)"
+                )
+                con.execute(
+                    sql,
+                    {
+                        "player_id": self.id,
+                        "guild_id": self.guild.id,
+                        "creature_id": creature.id,
+                        "strength": strength,
+                    },
                 )
 
         def add_to_discard(self, creature: Database.Creature, con=None):
