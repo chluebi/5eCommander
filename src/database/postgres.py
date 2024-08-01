@@ -162,7 +162,7 @@ class PostgresDatabase(Database):
                 ["base_creatures.guild_id", "base_creatures.id"],
                 ondelete="CASCADE",
             ),
-            ForeignKeyConstraint(["guild_id", "roller_id"], ["players.guild_id", "players.id"]),
+            ForeignKeyConstraint(["guild_id", "roller_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"),
             PrimaryKeyConstraint("guild_id", "channel_id", "message_id", name="pk_free_creatures"),
         )
 
@@ -366,6 +366,8 @@ class PostgresDatabase(Database):
                     Database.Player.PlayerGainEvent,
                     Database.Player.PlayerPayEvent,
                     Database.Player.PlayerPlayToRegionEvent,
+                    Database.Player.PlayerPlayToCampaignEvent,
+                    Database.FreeCreature.FreeCreatureClaimedEvent,
                 ]
 
                 sql = text(
@@ -1166,20 +1168,3 @@ class PostgresDatabase(Database):
                     },
                 ).scalar()
                 return result
-
-        def claimed(self, con=None):
-            with self.parent.transaction(parent=con) as con:
-                sql = text(
-                    """
-                    DELETE FROM free_creatures
-                    WHERE guild_id = :guild_id AND channel_id = :channel_id AND message_id = :message_id
-                """
-                )
-                con.execute(
-                    sql,
-                    {
-                        "guild_id": self.guild.id,
-                        "channel_id": self.channel_id,
-                        "message_id": self.message_id,
-                    },
-                )

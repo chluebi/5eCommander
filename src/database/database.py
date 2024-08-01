@@ -1,5 +1,6 @@
 import time
 import json
+import copy
 from typing import List, Tuple
 from collections import defaultdict
 
@@ -22,6 +23,7 @@ from src.core.exceptions import (
     CreatureCannotQuestHere,
     ExpiredFreeCreature,
     ProtectedFreeCreature,
+    CreatureNotFound
 )
 
 
@@ -95,7 +97,7 @@ class Database:
                 while parent.events == [] and parent.parent_manager:
                     parent = parent.parent_manager
 
-                if parent.events != []:
+                if parent.events != [] and event.parent_event is None:
                     event.parent_event = parent.events[-1]
             self.events.append(event)
 
@@ -599,7 +601,7 @@ class Database:
                         self.id,
                         creature.id,
                         region.id,
-                        extra_data,
+                        copy.deepcopy(extra_data),
                     )
                 )
 
@@ -621,6 +623,20 @@ class Database:
             base_creature: BaseCreature = creature.creature
 
             with self.parent.transaction(parent=con) as con:
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.Player.PlayerPlayToCampaignEvent(
+                        self.parent,
+                        event_id,
+                        time.time(),
+                        None,
+                        self.guild,
+                        self.id,
+                        creature.id,
+                        copy.deepcopy(extra_data),
+                    )
+                )
+
                 base_creature.campaign_ability_effect_price(
                     creature, con=con, extra_data=extra_data
                 )
@@ -794,7 +810,53 @@ class Database:
                 )
 
             def text(self) -> str:
-                return f"<player:{self.player_id}> plays <creature:{self.creature_id}> to <region:{self.region_id}>"
+                return f"<player:{self.player_id}> sends <creature:{self.creature_id}> to <region:{self.region_id}>"
+
+        class PlayerPlayToCampaignEvent(Event):
+
+            event_type = "player_play_to_campaign"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+                creature_id: int,
+                play_extra_data: dict,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+                self.creature_id = creature_id
+                self.play_extra_data = play_extra_data
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerPlayToCampaignEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["creature_id"],
+                    extra_data["play_extra_data"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps(
+                    {
+                        "player_id": self.player_id,
+                        "creature_id": self.creature_id,
+                        "play_extra_data": self.play_extra_data,
+                    }
+                )
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> makes <creature:{self.creature_id}> campaign"
 
     class Creature:
 
@@ -822,7 +884,8 @@ class Database:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
                 event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+                # add directly to parent instead of connection
+                self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
                         self.parent,
                         event_id,
@@ -892,6 +955,36 @@ class Database:
                 )
             return False
 
+        def create_events(self, con=None):
+            with self.parent.transaction(parent=con) as con:
+                # Notice that we add the events to the parent directly instead of the connection
+                # that is because we do not want these events to be part of the transaction
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                self.parent.add_event(
+                    Database.FreeCreature.FreeCreatureProtectedEvent(
+                        self.parent,
+                        event_id,
+                        self.get_protected_timestamp(con=con),
+                        None,
+                        self.guild,
+                        self.channel_id,
+                        self.message_id
+                    )
+                )
+
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                self.parent.add_event(
+                    Database.FreeCreature.FreeCreatureExpiresEvent(
+                        self.parent,
+                        event_id,
+                        self.get_expires_timestamp(con=con),
+                        None,
+                        self.guild,
+                        self.channel_id,
+                        self.message_id
+                    )
+                )
+
         def get_protected_timestamp(self, con=None) -> int:
             pass
 
@@ -903,9 +996,6 @@ class Database:
 
         def is_expired(self, timestamp: int, con=None) -> bool:
             return self.get_expires_timestamp(con=con) < timestamp
-
-        def claimed(self, con=None):
-            pass
 
         def claim(self, timestamp: int, owner, con=None):
 
@@ -924,9 +1014,17 @@ class Database:
 
             with self.parent.transaction(parent=con) as con:
                 owner.pay_price([Price(Resource.RALLY, self.creature.claim_cost)], con=con)
-                guild.remove_free_creature(self, con=con)
-                guild.add_creature(self.creature, owner, con=con)
-                self.claimed(con=con)
+                # dont do this for now so that information about claimed creatures can still be queried
+                # guild.remove_free_creature(self, con=con)
+                creature: Database.Creature = guild.add_creature(self.creature, owner, con=con)
+                owner.add_to_discard(creature, con=con)
+
+                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                con.add_event(
+                    Database.FreeCreature.FreeCreatureClaimedEvent(
+                        self.parent, event_id, time.time(), None, self.guild, self.channel_id, self.message_id, owner.id, creature.id
+                    )
+                )
 
         class FreeCreatureProtectedEvent(Event):
 
@@ -939,23 +1037,25 @@ class Database:
                 timestamp: int,
                 parent_event: Event,
                 guild,
-                free_creature_id: int,
+                channel_id: int,
+                message_id: int
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
-                self.free_creature_id = free_creature_id
+                self.channel_id = channel_id
+                self.message_id = message_id
 
             def from_extra_data(
                 parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
             ):
                 return Database.FreeCreature.FreeCreatureProtectedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["free_creature_id"]
+                    parent, id, timestamp, parent_event, guild, extra_data["channel_id"], extra_data["message_id"]
                 )
 
             def extra_data(self) -> str:
-                return json.dumps({"free_creature_id": self.free_creature_id})
+                return json.dumps({"channel_id": self.channel_id, "message_id": self.message_id})
 
             def text(self) -> str:
-                return "{free_creature_id} is no longer protected"
+                return f"<free_creature:({self.channel_id},{self.message_id})> is no longer protected"
 
         class FreeCreatureExpiresEvent(Event):
 
@@ -968,23 +1068,79 @@ class Database:
                 timestamp: int,
                 parent_event: Event,
                 guild,
-                free_creature_id: int,
+                channel_id: int,
+                message_id: int
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
-                self.free_creature_id = free_creature_id
+                self.channel_id = channel_id
+                self.message_id = message_id
 
             def from_extra_data(
                 parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
             ):
-                return Database.FreeCreature.FreeCreatureProtectedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["free_creature_id"]
+                return Database.FreeCreature.FreeCreatureExpiresEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["channel_id"], extra_data["message_id"]
                 )
 
             def extra_data(self) -> str:
-                return json.dumps({"free_creature_id": self.free_creature_id})
+                return json.dumps({"channel_id": self.channel_id, "message_id": self.message_id})
 
             def text(self) -> str:
-                return "{free_creature_id} has expired"
+                return f"<free_creature:({self.channel_id},{self.message_id})> has expired"
 
             def resolve(self, con=None):
-                self.guild.remove_free_creature(self.free_creature_id, con=con)
+                try:
+                    free_creature: Database.FreeCreature = self.guild.get_free_creature(self.channel_id, self.message_id, con=con)
+                    self.guild.remove_free_creature(free_creature, con=con)
+                except CreatureNotFound:
+                    pass
+
+        class FreeCreatureClaimedEvent(Event):
+
+            event_type = "free_creature_claimed"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                channel_id: int,
+                message_id: int,
+                player_id: int,
+                creature_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.channel_id = channel_id
+                self.message_id = message_id
+                self.player_id = player_id
+                self.creature_id = creature_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.FreeCreature.FreeCreatureClaimedEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event,
+                    guild,
+                    extra_data["channel_id"],
+                    extra_data["message_id"],
+                    extra_data["player_id"],
+                    extra_data["creature_id"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps(
+                    {
+                        "channel_id": self.channel_id,
+                        "message_id": self.message_id,
+                        "player_id": self.player_id,
+                        "creature_id": self.creature_id,
+                    }
+                )
+
+            def text(self) -> str:
+                return f"<free_creature:({self.channel_id},{self.message_id})> has been claimed by <player:{self.player_id}>: <creature:{self.creature_id}>"

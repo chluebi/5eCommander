@@ -42,8 +42,13 @@ def subtract(a: list, b: list):
     return new
 
 
-def events_by_type(guild_db: PostgresDatabase.Guild, t: str) -> Event:
-    return [e for e in guild_db.get_events(time.time() - 60, time.time() + 10) if e.event_type == t]
+def events_by_type(guild_db: PostgresDatabase.Guild, t: str, start=None, end=None) -> Event:
+    if start is None:
+        start = time.time() - 60
+    if end is None:
+        end = time.time() + 10
+        
+    return [e for e in guild_db.get_events(start, end) if e.event_type == t]
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -422,7 +427,18 @@ def test_playing():
 
         resources: dict[Resource, int] = player8_db.get_resources()
 
+        assert (
+            events_by_type(guild_db, PostgresDatabase.Player.PlayerPlayToCampaignEvent.event_type)
+            == []
+        )
+
         player8_db.play_creature_to_campaign(creature3_db)
+
+        campaign_event: PostgresDatabase.Player.PlayerPlayToCampaignEvent = events_by_type(
+            guild_db, PostgresDatabase.Player.PlayerPlayToCampaignEvent.event_type
+        )[0]
+        assert guild_db.get_creature(campaign_event.creature_id) == creature3_db
+        assert guild_db.get_player(campaign_event.player_id) == player8_db
 
         resources[Resource.RALLY] += 1
         assert player8_db.get_resources() == resources
@@ -447,10 +463,51 @@ def test_claim():
             Commoner(), 0, 0, player8_db
         )
 
+        assert (
+            events_by_type(
+                guild_db, PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type, end=time.time()*2
+            )
+            == []
+        )
+        assert (
+            events_by_type(
+                guild_db, PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type, end=time.time()*2
+            )
+            == []
+        )
+
+        free_creature1_db.create_events()
+
+        protected_event: PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent = events_by_type(
+            guild_db, PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type, end=time.time()*2
+        )[0]
+        assert guild_db.get_free_creature(protected_event.channel_id, protected_event.message_id) == free_creature1_db
+        assert protected_event.timestamp == free_creature1_db.get_protected_timestamp()
+
+        expires_event: PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent = events_by_type(
+            guild_db, PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type, end=time.time()*2
+        )[0]
+        assert guild_db.get_free_creature(expires_event.channel_id, protected_event.message_id) == free_creature1_db
+        assert expires_event.timestamp == free_creature1_db.get_expires_timestamp()
+
         assert free_creature1_db.is_protected(time.time())
         assert not free_creature1_db.is_expired(time.time())
 
+        assert (
+            events_by_type(
+                guild_db, PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent.event_type
+            )
+            == []
+        )
+
         free_creature1_db.claim(time.time() + guild_db.get_config()["free_protection"], player8_db)
+
+        claimed_event: PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent = events_by_type(
+            guild_db, PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent.event_type
+        )[0]
+        assert guild_db.get_free_creature(claimed_event.channel_id, claimed_event.message_id) == free_creature1_db
+        assert guild_db.get_player(claimed_event.player_id) == player8_db
+        assert guild_db.get_creature(claimed_event.creature_id) in player8_db.get_full_deck()
 
         resources[Resource.RALLY] -= 1
         assert player8_db.get_resources() == resources
