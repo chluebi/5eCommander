@@ -2,6 +2,7 @@ import random
 import json
 import time
 from copy import deepcopy
+from collections import defaultdict
 
 from sqlalchemy import (
     RootTransaction,
@@ -70,6 +71,10 @@ class PostgresDatabase(Database):
             Column("parent_event_id", BigInteger, nullable=True),
             Column("event_type", String, nullable=False),
             Column("extra_data", JSON, nullable=True),
+            # extra arguments for efficiency
+            Column("region_id", BigInteger, nullable=True),
+            Column("player_id", BigInteger, nullable=True),
+            Column("creature_id", BigInteger, nullable=True),
             ForeignKeyConstraint(["guild_id"], ["guilds.id"], ondelete="CASCADE"),
             ForeignKeyConstraint(
                 ["parent_event_id", "guild_id"],
@@ -319,8 +324,18 @@ class PostgresDatabase(Database):
 
     def add_event(self, event: Event, con=None):
         with self.transaction(parent=con) as con:
+            searched_dict = defaultdict(None)
+            searched_dict["region_id"] = None
+            searched_dict["player_id"] = None
+            searched_dict["creature_id"] = None
+
+            for key, value in json.loads(event.extra_data()).items():
+                for searched_key in searched_dict.keys():
+                    if key == searched_key:
+                        searched_dict[key] = value
+
             event_sql = text(
-                "INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data) VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data)"
+                "INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data, region_id, player_id, creature_id) VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data, :region_id, :player_id, :creature_id)"
             )
             con.execute(
                 event_sql,
@@ -331,6 +346,9 @@ class PostgresDatabase(Database):
                     "parent_event_id": event.parent_event.id if event.parent_event else None,
                     "event_type": event.event_type,
                     "extra_data": event.extra_data(),
+                    "region_id": searched_dict["region_id"],
+                    "player_id": searched_dict["player_id"],
+                    "creature_id": searched_dict["creature_id"],
                 },
             )
 
@@ -1000,7 +1018,7 @@ class PostgresDatabase(Database):
                     )
                     for result in results
                 ]
-            
+
         def get_played(self, con=None):
             with self.parent.transaction(parent=con) as con:
                 sql = text(

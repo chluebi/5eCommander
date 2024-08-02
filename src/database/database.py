@@ -408,7 +408,10 @@ class Database:
         def get_full_deck(self, con=None):
             with self.parent.transaction(parent=con) as con:
                 return sorted(
-                    self.get_deck(con=con) + self.get_hand(con=con) + self.get_discard(con=None) + self.get_played(con=None),
+                    self.get_deck(con=con)
+                    + self.get_hand(con=con)
+                    + self.get_discard(con=None)
+                    + self.get_played(con=None),
                     key=lambda x: str(x),
                 )
 
