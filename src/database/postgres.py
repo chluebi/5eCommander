@@ -231,6 +231,23 @@ class PostgresDatabase(Database):
             PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_discard"),
         )
 
+        played_table = Table(
+            "played",
+            metadata,
+            Column("player_id", BigInteger, nullable=False),
+            Column("guild_id", BigInteger, nullable=False),
+            Column("creature_id", BigInteger, nullable=False),
+            ForeignKeyConstraint(
+                ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
+            ),
+            ForeignKeyConstraint(
+                ["guild_id", "creature_id"],
+                ["creatures.guild_id", "creatures.id"],
+                ondelete="CASCADE",
+            ),
+            PrimaryKeyConstraint("player_id", "guild_id", "creature_id", name="pk_played"),
+        )
+
         campaign_table = Table(
             "campaign",
             metadata,
@@ -983,6 +1000,26 @@ class PostgresDatabase(Database):
                     )
                     for result in results
                 ]
+            
+        def get_played(self, con=None):
+            with self.parent.transaction(parent=con) as con:
+                sql = text(
+                    """
+                    SELECT p.creature_id, c.base_creature_id 
+                    FROM played p 
+                    JOIN creatures c ON p.creature_id = c.id 
+                    WHERE p.player_id = :player_id AND p.guild_id = :guild_id
+                """
+                )
+                results = con.execute(
+                    sql, {"player_id": self.id, "guild_id": self.guild.id}
+                ).fetchall()
+                return [
+                    PostgresDatabase.Creature(
+                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    )
+                    for result in results
+                ]
 
         def get_campaign(self, con=None):
             with self.parent.transaction(parent=con) as con:
@@ -1092,6 +1129,23 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
 
+        def recharge_creature(self, creature: Database.Creature, con=None):
+            with self.parent.transaction(parent=con) as con:
+                sql = text(
+                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+                sql = text(
+                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                )
+                con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
         def discard_creature_from_hand(self, creature: Database.Creature, con=None):
             with self.parent.transaction(parent=con) as con:
                 sql = text(
@@ -1119,7 +1173,7 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
                 sql = text(
-                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                    "INSERT INTO played (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
                 )
                 con.execute(
                     sql,

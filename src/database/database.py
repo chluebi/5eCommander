@@ -402,10 +402,13 @@ class Database:
         def get_discard(self, con=None):
             pass
 
+        def get_played(self, con=None):
+            pass
+
         def get_full_deck(self, con=None):
             with self.parent.transaction(parent=con) as con:
                 return sorted(
-                    self.get_deck(con=con) + self.get_hand(con=con) + self.get_discard(con=None),
+                    self.get_deck(con=con) + self.get_hand(con=con) + self.get_discard(con=None) + self.get_played(con=None),
                     key=lambda x: str(x),
                 )
 
@@ -584,6 +587,9 @@ class Database:
                 return cards_drawn, discard_reshuffled, hand_full
 
         def delete_creature_from_hand(self, creature, con=None) -> None:
+            pass
+
+        def recharge_creature(self, creature, con=None):
             pass
 
         def play_creature(self, creature, con=None) -> None:
@@ -938,9 +944,9 @@ class Database:
                 return "{creature_id} has recharged"
 
             def resolve(self, con=None):
-                self.guild.get_creature(self.creature_id).owner.add_to_discard(
-                    self.creature, con=con
-                )
+                with self.parent.transaction(parent=con) as con:
+                    creature = self.guild.get_creature(self.creature_id)
+                    creature.owner.recharge_creature(creature)
 
     class FreeCreature:
 

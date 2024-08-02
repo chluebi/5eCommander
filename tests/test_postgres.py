@@ -385,6 +385,8 @@ def test_playing():
         # needs an order to actually be able to play it
         player8_db.gain([Gain(Resource.ORDERS, 1)])
 
+        assert player8_db.get_played() == []
+
         prev_gain_events = events_by_type(
             guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type
         )
@@ -440,6 +442,8 @@ def test_playing():
         )[0]
         assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
         assert new_region_recharge_event.timestamp > new_play_event.timestamp
+
+        assert player8_db.get_played() == [creature2_db]
 
         resources[Resource.INTEL] += 1
         assert player8_db.get_resources() == resources
