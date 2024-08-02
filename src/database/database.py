@@ -144,7 +144,9 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseGuild: {self.id}>"
 
-        def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
+        def get_events(
+            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+        ) -> list[Event]:
             pass
 
         def set_config(self, config: dict, con=None):
@@ -417,6 +419,31 @@ class Database:
 
         def get_campaign(self, con=None):
             pass
+
+        def get_events(
+            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+        ) -> list[Event]:
+            pass
+
+        def remove_event(self, event: Event, con=None) -> Event:
+            pass
+
+        def get_recharges(self, con=None) -> dict:
+            recharge_event_classes: list[type[Event]] = [
+                Database.Player.PlayerOrderRechargeEvent,
+                Database.Player.PlayerMagicRechargeEvent,
+                Database.Player.PlayerCardRechargeEvent,
+            ]
+
+            r = {}
+
+            for c in recharge_event_classes:
+                events = self.get_events(0, time.time() * 2, event_type=c.event_type)
+                assert len(events) == 1
+                recharge_event = events[0]
+                r[c.event_type] = recharge_event
+
+            return r
 
         def has(self, resource: Resource, amount: int, con=None) -> bool:
             return self.fulfills_price([Price(resource, amount)], con=con)
@@ -885,6 +912,151 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> makes <creature:{self.creature_id}> campaign"
 
+        class PlayerOrderRechargeEvent(Event):
+
+            event_type = "player_order_recharge"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerOrderRechargeEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> recharges on orders"
+
+            def resolve(self, con=None):
+                with self.parent.transaction(parent=con) as con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
+                    guild_config = self.guild.get_config(con=con)
+                    player_orders = player.get_resources(con=con)[Resource.ORDERS]
+                    if player_orders + 1 <= guild_config["max_orders"]:
+                        player.gain([Gain(resource=Resource.ORDERS, amount=1)], con=con)
+
+                    event_id = self.parent.fresh_event_id(self.guild, con=con)
+                    con.add_event(
+                        Database.Player.PlayerOrderRechargeEvent(
+                            self.parent,
+                            event_id,
+                            time.time() + guild_config["order_recharge"],
+                            None,
+                            self.guild,
+                            self.player_id,
+                        ),
+                    )
+
+        class PlayerMagicRechargeEvent(Event):
+
+            event_type = "player_magic_recharge"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerMagicRechargeEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> recharges on magic"
+
+            def resolve(self, con=None):
+                with self.parent.transaction(parent=con) as con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
+                    guild_config = self.guild.get_config(con=con)
+                    player_magic = player.get_resources(con=con)[Resource.MAGIC]
+                    if player_magic + 1 <= guild_config["max_magic"]:
+                        player.gain([Gain(resource=Resource.MAGIC, amount=1)], con=con)
+
+                    event_id = self.parent.fresh_event_id(self.guild, con=con)
+                    con.add_event(
+                        Database.Player.PlayerMagicRechargeEvent(
+                            self.parent,
+                            event_id,
+                            time.time() + guild_config["magic_recharge"],
+                            None,
+                            self.guild,
+                            self.player_id,
+                        ),
+                    )
+
+        class PlayerCardRechargeEvent(Event):
+
+            event_type = "player_card_recharge"
+
+            def __init__(
+                self,
+                parent,
+                id: int,
+                timestamp: int,
+                parent_event: Event,
+                guild,
+                player_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event, guild)
+                self.player_id = player_id
+
+            def from_extra_data(
+                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
+            ):
+                return Database.Player.PlayerCardRechargeEvent(
+                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> recharges on cards"
+
+            def resolve(self, con=None):
+                with self.parent.transaction(parent=con) as con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
+                    guild_config = self.guild.get_config(con=con)
+                    player.draw_cards(1, con=con)
+
+                    event_id = self.parent.fresh_event_id(self.guild, con=con)
+                    con.add_event(
+                        Database.Player.PlayerCardRechargeEvent(
+                            self.parent,
+                            event_id,
+                            time.time() + guild_config["card_recharge"],
+                            None,
+                            self.guild,
+                            self.player_id,
+                        ),
+                    )
+
     class Creature:
 
         def __init__(self, parent, id: int, creature: BaseCreature, guild, owner):
@@ -1138,13 +1310,14 @@ class Database:
                 return f"<free_creature:({self.channel_id},{self.message_id})> has expired"
 
             def resolve(self, con=None):
-                try:
-                    free_creature: Database.FreeCreature = self.guild.get_free_creature(
-                        self.channel_id, self.message_id, con=con
-                    )
-                    self.guild.remove_free_creature(free_creature, con=con)
-                except CreatureNotFound:
-                    pass
+                with self.parent.transaction(parent=con) as con:
+                    try:
+                        free_creature: Database.FreeCreature = self.guild.get_free_creature(
+                            self.channel_id, self.message_id, con=con
+                        )
+                        self.guild.remove_free_creature(free_creature, con=con)
+                    except CreatureNotFound:
+                        pass
 
         class FreeCreatureClaimedEvent(Event):
 
@@ -1195,3 +1368,24 @@ class Database:
 
             def text(self) -> str:
                 return f"<free_creature:({self.channel_id},{self.message_id})> has been claimed by <player:{self.player_id}>: <creature:{self.creature_id}>"
+
+
+event_classes: list[type[Event]] = [
+    Database.Guild.RegionAddedEvent,
+    Database.Guild.RegionRemovedEvent,
+    Database.Guild.PlayerAddedEvent,
+    Database.Guild.PlayerRemovedEvent,
+    Database.Region.RegionRechargeEvent,
+    Database.Creature.CreatureRechargeEvent,
+    Database.FreeCreature.FreeCreatureProtectedEvent,
+    Database.FreeCreature.FreeCreatureExpiresEvent,
+    Database.Player.PlayerDrawEvent,
+    Database.Player.PlayerGainEvent,
+    Database.Player.PlayerPayEvent,
+    Database.Player.PlayerPlayToRegionEvent,
+    Database.Player.PlayerPlayToCampaignEvent,
+    Database.FreeCreature.FreeCreatureClaimedEvent,
+    Database.Player.PlayerOrderRechargeEvent,
+    Database.Player.PlayerMagicRechargeEvent,
+    Database.Player.PlayerCardRechargeEvent,
+]

@@ -32,7 +32,7 @@ from src.core.base_types import (
     Event,
 )
 
-from src.database.database import Database
+from src.database.database import Database, event_classes
 
 from src.core.exceptions import (
     GuildNotFound,
@@ -406,36 +406,44 @@ class PostgresDatabase(Database):
         def __init__(self, parent: Database, guild_id: int):
             super().__init__(parent, guild_id)
 
-        def get_events(self, timestamp_start: int, timestamp_end: int, con=None) -> list[Event]:
+        def get_events(
+            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+        ) -> list[Event]:
             with self.parent.transaction(parent=con) as con:
-                event_classes: list[type[Event]] = [
-                    Database.Guild.RegionAddedEvent,
-                    Database.Guild.RegionRemovedEvent,
-                    Database.Guild.PlayerAddedEvent,
-                    Database.Guild.PlayerRemovedEvent,
-                    Database.Region.RegionRechargeEvent,
-                    Database.Creature.CreatureRechargeEvent,
-                    Database.FreeCreature.FreeCreatureProtectedEvent,
-                    Database.FreeCreature.FreeCreatureExpiresEvent,
-                    Database.Player.PlayerDrawEvent,
-                    Database.Player.PlayerGainEvent,
-                    Database.Player.PlayerPayEvent,
-                    Database.Player.PlayerPlayToRegionEvent,
-                    Database.Player.PlayerPlayToCampaignEvent,
-                    Database.FreeCreature.FreeCreatureClaimedEvent,
-                ]
 
-                sql = text(
-                    f"""
-                    SELECT * FROM events
-                    WHERE guild_id = :guild_id
-                    AND timestamp BETWEEN :start AND :end
-                """
-                )
+                if event_type is None:
+                    sql = text(
+                        f"""
+                        SELECT * FROM events
+                        WHERE guild_id = :guild_id
+                        AND timestamp BETWEEN :start AND :end
+                        ORDER BY timestamp
+                    """
+                    )
 
-                results = con.execute(
-                    sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end}
-                ).fetchall()
+                    results = con.execute(
+                        sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end}
+                    ).fetchall()
+                else:
+                    sql = text(
+                        f"""
+                        SELECT * FROM events
+                        WHERE guild_id = :guild_id
+                        AND timestamp BETWEEN :start AND :end
+                        AND event_type LIKE :event_type
+                        ORDER BY timestamp
+                    """
+                    )
+
+                    results = con.execute(
+                        sql,
+                        {
+                            "guild_id": self.id,
+                            "start": timestamp_start,
+                            "end": timestamp_end,
+                            "event_type": event_type,
+                        },
+                    ).fetchall()
 
                 events = []
                 for r in results:
@@ -454,6 +462,13 @@ class PostgresDatabase(Database):
                     events.append(event)
 
                 return events
+
+        def remove_event(self, event: Event, con=None) -> Event:
+            with self.parent.transaction(parent=con) as con:
+                sql = text("DELETE FROM events WHERE id = :id AND guild_id = :guild_id")
+                con.execute(sql, {"id": event.id, "guild_id": self.id})
+
+                return event
 
         def set_config(self, config: dict, con=None) -> None:
             with self.parent.transaction(parent=con) as con:
@@ -539,6 +554,7 @@ class PostgresDatabase(Database):
 
         def add_player(self, player_id: int, con=None) -> Database.Player:
             player = PostgresDatabase.Player(self.parent, player_id, self)
+            guild_config = self.get_config()
 
             with self.parent.transaction(parent=con) as con:
                 sql_player = text(
@@ -568,6 +584,42 @@ class PostgresDatabase(Database):
                             "resource_type": resource_type.value,
                         },
                     )
+
+                # recharge events
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Player.PlayerOrderRechargeEvent(
+                        self.parent,
+                        event_id,
+                        time.time() + guild_config["order_recharge"],
+                        None,
+                        self,
+                        player_id,
+                    ),
+                )
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Player.PlayerMagicRechargeEvent(
+                        self.parent,
+                        event_id,
+                        time.time() + guild_config["magic_recharge"],
+                        None,
+                        self,
+                        player_id,
+                    ),
+                )
+                event_id = self.parent.fresh_event_id(self, con=con)
+                con.add_event(
+                    Database.Player.PlayerCardRechargeEvent(
+                        self.parent,
+                        event_id,
+                        time.time() + guild_config["card_recharge"],
+                        None,
+                        self,
+                        player_id,
+                    ),
+                )
+                # recharge events
 
                 event_id = self.parent.fresh_event_id(self, con=con)
                 con.add_event(
@@ -1061,6 +1113,73 @@ class PostgresDatabase(Database):
                     )
                     for result in results
                 ]
+
+        def get_events(
+            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+        ) -> list[Event]:
+            with self.parent.transaction(parent=con) as con:
+
+                if event_type is None:
+                    sql = text(
+                        f"""
+                        SELECT * FROM events
+                        WHERE guild_id = :guild_id
+                        AND timestamp BETWEEN :start AND :end
+                        AND player_id = :player_id
+                        ORDER BY timestamp
+                    """
+                    )
+
+                    results = con.execute(
+                        sql,
+                        {
+                            "guild_id": self.guild.id,
+                            "start": timestamp_start,
+                            "end": timestamp_end,
+                            "player_id": self.id,
+                        },
+                    ).fetchall()
+                else:
+                    sql = text(
+                        f"""
+                        SELECT * FROM events
+                        WHERE guild_id = :guild_id
+                        AND timestamp BETWEEN :start AND :end
+                        AND player_id = :player_id
+                        AND event_type LIKE :event_type
+                        ORDER BY timestamp
+                    """
+                    )
+
+                    results = con.execute(
+                        sql,
+                        {
+                            "guild_id": self.guild.id,
+                            "start": timestamp_start,
+                            "end": timestamp_end,
+                            "player_id": self.id,
+                            "event_type": event_type,
+                        },
+                    ).fetchall()
+
+                events = []
+                for r in results:
+                    event = None
+                    extra_data = r[5]
+                    assert extra_data["player_id"] == self.id
+
+                    for event_class in event_classes:
+
+                        if r[4] == event_class.event_type:
+                            event = event_class.from_extra_data(
+                                self.parent, r[0], r[2], r[3], self.guild, extra_data
+                            )
+                            break
+
+                    assert event is not None
+                    events.append(event)
+
+                return events
 
         def draw_card_raw(self, con=None):
 

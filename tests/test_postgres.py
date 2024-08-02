@@ -48,7 +48,7 @@ def events_by_type(guild_db: PostgresDatabase.Guild, t: str, start=None, end=Non
     if end is None:
         end = time.time() + 10
 
-    return [e for e in guild_db.get_events(start, end) if e.event_type == t]
+    return guild_db.get_events(start, end, event_type=t)
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -565,6 +565,97 @@ def test_claim():
 
         resources[Resource.RALLY] -= 1
         assert player8_db.get_resources() == resources
+
+    finally:
+        test_db.remove_guild(guild_db)
+        assert test_db.get_guilds() == []
+
+
+def test_recharge():
+    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+
+    try:
+        config = guild_db.get_config()
+        player8_db: PostgresDatabase.Player = guild_db.add_player(8)
+
+        recharges = player8_db.get_recharges()
+        assert recharges["player_order_recharge"].event_type == "player_order_recharge"
+        assert recharges["player_order_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_order_recharge"].timestamp
+            < time.time() + config["order_recharge"] + 1
+        )
+
+        assert recharges["player_magic_recharge"].event_type == "player_magic_recharge"
+        assert recharges["player_magic_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_magic_recharge"].timestamp
+            < time.time() + config["magic_recharge"] + 1
+        )
+
+        assert recharges["player_card_recharge"].event_type == "player_card_recharge"
+        assert recharges["player_card_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_card_recharge"].timestamp < time.time() + config["card_recharge"] + 1
+        )
+
+        # now we refresh the events
+        # order
+        order_recharge_event: Database.Player.PlayerOrderRechargeEvent = recharges[
+            "player_order_recharge"
+        ]
+
+        resources = player8_db.get_resources()
+        order_recharge_event.resolve()
+        resources[Resource.ORDERS] += 1
+        assert player8_db.get_resources() == resources
+
+        guild_db.remove_event(order_recharge_event)
+
+        # magic
+        magic_recharge_event: Database.Player.PlayerMagicRechargeEvent = recharges[
+            "player_magic_recharge"
+        ]
+
+        resources = player8_db.get_resources()
+        magic_recharge_event.resolve()
+        resources[Resource.MAGIC] += 1
+        assert player8_db.get_resources() == resources
+
+        guild_db.remove_event(magic_recharge_event)
+
+        # cards
+        card_recharge_event: Database.Player.PlayerCardRechargeEvent = recharges[
+            "player_card_recharge"
+        ]
+        hand = player8_db.get_hand()
+        card_recharge_event.resolve()
+        assert is_subset(hand, player8_db.get_hand())
+        assert len(hand) + 1 == len(player8_db.get_hand())
+
+        guild_db.remove_event(card_recharge_event)
+
+        # events refreshed, check invariants
+        recharges = player8_db.get_recharges()
+        assert recharges["player_order_recharge"].event_type == "player_order_recharge"
+        assert recharges["player_order_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_order_recharge"].timestamp
+            < time.time() + config["order_recharge"] + 1
+        )
+
+        assert recharges["player_magic_recharge"].event_type == "player_magic_recharge"
+        assert recharges["player_magic_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_magic_recharge"].timestamp
+            < time.time() + config["magic_recharge"] + 1
+        )
+
+        assert recharges["player_card_recharge"].event_type == "player_card_recharge"
+        assert recharges["player_card_recharge"].timestamp > time.time()
+        assert (
+            recharges["player_card_recharge"].timestamp < time.time() + config["card_recharge"] + 1
+        )
 
     finally:
         test_db.remove_guild(guild_db)
