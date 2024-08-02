@@ -10,14 +10,14 @@ BASE_HANDS_SIZE = 5
 
 Resource = Enum(
     "Resource",
-    ["ORDERS", "GOLD", "ARTEFACTS", "SUPPLIES", "MAGIC", "RALLY", "STRENGTH"],
+    ["ORDERS", "GOLD", "ARTEFACTS", "INTEL", "MAGIC", "RALLY", "STRENGTH"],
 )
 
 BaseResources = [
     Resource.ORDERS,
     Resource.GOLD,
     Resource.ARTEFACTS,
-    Resource.SUPPLIES,
+    Resource.INTEL,
     Resource.MAGIC,
     Resource.RALLY,
     Resource.STRENGTH,
@@ -36,8 +36,8 @@ def resource_to_emoji(resource: Resource) -> str:
             return "🪙"
         case Resource.ARTEFACTS:
             return "🔮"
-        case Resource.SUPPLIES:
-            return "🍖"
+        case Resource.INTEL:
+            return "🤫"
         case Resource.MAGIC:
             return "✨"
         case Resource.RALLY:

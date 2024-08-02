@@ -410,7 +410,7 @@ def test_playing():
             prev_gain_events,
         )[0]
         assert new_gain_event.event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
-        assert new_gain_event.changes == [(Resource.SUPPLIES.value, 1)]
+        assert new_gain_event.changes == [(Resource.INTEL.value, 1)]
 
         new_pay_event: PostgresDatabase.Player.PlayerPayEvent = events_by_type(
             guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type
@@ -441,7 +441,7 @@ def test_playing():
         assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
         assert new_region_recharge_event.timestamp > new_play_event.timestamp
 
-        resources[Resource.SUPPLIES] += 1
+        resources[Resource.INTEL] += 1
         assert player8_db.get_resources() == resources
 
         assert region1_db.occupied()[0] == creature2_db

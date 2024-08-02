@@ -14,10 +14,10 @@ def test_text():
 
     village = Village()
 
-    assert village.quest_effect_full_text() == "gain 1 🍖supply"
-    assert village.quest_effect_short_text() == "+1🍖"
+    assert village.quest_effect_full_text() == "gain 1 🤫intel"
+    assert village.quest_effect_short_text() == "+1🤫"
 
     small_mine = SmallMine()
 
-    assert small_mine.quest_effect_full_text() == "pay 1 🍖supply. gain 5 🪙gold."
-    assert small_mine.quest_effect_short_text() == "-1🍖 -> +5🪙"
+    assert small_mine.quest_effect_full_text() == "pay 1 🤫intel. gain 5 🪙gold."
+    assert small_mine.quest_effect_short_text() == "-1🤫 -> +5🪙"
