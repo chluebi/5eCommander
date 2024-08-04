@@ -1,10 +1,11 @@
+from typing import Optional
 import time
 
 from src.core.creatures import *
 from src.core.regions import *
 
 
-def test_text():
+def test_text() -> None:
     commoner = Commoner()
 
     assert commoner.quest_ability_effect_full_text() == ""

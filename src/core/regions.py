@@ -1,3 +1,5 @@
+from typing import Optional, Any, List
+
 from src.core.base_types import (
     Resource,
     Price,
@@ -25,7 +27,7 @@ class SimpleRegion(BaseRegion):
 
     id = -1
     name = "simple region"
-    category = None
+    category: Optional[RegionCategory] = None
 
     def quest_price(self) -> list[Price]:
         return []
@@ -39,7 +41,13 @@ class SimpleRegion(BaseRegion):
     def quest_effect_full_text(self) -> str:
         return resource_changes_to_string(self.quest_price() + self.quest_gain())
 
-    def quest_effect_price(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_effect_price(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         price = self.quest_price()
 
         if price == []:
@@ -49,7 +57,13 @@ class SimpleRegion(BaseRegion):
             owner: Database.Player = creature_db.owner
             owner.pay_price(price, con=con, extra_data=extra_data)
 
-    def quest_effect(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_effect(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         gain = self.quest_gain()
 
         if gain == []:
@@ -60,7 +74,7 @@ class SimpleRegion(BaseRegion):
             owner.gain(gain, con=con, extra_data=extra_data)
 
 
-class Village(SimpleRegion):
+class Village(Database.BasicRegion):
 
     id = 0
     name = "village"
@@ -70,7 +84,7 @@ class Village(SimpleRegion):
         return [Gain(Resource.INTEL, 1)]
 
 
-class SmallMine(SimpleRegion):
+class SmallMine(Database.BasicRegion):
 
     id = 1
     name = "small mine"
@@ -83,14 +97,14 @@ class SmallMine(SimpleRegion):
         return [Gain(Resource.GOLD, 5)]
 
 
-regions = [
+regions_list = [
     Village(),
     SmallMine(),
 ]
 
-assert len(set([r.id for r in regions])) == len(regions)
+assert len(set([r.id for r in regions_list])) == len(regions_list)
 
-regions = {r.id: r for r in regions}
+regions = {r.id: r for r in regions_list}
 
 assert all(key == r.id for key, r in regions.items())
 assert len(set([r.id for r in regions.values()])) == len(regions)

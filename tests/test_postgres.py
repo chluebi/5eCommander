@@ -1,9 +1,18 @@
 import time
+from typing import cast, List, Tuple, Union, Optional, Type, TypeVar, Callable
 
 import sqlalchemy
-from testcontainers.postgres import PostgresContainer
+from testcontainers.postgres import PostgresContainer  # type: ignore
 
-from src.core.base_types import BaseResources, Resource, BaseRegion, StartCondition, Event
+from src.core.base_types import (
+    BaseResources,
+    Resource,
+    BaseRegion,
+    StartCondition,
+    Event,
+    Gain,
+    Price,
+)
 from src.core.exceptions import (
     GuildNotFound,
     PlayerNotFound,
@@ -16,15 +25,17 @@ from src.database.postgres import PostgresDatabase
 from src.core.creatures import *
 from src.core.regions import *
 
+K = TypeVar("K")
 
-def is_subset(a: list, b: list):
+
+def is_subset(a: List[K], b: List[K]) -> bool:
     for e in a:
         if e not in b:
             return False
     return True
 
 
-def are_subsets(a: list, b: list):
+def are_subsets(a: List[K], b: List[K]) -> bool:
     for e in a:
         if e not in b:
             return False
@@ -34,7 +45,7 @@ def are_subsets(a: list, b: list):
     return True
 
 
-def subtract(a: list, b: list):
+def subtract(a: List[K], b: List[K]) -> List[K]:
     new = []
     for e in a:
         if e not in b:
@@ -42,13 +53,18 @@ def subtract(a: list, b: list):
     return new
 
 
-def events_by_type(guild_db: PostgresDatabase.Guild, t: str, start=None, end=None) -> Event:
+T = TypeVar("T", bound=Event)
+
+
+def events_by_type(
+    guild_db: Database.Guild, t: Type[T], start: Optional[float] = None, end: Optional[float] = None
+) -> List[T]:
     if start is None:
         start = time.time() - 60
     if end is None:
         end = time.time() + 10
 
-    return guild_db.get_events(start, end, event_type=t)
+    return cast(List[T], guild_db.get_events(start, end, event_type=t))
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -57,13 +73,13 @@ engine = sqlalchemy.create_engine(postgres.get_connection_url())
 test_db = PostgresDatabase(start_condition, engine)
 
 
-def test_guild_creation():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_guild_creation() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
         assert test_db.get_guild(guild_db.id) == guild_db
         assert test_db.get_guilds() == [guild_db]
-        assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
+        assert [r.region for r in guild_db.get_regions()] == cast(List[Database.BasicRegion], start_condition.start_active_regions) 
         assert [
             c for c in guild_db.get_creature_pool()
         ] == start_condition.start_available_creatures
@@ -79,18 +95,16 @@ def test_guild_creation():
         assert test_db.get_guilds() == []
 
 
-def test_player_creation():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_player_creation() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
         assert are_subsets(
             [
                 guild_db.get_region(e.region_id).region
-                for e in events_by_type(
-                    guild_db, PostgresDatabase.Guild.RegionAddedEvent.event_type
-                )
+                for e in events_by_type(guild_db, Database.Guild.RegionAddedEvent)
             ],
-            start_condition.start_active_regions,
+            cast(List[Database.BasicRegion], start_condition.start_active_regions) ,
         )
 
         player1_db: Database.Player = guild_db.add_player(1)
@@ -99,9 +113,7 @@ def test_player_creation():
         assert are_subsets(
             [
                 guild_db.get_player(e.player_id)
-                for e in events_by_type(
-                    guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type
-                )
+                for e in events_by_type(guild_db, Database.Guild.PlayerAddedEvent)
             ],
             [player1_db],
         )
@@ -111,9 +123,7 @@ def test_player_creation():
         assert are_subsets(
             [
                 guild_db.get_player(e.player_id)
-                for e in events_by_type(
-                    guild_db, PostgresDatabase.Guild.PlayerAddedEvent.event_type
-                )
+                for e in events_by_type(guild_db, Database.Guild.PlayerAddedEvent)
             ],
             [player1_db, player2_db],
         )
@@ -125,12 +135,7 @@ def test_player_creation():
         except PlayerNotFound:
             pass
         assert are_subsets(
-            [
-                e.player_id
-                for e in events_by_type(
-                    guild_db, PostgresDatabase.Guild.PlayerRemovedEvent.event_type
-                )
-            ],
+            [e.player_id for e in events_by_type(guild_db, Database.Guild.PlayerRemovedEvent)],
             [player1_db.id],
         )
 
@@ -141,19 +146,19 @@ def test_player_creation():
         assert test_db.get_guilds() == []
 
 
-def test_player_resources():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_player_resources() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
-        player1_db: PostgresDatabase.Player = guild_db.add_player(1)
+        player1_db: Database.Player = guild_db.add_player(1)
 
         for res in BaseResources:
             assert player1_db.has(res, 0) == True
             assert player1_db.has(res, 1) == False
 
-        get_events = lambda: events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type
-        ) + events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)
+        get_events: Callable[[], List[Event]] = lambda: events_by_type(
+            guild_db, Database.Player.PlayerGainEvent
+        ) + events_by_type(guild_db, Database.Player.PlayerPayEvent)
         assert len(get_events()) == 0
 
         for i in [1, 2, 5, 100]:
@@ -164,11 +169,10 @@ def test_player_resources():
 
                 new_events = subtract(get_events(), prev_events)
                 assert len(new_events) == 1
-                assert (
-                    new_events[0].event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
-                )
-                assert new_events[0].player_id == player1_db.id
-                assert new_events[0].changes == [(res.value, i)]
+                new_event = cast(Database.Player.PlayerGainEvent, new_events[0])
+                assert new_event.event_type == Database.Player.PlayerGainEvent.event_type
+                assert new_event.player_id == player1_db.id
+                assert new_event.changes == [(res.value, i)]
 
                 for res2 in BaseResources:
                     if res2 == res:
@@ -183,17 +187,18 @@ def test_player_resources():
 
                 new_events = subtract(get_events(), prev_events)
                 assert len(new_events) == 1
-                assert new_events[0].event_type == PostgresDatabase.Player.PlayerPayEvent.event_type
-                assert new_events[0].player_id == player1_db.id
-                assert new_events[0].changes == [(res.value, i)]
+                new_event2 = cast(Database.Player.PlayerPayEvent, new_events[0])
+                assert new_event2.event_type == Database.Player.PlayerPayEvent.event_type
+                assert new_event2.player_id == player1_db.id
+                assert new_event2.changes == [(res.value, i)]
 
     finally:
         test_db.remove_guild(guild_db)
         assert test_db.get_guilds() == []
 
 
-def test_player_prices():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_player_prices() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
         player1_db: Database.Player = guild_db.add_player(1)
@@ -257,20 +262,20 @@ def test_player_prices():
         assert test_db.get_guilds() == []
 
 
-def test_deck():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_deck() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
-        player5_db: PostgresDatabase.Player = guild_db.add_player(5)
+        player5_db: Database.Player = guild_db.add_player(5)
 
-        assert are_subsets([c.creature for c in player5_db.get_deck()], start_condition.start_deck)
+        assert are_subsets([c.creature for c in player5_db.get_deck()], cast(List[Database.BasicCreature], start_condition.start_deck))
 
-        get_events = lambda: events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerDrawEvent.event_type
+        get_events: Callable[[], List[Database.Player.PlayerDrawEvent]] = lambda: events_by_type(
+            guild_db, Database.Player.PlayerDrawEvent
         )
 
-        for _ in start_condition.start_deck:
-            assert player5_db.draw_card_raw().creature in start_condition.start_deck
+        for _ in cast(List[Database.BasicCreature], start_condition.start_deck):
+            assert player5_db.draw_card_raw().creature in cast(List[Database.BasicCreature], start_condition.start_deck)
 
         for _ in range(10):
             try:
@@ -279,14 +284,14 @@ def test_deck():
             except EmptyDeckException:
                 pass
 
-        for i in range(len(start_condition.start_deck) * 2):
+        for i in range(len(cast(List[Database.BasicCreature], start_condition.start_deck)) * 2):
 
             prev_events = get_events()
             assert len(prev_events) == i
 
-            player6_db: PostgresDatabase.Player = guild_db.add_player(6)
+            player6_db: Database.Player = guild_db.add_player(6)
 
-            assert [c.creature for c in player6_db.get_deck()] == start_condition.start_deck
+            assert [c.creature for c in player6_db.get_deck()] == cast(List[Database.BasicCreature], start_condition.start_deck)
             assert player6_db.get_hand() == []
 
             cards_drawn, reshuffled, hand_full = player6_db.draw_cards(N=i)
@@ -295,19 +300,19 @@ def test_deck():
             assert len(all_events) == i + 1
             new_events = subtract(all_events, prev_events)
             assert len(new_events) == 1
-            assert new_events[0].event_type == PostgresDatabase.Player.PlayerDrawEvent.event_type
+            assert new_events[0].event_type == Database.Player.PlayerDrawEvent.event_type
             assert guild_db.get_player(new_events[0].player_id) == player6_db
             assert new_events[0].num_cards == len(cards_drawn)
 
             if i <= guild_db.get_config()["max_cards"]:
-                assert len(cards_drawn) == min(i, len(start_condition.start_deck))
-                if i <= len(start_condition.start_deck):
+                assert len(cards_drawn) == min(i, len(cast(List[Database.BasicCreature], start_condition.start_deck)))
+                if i <= len(cast(List[Database.BasicCreature], start_condition.start_deck)):
                     assert not reshuffled
                 else:
                     assert reshuffled
 
                 for card in cards_drawn:
-                    assert card.creature in start_condition.start_deck
+                    assert card.creature in cast(List[Database.BasicCreature], start_condition.start_deck)
             else:
                 assert hand_full
                 assert len(cards_drawn) == guild_db.get_config()["max_cards"]
@@ -315,15 +320,15 @@ def test_deck():
             guild_db.remove_player(player6_db)
 
         # drawing creatures
-        player7_db: PostgresDatabase.Player = guild_db.add_player(7)
-        assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
+        player7_db: Database.Player = guild_db.add_player(7)
+        assert [c.creature for c in player7_db.get_deck()] == cast(List[Database.BasicCreature], start_condition.start_deck)
 
         # draw entire deck
         cards_drawn, reshuffled, hand_full = player7_db.draw_cards(
-            N=len(start_condition.start_deck)
+            N=len(cast(List[Database.BasicCreature], start_condition.start_deck))
         )
 
-        assert len(cards_drawn) == len(start_condition.start_deck)
+        assert len(cards_drawn) == len(cast(List[Database.BasicCreature], start_condition.start_deck))
         assert len(player7_db.get_deck()) == 0
 
         # hand full
@@ -333,7 +338,7 @@ def test_deck():
 
         # remove a creature to make space
         player7_db.delete_creature_from_hand(player7_db.get_hand()[0])
-        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 1
+        assert len(player7_db.get_hand()) == len(cast(List[Database.BasicCreature], start_condition.start_deck)) - 1
 
         # deck empty
         cards_drawn, reshuffled, hand_full = player7_db.draw_cards(N=1)
@@ -343,7 +348,7 @@ def test_deck():
         # discard a creature
         creature_to_discard = player7_db.get_hand()[0]
         player7_db.discard_creature_from_hand(creature_to_discard)
-        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 2
+        assert len(player7_db.get_hand()) == len(cast(List[Database.BasicCreature], start_condition.start_deck)) - 2
         assert player7_db.get_deck() == []
 
         # now drawing works as the discarded creature is reshuffled
@@ -352,31 +357,31 @@ def test_deck():
         assert cards_drawn == [creature_to_discard]
         assert player7_db.get_deck() == []
 
-        assert is_subset([c.creature for c in player7_db.get_hand()], start_condition.start_deck)
+        assert is_subset([c.creature for c in player7_db.get_hand()], cast(List[Database.BasicCreature], start_condition.start_deck))
 
     finally:
         test_db.remove_guild(guild_db)
         assert test_db.get_guilds() == []
 
 
-def test_playing():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_playing() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
-        player8_db: PostgresDatabase.Player = guild_db.add_player(8)
-        assert [c.creature for c in player8_db.get_deck()] == start_condition.start_deck
+        player8_db: Database.Player = guild_db.add_player(8)
+        assert [c.creature for c in player8_db.get_deck()] == cast(List[Database.BasicCreature], start_condition.start_deck)
 
         player8_db.draw_cards(5)
         assert are_subsets(
-            [c.creature for c in player8_db.get_full_deck()], start_condition.start_deck
+            [c.creature for c in player8_db.get_full_deck()], cast(List[Database.BasicCreature], start_condition.start_deck)
         )
         for c in player8_db.get_hand():
-            assert c.creature in start_condition.start_deck
+            assert c.creature in cast(List[Database.BasicCreature], start_condition.start_deck)
 
-        creature2_db: PostgresDatabase.Creature = player8_db.get_hand()[0]
+        creature2_db: Database.Creature = player8_db.get_hand()[0]
         assert isinstance(creature2_db.creature, Commoner)
 
-        region1_db: PostgresDatabase.Region = guild_db.get_regions()[0]
+        region1_db: Database.Region = guild_db.get_regions()[0]
         assert region1_db.occupied() == (None, None)
         assert isinstance(region1_db.region, Village)
 
@@ -387,58 +392,44 @@ def test_playing():
 
         assert player8_db.get_played() == []
 
-        prev_gain_events = events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type
-        )
+        prev_gain_events = events_by_type(guild_db, Database.Player.PlayerGainEvent)
         assert len(prev_gain_events) == 1
-        assert len(events_by_type(guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type)) == 0
-        assert (
-            len(
-                events_by_type(guild_db, PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type)
-            )
-            == 0
-        )
-        assert (
-            len(
-                events_by_type(guild_db, PostgresDatabase.Creature.CreatureRechargeEvent.event_type)
-            )
-            == 0
-        )
+        assert len(events_by_type(guild_db, Database.Player.PlayerPayEvent)) == 0
+        assert len(events_by_type(guild_db, Database.Player.PlayerPlayToRegionEvent)) == 0
+        assert len(events_by_type(guild_db, Database.Creature.CreatureRechargeEvent)) == 0
 
         player8_db.play_creature_to_region(creature2_db, region1_db)
 
-        new_gain_event: PostgresDatabase.Player.PlayerGainEvent = subtract(
-            events_by_type(guild_db, PostgresDatabase.Player.PlayerGainEvent.event_type),
+        new_gain_event: Database.Player.PlayerGainEvent = subtract(
+            events_by_type(guild_db, Database.Player.PlayerGainEvent),
             prev_gain_events,
         )[0]
-        assert new_gain_event.event_type == PostgresDatabase.Player.PlayerGainEvent.event_type
+        assert new_gain_event.event_type == Database.Player.PlayerGainEvent.event_type
         assert new_gain_event.changes == [(Resource.INTEL.value, 1)]
 
-        new_pay_event: PostgresDatabase.Player.PlayerPayEvent = events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerPayEvent.event_type
+        new_pay_event: Database.Player.PlayerPayEvent = events_by_type(
+            guild_db, Database.Player.PlayerPayEvent
         )[0]
-        assert new_pay_event.event_type == PostgresDatabase.Player.PlayerPayEvent.event_type
+        assert new_pay_event.event_type == Database.Player.PlayerPayEvent.event_type
         assert new_pay_event.changes == [(Resource.ORDERS.value, 1)]
 
-        new_play_event: PostgresDatabase.Player.PlayerPlayToRegionEvent = events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type
+        new_play_event: Database.Player.PlayerPlayToRegionEvent = events_by_type(
+            guild_db, Database.Player.PlayerPlayToRegionEvent
         )[0]
-        assert (
-            new_play_event.event_type == PostgresDatabase.Player.PlayerPlayToRegionEvent.event_type
-        )
+        assert new_play_event.event_type == Database.Player.PlayerPlayToRegionEvent.event_type
         assert guild_db.get_player(new_play_event.player_id) == player8_db
         assert guild_db.get_creature(new_play_event.creature_id) == creature2_db
         assert guild_db.get_region(new_play_event.region_id) == region1_db
         assert new_play_event.play_extra_data == {}
 
-        new_creature_recharge_event: PostgresDatabase.Creature.CreatureRechargeEvent = (
-            events_by_type(guild_db, PostgresDatabase.Creature.CreatureRechargeEvent.event_type)[0]
-        )
+        new_creature_recharge_event: Database.Creature.CreatureRechargeEvent = events_by_type(
+            guild_db, Database.Creature.CreatureRechargeEvent
+        )[0]
         assert guild_db.get_creature(new_creature_recharge_event.creature_id) == creature2_db
         assert new_creature_recharge_event.timestamp > new_play_event.timestamp
 
-        new_region_recharge_event: PostgresDatabase.Region.RegionRechargeEvent = events_by_type(
-            guild_db, PostgresDatabase.Region.RegionRechargeEvent.event_type
+        new_region_recharge_event: Database.Region.RegionRechargeEvent = events_by_type(
+            guild_db, Database.Region.RegionRechargeEvent
         )[0]
         assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
         assert new_region_recharge_event.timestamp > new_play_event.timestamp
@@ -453,23 +444,20 @@ def test_playing():
 
         # campaign
 
-        creature3_db: PostgresDatabase.Creature = player8_db.get_hand()[0]
+        creature3_db: Database.Creature = player8_db.get_hand()[0]
         assert isinstance(creature3_db.creature, Commoner)
 
-        resources: dict[Resource, int] = player8_db.get_resources()
+        resources2: dict[Resource, int] = player8_db.get_resources()
 
         assert player8_db.get_campaign() == []
         old_deck = player8_db.get_full_deck()
 
-        assert (
-            events_by_type(guild_db, PostgresDatabase.Player.PlayerPlayToCampaignEvent.event_type)
-            == []
-        )
+        assert events_by_type(guild_db, Database.Player.PlayerPlayToCampaignEvent) == []
 
         player8_db.play_creature_to_campaign(creature3_db)
 
-        campaign_event: PostgresDatabase.Player.PlayerPlayToCampaignEvent = events_by_type(
-            guild_db, PostgresDatabase.Player.PlayerPlayToCampaignEvent.event_type
+        campaign_event: Database.Player.PlayerPlayToCampaignEvent = events_by_type(
+            guild_db, Database.Player.PlayerPlayToCampaignEvent
         )[0]
         assert guild_db.get_creature(campaign_event.creature_id) == creature3_db
         assert guild_db.get_player(campaign_event.player_id) == player8_db
@@ -477,33 +465,31 @@ def test_playing():
         assert player8_db.get_campaign() == [(creature3_db, 0)]
         assert are_subsets(subtract(old_deck, [creature3_db]), player8_db.get_full_deck())
 
-        resources[Resource.RALLY] += 1
-        assert player8_db.get_resources() == resources
+        resources2[Resource.RALLY] += 1
+        assert player8_db.get_resources() == resources2
 
     finally:
         test_db.remove_guild(guild_db)
         assert test_db.get_guilds() == []
 
 
-def test_claim():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_claim() -> None:
+    guild_db = test_db.add_guild(1)
 
     try:
-        player8_db: PostgresDatabase.Player = guild_db.add_player(8)
+        player8_db = guild_db.add_player(8)
 
         player8_db.gain([Gain(Resource.RALLY, 1)])
 
         assert player8_db.get_resources()[Resource.RALLY] == 1
         resources: dict[Resource, int] = player8_db.get_resources()
 
-        free_creature1_db: PostgresDatabase.FreeCreature = guild_db.add_free_creature(
-            Commoner(), 0, 0, player8_db
-        )
+        free_creature1_db = guild_db.add_free_creature(Commoner(), 0, 0, player8_db)
 
         assert (
             events_by_type(
                 guild_db,
-                PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type,
+                Database.FreeCreature.FreeCreatureProtectedEvent,
                 end=time.time() * 2,
             )
             == []
@@ -511,7 +497,7 @@ def test_claim():
         assert (
             events_by_type(
                 guild_db,
-                PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type,
+                Database.FreeCreature.FreeCreatureExpiresEvent,
                 end=time.time() * 2,
             )
             == []
@@ -519,9 +505,9 @@ def test_claim():
 
         free_creature1_db.create_events()
 
-        protected_event: PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent = events_by_type(
+        protected_event: Database.FreeCreature.FreeCreatureProtectedEvent = events_by_type(
             guild_db,
-            PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent.event_type,
+            Database.FreeCreature.FreeCreatureProtectedEvent,
             end=time.time() * 2,
         )[0]
         assert (
@@ -530,9 +516,9 @@ def test_claim():
         )
         assert protected_event.timestamp == free_creature1_db.get_protected_timestamp()
 
-        expires_event: PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent = events_by_type(
+        expires_event: Database.FreeCreature.FreeCreatureExpiresEvent = events_by_type(
             guild_db,
-            PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent.event_type,
+            Database.FreeCreature.FreeCreatureExpiresEvent,
             end=time.time() * 2,
         )[0]
         assert (
@@ -544,18 +530,12 @@ def test_claim():
         assert free_creature1_db.is_protected(time.time())
         assert not free_creature1_db.is_expired(time.time())
 
-        assert (
-            events_by_type(
-                guild_db, PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent.event_type
-            )
-            == []
-        )
+        assert events_by_type(guild_db, Database.FreeCreature.FreeCreatureClaimedEvent) == []
 
         free_creature1_db.claim(time.time() + guild_db.get_config()["free_protection"], player8_db)
 
-        claimed_event: PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent = events_by_type(
-            guild_db, PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent.event_type
-        )[0]
+        claimed_event = events_by_type(guild_db, Database.FreeCreature.FreeCreatureClaimedEvent)[0]
+
         assert (
             guild_db.get_free_creature(claimed_event.channel_id, claimed_event.message_id)
             == free_creature1_db
@@ -571,12 +551,12 @@ def test_claim():
         assert test_db.get_guilds() == []
 
 
-def test_recharge():
-    guild_db: PostgresDatabase.Guild = test_db.add_guild(1)
+def test_recharge() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
         config = guild_db.get_config()
-        player8_db: PostgresDatabase.Player = guild_db.add_player(8)
+        player8_db: Database.Player = guild_db.add_player(8)
 
         recharges = player8_db.get_recharges()
         assert recharges["player_order_recharge"].event_type == "player_order_recharge"
@@ -601,9 +581,9 @@ def test_recharge():
 
         # now we refresh the events
         # order
-        order_recharge_event: Database.Player.PlayerOrderRechargeEvent = recharges[
-            "player_order_recharge"
-        ]
+        order_recharge_event: Database.Player.PlayerOrderRechargeEvent = cast(
+            Database.Player.PlayerOrderRechargeEvent, recharges["player_order_recharge"]
+        )
 
         resources = player8_db.get_resources()
         order_recharge_event.resolve()
@@ -613,9 +593,9 @@ def test_recharge():
         guild_db.remove_event(order_recharge_event)
 
         # magic
-        magic_recharge_event: Database.Player.PlayerMagicRechargeEvent = recharges[
-            "player_magic_recharge"
-        ]
+        magic_recharge_event: Database.Player.PlayerMagicRechargeEvent = cast(
+            Database.Player.PlayerMagicRechargeEvent, recharges["player_magic_recharge"]
+        )
 
         resources = player8_db.get_resources()
         magic_recharge_event.resolve()
@@ -625,9 +605,9 @@ def test_recharge():
         guild_db.remove_event(magic_recharge_event)
 
         # cards
-        card_recharge_event: Database.Player.PlayerCardRechargeEvent = recharges[
-            "player_card_recharge"
-        ]
+        card_recharge_event: Database.Player.PlayerCardRechargeEvent = cast(
+            Database.Player.PlayerCardRechargeEvent, recharges["player_card_recharge"]
+        )
         hand = player8_db.get_hand()
         card_recharge_event.resolve()
         assert is_subset(hand, player8_db.get_hand())
@@ -662,9 +642,9 @@ def test_recharge():
         assert test_db.get_guilds() == []
 
 
-def test_rollback():
-    guild_db1: PostgresDatabase.Guild = test_db.add_guild(1)
-    guild_db2: PostgresDatabase.Guild = test_db.add_guild(2)
+def test_rollback() -> None:
+    guild_db1: Database.Guild = test_db.add_guild(1)
+    guild_db2: Database.Guild = test_db.add_guild(2)
 
     test_db.remove_guild(guild_db2)
 

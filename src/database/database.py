@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import time
 import json
 import copy
-from typing import List, Tuple
+from typing import List, Tuple, Type, Optional, Union, Any, cast, Generic, TypeVar
 from collections import defaultdict
 
 from src.core.base_types import (
@@ -13,6 +15,7 @@ from src.core.base_types import (
     BaseRegion,
     Event,
     StartCondition,
+    RegionCategory,
     resource_changes_to_string,
     resource_changes_to_short_string,
 )
@@ -27,71 +30,86 @@ from src.core.exceptions import (
 )
 
 
+from sqlalchemy import (
+    RootTransaction,
+    Connection
+)
+
+
 class Database:
 
     def __init__(self, start_condition: StartCondition):
         self.start_condition = start_condition
 
-    def timestamp_after(self, seconds: int):
-        return int(time.time() + seconds)
+    def timestamp_after(self, seconds: float) -> float:
+        return float(time.time() + seconds)
 
     class TransactionManager:
 
-        def __init__(self, parent, parent_manager):
+        def __init__(
+            self,
+            parent: Database,
+            parent_manager: Optional[Database.TransactionManager],
+        ):
             self.parent: Database = parent
-            self.parent_manager: Database.TransactionManager = parent_manager
+            self.parent_manager = parent_manager
             self.children: list[Database.TransactionManager] = []
             self.events: list[Event] = []
 
-            self.con = None
-            self.trans = None
+            self.con: Connection = cast(Connection, None)
+            self.trans: RootTransaction = cast(RootTransaction, None)
 
-        def __enter__(self):
+        def __enter__(self) -> Database.TransactionManager:
             if self.parent_manager is None:
-                con, trans = self.start_connection()
+                res = self.start_connection()
+                self.con = res[0]
+                self.trans = res[1]
             else:
-                con = self.parent_manager.con
-                trans = self.parent_manager.trans
+                assert self.parent_manager.con is not None
+                assert self.parent_manager.trans is not None
+                self.con = self.parent_manager.con
+                self.trans = self.parent_manager.trans
                 self.parent_manager.children.append(self)
 
-            self.con = con
-            self.trans = trans
 
             return self
 
-        def __exit__(self, exc_type, exc_value, traceback):
+        def __exit__(
+            self,
+            exc_type: Optional[Type[Exception]],
+            exc_value: Optional[Exception],
+            traceback: Any,
+        ) -> None:
             if self.parent_manager is None:
-                if exc_type is not None:
+                if exc_value is not None:
                     self.rollback_transaction()
-                    return False
+                    raise exc_value
 
                 for e in self.get_events():
                     self.parent.add_event(e, con=self)
 
                 self.commit_transaction()
                 self.end_connection()
-                return True
             else:
-                if exc_type is not None:
-                    return False
-                return True
+                if exc_value is not None:
+                    raise exc_value
 
-        def start_connection(self):
-            pass
+        def start_connection(self) -> Tuple[Connection, RootTransaction]:
+            assert False
 
-        def end_connection(self):
-            pass
+        def end_connection(self) -> None:
+            assert False
 
-        def commit_transaction(self):
-            pass
+        def commit_transaction(self) -> None:
+            assert False
 
-        def rollback_transaction(self):
-            pass
+        def rollback_transaction(self) -> None:
+            assert False
 
-        def execute(self, *args):
-            pass
+        def execute(self, *args: Any) -> Any:
+            assert False
 
-        def add_event(self, event: Event):
+        def add_event(self, event: Event) -> None:
             if self.parent_manager:
                 parent = self.parent_manager
                 while parent.events == [] and parent.parent_manager:
@@ -101,42 +119,66 @@ class Database:
                     event.parent_event = parent.events[-1]
             self.events.append(event)
 
-        def get_events(self):
+        def get_events(self) -> List[Event]:
             return self.events + sum([c.get_events() for c in self.children], [])
 
-        def get_root(self):
+        def get_root(self) -> Database.TransactionManager:
             if self.parent_manager is None:
                 return self
             return self.parent_manager.get_root()
 
-    def transaction(self, parent: TransactionManager = None):
+    def transaction(
+        self, parent: Optional[Database.TransactionManager] = None
+    ) -> TransactionManager:
         return self.TransactionManager(self, parent)
 
-    def fresh_event_id(self, guild, con=None):
-        pass
+    def fresh_event_id(
+        self,
+        guild: Database.Guild,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> int:
+        assert False
 
-    def add_event(self, event: Event, con=None):
-        pass
+    def add_event(
+        self,
+        event: Event,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> None:
+        assert False
 
-    def add_guild(self, guild_id: int, con=None):
-        pass
+    def add_guild(
+        self,
+        guild_id: int,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> Database.Guild:
+        assert False
 
-    def get_guilds(self, con=None):
-        pass
+    def get_guilds(
+        self, con: Optional[Database.TransactionManager] = None
+    ) -> List[Database.Guild]:
+        assert False
 
-    def get_guild(self, guild_id: int, con=None):
-        pass
+    def get_guild(
+        self,
+        guild_id: int,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> Database.Guild:
+        assert False
 
-    def remove_guild(self, guild_id: int, con=None):
-        pass
+    def remove_guild(
+        self,
+        guild: Database.Guild,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> Database.Guild:
+        assert False
 
     class Guild:
 
-        def __init__(self, parent, id: int):
+        def __init__(self, parent: Database, id: int):
             self.parent = parent
             self.id = id
 
-        def __eq__(self, other) -> bool:
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Database.Guild):
                 return self.parent == other.parent and self.id == other.id
             return False
@@ -145,97 +187,199 @@ class Database:
             return f"<DatabaseGuild: {self.id}>"
 
         def get_events(
-            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+            self,
+            timestamp_start: float,
+            timestamp_end: float,
+            event_type: Optional[Type[Event]] = None,
+            con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
-            pass
+            assert False
 
-        def set_config(self, config: dict, con=None):
-            pass
+        def remove_event(
+            self,
+            event: Event,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Event:
+            assert False
 
-        def get_config(self, con=None):
-            pass
+        def set_config(
+            self,
+            config: dict[Any, Any],
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
-        def fresh_region_id(self, con=None):
-            pass
+        def get_config(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> dict[Any, Any]:
+            assert False
 
-        def add_region(self, region: BaseRegion, con=None):
-            pass
+        def fresh_region_id(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> int:
+            assert False
 
-        def get_regions(self, con=None):
-            pass
+        def add_region(
+            self,
+            region: Database.BasicRegion,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Region:
+            assert False
 
-        def get_region(self, region_id: int, con=None):
-            pass
+        def get_regions(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Region]:
+            assert False
 
-        def remove_region(self, region, con=None):
-            pass
+        def get_region(
+            self,
+            region_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Region:
+            assert False
 
-        def add_player(self, player_id: int, con=None):
-            pass
+        def remove_region(
+            self,
+            region: Database.Region,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Region:
+            assert False
 
-        def get_players(self):
-            pass
+        def add_player(
+            self,
+            player_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Player:
+            assert False
 
-        def get_player(self, player_id: int, con=None):
-            pass
+        def get_players(self) -> List[Database.Player]:
+            assert False
 
-        def remove_player(self, player, con=None):
-            pass
+        def get_player(
+            self,
+            player_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Player:
+            assert False
 
-        def fresh_creature_id(self, con=None):
-            pass
+        def remove_player(
+            self,
+            player: Database.Player,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Player:
+            assert False
 
-        def add_creature(self, creature: BaseCreature, owner, con=None):
-            pass
+        def fresh_creature_id(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> int:
+            assert False
 
-        def get_creatures(self, con=None):
-            pass
+        def add_creature(
+            self,
+            creature: Database.BasicCreature,
+            owner: Database.Player,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Creature:
+            assert False
 
-        def get_creature(self, creature_id: int, con=None):
-            pass
+        def get_creatures(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            assert False
 
-        def remove_creature(self, creature, con=None):
-            pass
+        def get_creature(
+            self,
+            creature_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Creature:
+            assert False
 
-        def add_to_creature_pool(self, creature: BaseCreature, con=None):
-            pass
+        def remove_creature(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Creature:
+            assert False
 
-        def get_creature_pool(self, con=None):
-            pass
+        def add_to_creature_pool(
+            self,
+            creature: Database.BasicCreature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
-        def get_random_from_creature_pool(self, con=None):
-            pass
+        def get_creature_pool(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.BasicCreature]:
+            assert False
 
-        def remove_from_creature_pool(self, creature: BaseCreature, con=None):
-            pass
+        def get_random_from_creature_pool(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> Database.BasicCreature:
+            assert False
+
+        def remove_from_creature_pool(
+            self,
+            creature: Database.BasicCreature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
         def add_free_creature(
-            self, creature: BaseCreature, channel_id: int, message_id: int, roller, con=None
-        ):
-            pass
+            self,
+            creature: Database.BasicCreature,
+            channel_id: int,
+            message_id: int,
+            roller: Database.Player,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.FreeCreature:
+            assert False
 
-        def get_free_creatures(self, con=None):
-            pass
+        def get_free_creatures(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.FreeCreature]:
+            assert False
 
-        def get_free_creature(self, channel_id: int, message_id: int, con=None):
-            pass
+        def get_free_creature(
+            self,
+            channel_id: int,
+            message_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.FreeCreature:
+            assert False
 
-        def remove_free_creature(self, creature, con=None):
-            pass
+        def remove_free_creature(
+            self,
+            creature: Database.FreeCreature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.FreeCreature:
+            assert False
 
         class RegionAddedEvent(Event):
 
             event_type = "region_added"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                region_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.region_id = region_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.RegionAddedEvent:
                 return Database.Guild.RegionAddedEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["region_id"]
                 )
@@ -251,15 +395,27 @@ class Database:
             event_type = "region_removed"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                region_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.region_id = region_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
-                return Database.Guild.RegionEvent(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.RegionRemovedEvent:
+                return Database.Guild.RegionRemovedEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["region_id"]
                 )
 
@@ -267,21 +423,33 @@ class Database:
                 return json.dumps({"region_id": self.region_id})
 
             def text(self) -> str:
-                return f"<region:{self.region_id}> has been remvoed"
+                return f"<region:{self.region_id}> has been removed"
 
         class PlayerAddedEvent(Event):
 
             event_type = "player_added"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, player_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                player_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.PlayerAddedEvent:
                 return Database.Guild.PlayerAddedEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["player_id"]
                 )
@@ -297,14 +465,26 @@ class Database:
             event_type = "player_removed"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, player_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                player_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.PlayerRemovedEvent:
                 return Database.Guild.PlayerRemovedEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["player_id"]
                 )
@@ -314,16 +494,57 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> has left"
+            
+    class BasicRegion(BaseRegion):
+
+        id = -1
+        name = "default_region"
+        category: Optional[RegionCategory] = None
+
+        def __init__(self: Database.BasicRegion) -> None:
+            pass
+
+        def __repr__(self) -> str:
+            return f"<BaseRegion: {self.id}#{self.name}>"
+
+        def __eq__(self, other: Any) -> bool:
+            if isinstance(other, Database.BasicRegion):
+                return self.id == other.id
+            return False
+
+        def quest_effect_short_text(self) -> str:
+            return ""
+
+        def quest_effect_full_text(self) -> str:
+            return ""
+
+        def quest_effect_price(
+            self,
+            region_db: Database.Region,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            return
+
+        def quest_effect(
+            self,
+            region_db: Database.Region,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            return
 
     class Region:
 
-        def __init__(self, parent, id: int, region: BaseRegion, guild):
+        def __init__(self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild):
             self.parent = parent
             self.id = id
             self.region = region
             self.guild = guild
 
-        def __eq__(self, other) -> bool:
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Database.Region):
                 return (
                     self.parent == other.parent
@@ -335,28 +556,50 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseRegion: {self.region} in {self.guild}, status: {self.occupied()}>"
 
-        def occupy(self, creature, con=None):
-            pass
+        def occupy(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
-        def unoccupy(self, current: int, con=None):
-            pass
+        def unoccupy(
+            self,
+            current: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
-        def occupied(self, con=None) -> tuple:
-            pass
+        def occupied(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> tuple[Optional[Database.Creature], Optional[int]]:
+            assert False
 
         class RegionRechargeEvent(Event):
 
             event_type = "region_recharge"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, region_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                region_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.region_id = region_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Region.RegionRechargeEvent:
                 return Database.Region.RegionRechargeEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["region_id"]
                 )
@@ -367,17 +610,20 @@ class Database:
             def text(self) -> str:
                 return f"{self.region_id} has recharged"
 
-            def resolve(self, con=None):
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
                 self.guild.get_region(self.region_id).unoccupy(self.timestamp, con=con)
 
     class Player:
 
-        def __init__(self, parent, id, guild):
+        def __init__(self, parent: Database, id: int, guild: Database.Guild):
             self.parent = parent
             self.id = id
             self.guild = guild
 
-        def __eq__(self, other) -> bool:
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Database.Player):
                 return (
                     self.parent == other.parent
@@ -389,73 +635,113 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabasePlayer: {self.id} in {self.guild}>"
 
-        def get_resources(self, con=None) -> dict[Resource, int]:
-            pass
+        def get_resources(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> dict[Resource, int]:
+            assert False
 
-        def set_resources(self, resources: dict[Resource, int], con=None):
-            pass
+        def set_resources(
+            self,
+            resources: dict[Resource, int],
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
 
-        def get_deck(self, con=None):
-            pass
+        def get_deck(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            assert False
 
-        def get_hand(self, con=None):
-            pass
+        def get_hand(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            assert False
 
-        def get_discard(self, con=None):
-            pass
+        def get_discard(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            assert False
 
-        def get_played(self, con=None):
-            pass
+        def get_played(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            assert False
 
-        def get_full_deck(self, con=None):
-            with self.parent.transaction(parent=con) as con:
+        def get_full_deck(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Creature]:
+            with self.parent.transaction(parent=con) as sub_con:
                 return sorted(
-                    self.get_deck(con=con)
-                    + self.get_hand(con=con)
+                    self.get_deck(con=sub_con)
+                    + self.get_hand(con=sub_con)
                     + self.get_discard(con=None)
                     + self.get_played(con=None),
                     key=lambda x: str(x),
                 )
 
-        def get_campaign(self, con=None):
-            pass
+        def get_campaign(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Tuple[Database.Creature, int]]:
+            assert False
 
         def get_events(
-            self, timestamp_start: int, timestamp_end: int, event_type=None, con=None
+            self,
+            timestamp_start: float,
+            timestamp_end: float,
+            event_type: Optional[Type[Event]] = None,
+            con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
-            pass
+            assert False
 
-        def remove_event(self, event: Event, con=None) -> Event:
-            pass
-
-        def get_recharges(self, con=None) -> dict:
+        def get_recharges(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> dict[str, Event]:
             recharge_event_classes: list[type[Event]] = [
                 Database.Player.PlayerOrderRechargeEvent,
                 Database.Player.PlayerMagicRechargeEvent,
                 Database.Player.PlayerCardRechargeEvent,
             ]
 
-            r = {}
+            r: dict[str, Event] = {}
 
             for c in recharge_event_classes:
-                events = self.get_events(0, time.time() * 2, event_type=c.event_type)
+                events = self.get_events(0, time.time() * 2, event_type=c)
                 assert len(events) == 1
                 recharge_event = events[0]
                 r[c.event_type] = recharge_event
 
             return r
 
-        def has(self, resource: Resource, amount: int, con=None) -> bool:
+        def has(
+            self,
+            resource: Resource,
+            amount: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> bool:
             return self.fulfills_price([Price(resource, amount)], con=con)
 
-        def give(self, resource: Resource, amount: int, con=None) -> None:
+        def give(
+            self,
+            resource: Resource,
+            amount: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             self.gain([Gain(resource, amount)], con=con)
 
-        def remove(self, resource: Resource, amount: int, con=None) -> None:
+        def remove(
+            self,
+            resource: Resource,
+            amount: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             self.pay_price([Price(resource, amount)], con=con)
 
-        def fulfills_price(self, price: list[Price], con=None) -> bool:
-            merged_prices = defaultdict(lambda: 0)
+        def fulfills_price(
+            self,
+            price: list[Price],
+            con: Optional[Database.TransactionManager] = None,
+        ) -> bool:
+            merged_prices: dict[Resource, int] = defaultdict(lambda: 0)
             for p in price:
                 if p.amount == 0:
                     continue
@@ -465,9 +751,9 @@ class Database:
             if len(merged_prices) == 0:
                 return True
 
-            with self.parent.transaction(parent=con) as con:
-                resources: dict[Resource, int] = self.get_resources(con=con)
-                hand_size: list = len(self.get_hand(con=con))
+            with self.parent.transaction(parent=con) as sub_con:
+                resources: dict[Resource, int] = self.get_resources(con=sub_con)
+                hand_size: int = len(self.get_hand(con=sub_con))
 
             for r, a in merged_prices.items():
                 if r in BaseResources:
@@ -475,34 +761,45 @@ class Database:
                         return False
             return True
 
-        def _delete_creatures(self, hand_size: int, a: int, extra_data: dict, con=None):
+        def _delete_creatures(
+            self,
+            hand_size: int,
+            a: int,
+            extra_data: dict[Any, Any],
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
 
-            expected_extra_data = {
-                "creatures_to_delete": {"text": "creatures to delete", "type": "list creature"}
-            }
+            with self.parent.transaction(parent=con) as sub_con:
+                expected_extra_data = {
+                    "creatures_to_delete": {"text": "creatures to delete", "type": "list creature"}
+                }
 
-            try:
-                creatures_to_delete = extra_data["creatures_to_delete"]
-            except KeyError:
-                raise MissingExtraData(extra_data=expected_extra_data)
+                try:
+                    creatures_to_delete = extra_data["creatures_to_delete"]
+                except KeyError:
+                    raise MissingExtraData(extra_data=expected_extra_data)
 
-            try:
-                assert len(set(creatures_to_delete)) >= a
-                for creature_id in creatures_to_delete:
-                    assert self.guild.get_creature(creature_id, con=con).owner == self
-            except Exception as e:
-                BadExtraData(str(e), extra_data=expected_extra_data)
+                try:
+                    assert len(set(creatures_to_delete)) >= a
+                    for creature_id in creatures_to_delete:
+                        assert self.guild.get_creature(creature_id, con=sub_con).owner == self
+                except Exception as e:
+                    raise BadExtraData(str(e), extra_data=expected_extra_data)
 
-            # like this extra_data can be further propagated
-            creatures_to_delete = creatures_to_delete[:a]
-            extra_data["creatures_to_delete"] = creatures_to_delete
+                # like this extra_data can be further propagated
+                creatures_to_delete = creatures_to_delete[:a]
+                extra_data["creatures_to_delete"] = creatures_to_delete
 
-            with self.parent.transaction(parent=con) as con:
                 for c in creatures_to_delete:
                     self.delete_creature_from_hand(c)
 
-        def gain(self, gain: list[Gain], con=None, extra_data={}) -> None:
-            merged_gains = defaultdict(lambda: 0)
+        def gain(
+            self,
+            gain: list[Gain],
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            merged_gains: dict[Resource, int] = defaultdict(lambda: 0)
             for g in gain:
                 if g.amount == 0:
                     continue
@@ -511,9 +808,9 @@ class Database:
             if len(merged_gains) == 0:
                 return
 
-            with self.parent.transaction(parent=con) as con:
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+            with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.Player.PlayerGainEvent(
                         self.parent,
                         event_id,
@@ -525,17 +822,22 @@ class Database:
                     ),
                 )
 
-                resources: dict[Resource, int] = self.get_resources(con=con)
-                hand_size: list = len(self.get_hand(con=con))
+                resources: dict[Resource, int] = self.get_resources(con=sub_con)
+                hand_size: int = len(self.get_hand(con=sub_con))
 
                 for r, a in merged_gains.items():
                     if r in BaseResources:
                         resources[r] += a
 
-                self.set_resources(resources, con=con)
+                self.set_resources(resources, con=sub_con)
 
-        def pay_price(self, price: list[Price], con=None, extra_data={}) -> None:
-            merged_price = defaultdict(lambda: 0)
+        def pay_price(
+            self,
+            price: list[Price],
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            merged_price: dict[Resource, int] = defaultdict(lambda: 0)
             for p in price:
                 if p.amount == 0:
                     continue
@@ -544,9 +846,9 @@ class Database:
             if len(merged_price) == 0:
                 return
 
-            with self.parent.transaction(parent=con) as con:
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+            with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.Player.PlayerPayEvent(
                         self.parent,
                         event_id,
@@ -558,8 +860,8 @@ class Database:
                     ),
                 )
 
-                resources: dict[Resource, int] = self.get_resources(con=con)
-                hand_size: list = len(self.get_hand(con=con))
+                resources: dict[Resource, int] = self.get_resources(con=sub_con)
+                hand_size = len(self.get_hand(con=sub_con))
 
                 for r, a in merged_price.items():
                     if r in BaseResources:
@@ -568,20 +870,28 @@ class Database:
                                 "Player is paying {} {} but only has {}".format(a, r, resources[r])
                             )
                         resources[r] -= a
-                self.set_resources(resources, con=con)
+                self.set_resources(resources, con=sub_con)
 
-        def draw_card_raw(self, con=None) -> BaseCreature:
+        def draw_card_raw(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> Database.Creature:
+            assert False
+
+        def reshuffle_discard(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> None:
             pass
 
-        def reshuffle_discard(self, con=None) -> None:
-            pass
+        def draw_cards(
+            self,
+            N: int = 1,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> tuple[List[Database.Creature], bool, bool]:
+            with self.parent.transaction(parent=con) as sub_con:
+                max_cards = self.guild.get_config(con=sub_con)["max_cards"]
+                current_cards = len(self.get_hand(con=sub_con))
 
-        def draw_cards(self, N=1, con=None) -> tuple[int, bool]:
-            with self.parent.transaction(parent=con) as con:
-                max_cards = self.guild.get_config(con=con)["max_cards"]
-                current_cards = len(self.get_hand(con=con))
-
-                cards_drawn = []
+                cards_drawn: List[Database.Creature] = []
                 discard_reshuffled = False
                 hand_full = False
                 for _ in range(N):
@@ -591,18 +901,18 @@ class Database:
                         hand_full = True
                         break
 
-                    if len(self.get_deck(con=con)) == 0:
-                        self.reshuffle_discard(con=con)
+                    if len(self.get_deck(con=sub_con)) == 0:
+                        self.reshuffle_discard(con=sub_con)
                         discard_reshuffled = True
 
-                        if len(self.get_deck(con=con)) == 0:
+                        if len(self.get_deck(con=sub_con)) == 0:
                             break
 
-                    card = self.draw_card_raw(con=con)
+                    card = self.draw_card_raw(con=sub_con)
                     cards_drawn.append(card)
 
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.Player.PlayerDrawEvent(
                         self.parent,
                         event_id,
@@ -616,34 +926,68 @@ class Database:
 
                 return cards_drawn, discard_reshuffled, hand_full
 
-        def delete_creature_from_hand(self, creature, con=None) -> None:
+        def delete_creature_from_hand(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
-        def recharge_creature(self, creature, con=None):
+        def recharge_creature(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
-        def play_creature(self, creature, con=None) -> None:
+        def discard_creature_from_hand(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
-        def campaign_creature(self, creature, strength: int, con=None) -> None:
+        def play_creature(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
-        def add_to_discard(self, creature, con=None) -> None:
+        def campaign_creature(
+            self,
+            creature: Database.Creature,
+            strength: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
-        def play_creature_to_region(self, creature, region, con=None, extra_data={}):
+        def add_to_discard(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            pass
+
+        def play_creature_to_region(
+            self,
+            creature: Database.Creature,
+            region: Database.Region,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
 
             if region.region.category not in creature.creature.quest_region_categories:
                 raise CreatureCannotQuestHere(
                     f"Region is {region.region.category} but creature can only go to {creature.creature.quest_region_categories}"
                 )
 
-            base_region: BaseRegion = region.region
-            base_creature: BaseCreature = creature.creature
+            base_region: Database.BasicRegion = region.region
+            base_creature: Database.BasicCreature = creature.creature
 
-            with self.parent.transaction(parent=con) as con:
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+            with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.Player.PlayerPlayToRegionEvent(
                         self.parent,
                         event_id,
@@ -657,26 +1001,31 @@ class Database:
                     )
                 )
 
-                self.pay_price([Price(Resource.ORDERS, 1)], con=con)
+                self.pay_price([Price(Resource.ORDERS, 1)], con=sub_con)
                 base_creature.quest_ability_effect_price(
-                    region, creature, con=con, extra_data=extra_data
+                    region, creature, con=sub_con, extra_data=extra_data
                 )
-                base_region.quest_effect_price(region, creature, con=con, extra_data=extra_data)
-                self.play_creature(creature, con=con)
-                region: Database.Region = region
-                region.occupy(creature, con=con)
-                creature: Database.Creature = creature
-                creature.play(con=con)
-                base_region.quest_effect(region, creature, con=con, extra_data=extra_data)
-                base_creature.quest_ability_effect(region, creature, con=con, extra_data=extra_data)
+                base_region.quest_effect_price(region, creature, con=sub_con, extra_data=extra_data)
+                self.play_creature(creature, con=sub_con)
+                region.occupy(creature, con=sub_con)
+                creature.play(con=sub_con)
+                base_region.quest_effect(region, creature, con=sub_con, extra_data=extra_data)
+                base_creature.quest_ability_effect(
+                    region, creature, con=sub_con, extra_data=extra_data
+                )
 
-        def play_creature_to_campaign(self, creature, con=None, extra_data={}):
+        def play_creature_to_campaign(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
 
-            base_creature: BaseCreature = creature.creature
+            base_creature: Database.BasicCreature = creature.creature
 
-            with self.parent.transaction(parent=con) as con:
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+            with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.Player.PlayerPlayToCampaignEvent(
                         self.parent,
                         event_id,
@@ -690,12 +1039,12 @@ class Database:
                 )
 
                 base_creature.campaign_ability_effect_price(
-                    creature, con=con, extra_data=extra_data
+                    creature, con=sub_con, extra_data=extra_data
                 )
                 strength = base_creature.campaign_ability_effect(
-                    creature, con=con, extra_data=extra_data
+                    creature, con=sub_con, extra_data=extra_data
                 )
-                self.campaign_creature(creature, strength, con=con)
+                self.campaign_creature(creature, strength, con=sub_con)
 
         class PlayerDrawEvent(Event):
 
@@ -703,11 +1052,11 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
                 num_cards: int,
             ):
@@ -715,9 +1064,15 @@ class Database:
                 self.player_id = player_id
                 self.num_cards = num_cards
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerDrawEvent:
                 return Database.Player.PlayerDrawEvent(
                     parent,
                     id,
@@ -740,11 +1095,11 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
                 changes: List[Tuple[int, int]],
             ):
@@ -752,9 +1107,15 @@ class Database:
                 self.player_id = player_id
                 self.changes = changes
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerGainEvent:
                 return Database.Player.PlayerGainEvent(
                     parent,
                     id,
@@ -769,10 +1130,10 @@ class Database:
                 return json.dumps({"player_id": self.player_id, "changes": self.changes})
 
             def text(self) -> str:
-                gain_list = list(
-                    map(lambda x: Gain(resource=Resource(x[0]), amount=x[1]), self.changes)
+                gain_string = resource_changes_to_string(
+                    list(map(lambda x: Gain(resource=Resource(x[0]), amount=x[1]), self.changes)),
+                    third_person=True,
                 )
-                gain_string = resource_changes_to_string(gain_list, third_person=True)
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerPayEvent(Event):
@@ -781,11 +1142,11 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
                 changes: List[Tuple[int, int]],
             ):
@@ -793,9 +1154,15 @@ class Database:
                 self.player_id = player_id
                 self.changes = changes
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerPayEvent:
                 return Database.Player.PlayerPayEvent(
                     parent,
                     id,
@@ -810,10 +1177,10 @@ class Database:
                 return json.dumps({"player_id": self.player_id, "changes": self.changes})
 
             def text(self) -> str:
-                gain_list = list(
-                    map(lambda x: Price(resource=Resource(x[0]), amount=x[1]), self.changes)
+                gain_string = resource_changes_to_string(
+                    list(map(lambda x: Price(resource=Resource(x[0]), amount=x[1]), self.changes)),
+                    third_person=True,
                 )
-                gain_string = resource_changes_to_string(gain_list, third_person=True)
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerPlayToRegionEvent(Event):
@@ -822,15 +1189,15 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
                 region_id: int,
-                play_extra_data: dict,
+                play_extra_data: dict[Any, Any],
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
@@ -838,9 +1205,15 @@ class Database:
                 self.region_id = region_id
                 self.play_extra_data = play_extra_data
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerPlayToRegionEvent:
                 return Database.Player.PlayerPlayToRegionEvent(
                     parent,
                     id,
@@ -872,23 +1245,29 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
-                play_extra_data: dict,
+                play_extra_data: dict[Any, Any],
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
                 self.creature_id = creature_id
                 self.play_extra_data = play_extra_data
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerPlayToCampaignEvent:
                 return Database.Player.PlayerPlayToCampaignEvent(
                     parent,
                     id,
@@ -918,19 +1297,25 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerOrderRechargeEvent:
                 return Database.Player.PlayerOrderRechargeEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["player_id"]
                 )
@@ -941,16 +1326,19 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> recharges on orders"
 
-            def resolve(self, con=None):
-                with self.parent.transaction(parent=con) as con:
-                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
-                    guild_config = self.guild.get_config(con=con)
-                    player_orders = player.get_resources(con=con)[Resource.ORDERS]
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                with self.parent.transaction(parent=con) as sub_con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
+                    guild_config = self.guild.get_config(con=sub_con)
+                    player_orders = player.get_resources(con=sub_con)[Resource.ORDERS]
                     if player_orders + 1 <= guild_config["max_orders"]:
-                        player.gain([Gain(resource=Resource.ORDERS, amount=1)], con=con)
+                        player.gain([Gain(resource=Resource.ORDERS, amount=1)], con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=con)
-                    con.add_event(
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    sub_con.add_event(
                         Database.Player.PlayerOrderRechargeEvent(
                             self.parent,
                             event_id,
@@ -967,19 +1355,25 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerMagicRechargeEvent:
                 return Database.Player.PlayerMagicRechargeEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["player_id"]
                 )
@@ -990,16 +1384,19 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> recharges on magic"
 
-            def resolve(self, con=None):
-                with self.parent.transaction(parent=con) as con:
-                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
-                    guild_config = self.guild.get_config(con=con)
-                    player_magic = player.get_resources(con=con)[Resource.MAGIC]
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                with self.parent.transaction(parent=con) as sub_con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
+                    guild_config = self.guild.get_config(con=sub_con)
+                    player_magic = player.get_resources(con=sub_con)[Resource.MAGIC]
                     if player_magic + 1 <= guild_config["max_magic"]:
-                        player.gain([Gain(resource=Resource.MAGIC, amount=1)], con=con)
+                        player.gain([Gain(resource=Resource.MAGIC, amount=1)], con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=con)
-                    con.add_event(
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    sub_con.add_event(
                         Database.Player.PlayerMagicRechargeEvent(
                             self.parent,
                             event_id,
@@ -1016,19 +1413,25 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 player_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.player_id = player_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerCardRechargeEvent:
                 return Database.Player.PlayerCardRechargeEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["player_id"]
                 )
@@ -1039,14 +1442,17 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> recharges on cards"
 
-            def resolve(self, con=None):
-                with self.parent.transaction(parent=con) as con:
-                    player: Database.Player = self.guild.get_player(self.player_id, con=con)
-                    guild_config = self.guild.get_config(con=con)
-                    player.draw_cards(1, con=con)
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                with self.parent.transaction(parent=con) as sub_con:
+                    player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
+                    guild_config = self.guild.get_config(con=sub_con)
+                    player.draw_cards(1, con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=con)
-                    con.add_event(
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    sub_con.add_event(
                         Database.Player.PlayerCardRechargeEvent(
                             self.parent,
                             event_id,
@@ -1057,16 +1463,85 @@ class Database:
                         ),
                     )
 
+
+    class BasicCreature(BaseCreature):
+
+        id = -1
+        name = "default_creature"
+        quest_region_categories: list[RegionCategory] = []
+        claim_cost: int = 0
+
+        def __init__(self: Database.BasicCreature):
+            assert False
+
+        def __repr__(self) -> str:
+            return f"<BaseCreature: {self.name}>"
+
+        def __eq__(self, other: Any) -> bool:
+            if isinstance(other, BaseCreature):
+                return str(self) == str(other)
+            return False
+
+        # questing
+        def quest_ability_effect_short_text(self) -> str:
+            assert False
+
+        def quest_ability_effect_full_text(self) -> str:
+            assert False
+
+        def quest_ability_effect_price(
+            self,
+            region_db: Database.Region,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            assert False
+
+        def quest_ability_effect(
+            self,
+            region_db: Database.Region,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
+        ) -> None:
+            assert False
+
+        # campaigning
+        def campaign_ability_effect_short_text(self) -> str:
+            assert False
+
+        def campaign_ability_effect_full_text(self) -> str:
+            assert False
+
+        def campaign_ability_effect_price(
+            self, creature_db: Database.Creature, con: Optional[Database.TransactionManager] = None, extra_data: dict[Any, Any] = {}
+        ) -> None:
+            assert False
+
+        def campaign_ability_effect(
+            self, creature_db: Database.Creature, con: Optional[Database.TransactionManager] = None, extra_data: dict[Any, Any] = {}
+        ) -> int:
+            assert False
+
+
     class Creature:
 
-        def __init__(self, parent, id: int, creature: BaseCreature, guild, owner):
+        def __init__(
+            self,
+            parent: Database,
+            id: int,
+            creature: Database.BasicCreature,
+            guild: Database.Guild,
+            owner: Database.Player,
+        ):
             self.parent = parent
             self.id = id
             self.creature = creature
             self.guild = guild
             self.owner = owner
 
-        def __eq__(self, other) -> bool:
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Database.Creature):
                 return (
                     self.parent == other.parent
@@ -1078,11 +1553,13 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
-        def play(self, parent_event=None, con=None):
-            with self.parent.transaction(parent=con) as con:
+        def play(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
                 # add directly to parent instead of connection
                 self.parent.add_event(
                     Database.Creature.CreatureRechargeEvent(
@@ -1100,14 +1577,26 @@ class Database:
             event_type = "creature_recharge"
 
             def __init__(
-                self, parent, id: int, timestamp: int, parent_event: Event, guild, creature_id: int
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                creature_id: int,
             ):
                 super().__init__(parent, id, timestamp, parent_event, guild)
                 self.creature_id = creature_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Creature.CreatureRechargeEvent:
                 return Database.Creature.CreatureRechargeEvent(
                     parent, id, timestamp, parent_event, guild, extra_data["creature_id"]
                 )
@@ -1118,8 +1607,11 @@ class Database:
             def text(self) -> str:
                 return "{creature_id} has recharged"
 
-            def resolve(self, con=None):
-                with self.parent.transaction(parent=con) as con:
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                with self.parent.transaction(parent=con) as sub_con:
                     creature = self.guild.get_creature(self.creature_id)
                     creature.owner.recharge_creature(creature)
 
@@ -1127,23 +1619,23 @@ class Database:
 
         def __init__(
             self,
-            parent,
-            creature: BaseCreature,
-            guild,
+            parent: Database,
+            creature: Database.BasicCreature,
+            guild: Database.Guild,
             channel_id: int,
             message_id: int,
-            roller,
-            timestamp_protected: int,
-            timestamp_expires: int,
+            roller_id: int,
+            timestamp_protected: float,
+            timestamp_expires: float,
         ):
             self.parent = parent
             self.guild = guild
             self.creature = creature
-            self.roller = roller
+            self.roller_id = roller_id
             self.channel_id = channel_id
             self.message_id = message_id
 
-        def __eq__(self, other) -> bool:
+        def __eq__(self, other: Any) -> bool:
             if isinstance(other, Database.FreeCreature):
                 return (
                     self.parent == other.parent
@@ -1154,16 +1646,18 @@ class Database:
                 )
             return False
 
-        def create_events(self, con=None):
-            with self.parent.transaction(parent=con) as con:
+        def create_events(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
                 # Notice that we add the events to the parent directly instead of the connection
                 # that is because we do not want these events to be part of the transaction
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
                 self.parent.add_event(
                     Database.FreeCreature.FreeCreatureProtectedEvent(
                         self.parent,
                         event_id,
-                        self.get_protected_timestamp(con=con),
+                        self.get_protected_timestamp(con=sub_con),
                         None,
                         self.guild,
                         self.channel_id,
@@ -1171,12 +1665,12 @@ class Database:
                     )
                 )
 
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
                 self.parent.add_event(
                     Database.FreeCreature.FreeCreatureExpiresEvent(
                         self.parent,
                         event_id,
-                        self.get_expires_timestamp(con=con),
+                        self.get_expires_timestamp(con=sub_con),
                         None,
                         self.guild,
                         self.channel_id,
@@ -1184,42 +1678,56 @@ class Database:
                     )
                 )
 
-        def get_protected_timestamp(self, con=None) -> int:
-            pass
+        def get_protected_timestamp(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> int:
+            return -1
 
-        def get_expires_timestamp(self, con=None) -> int:
-            pass
+        def get_expires_timestamp(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> int:
+            return -1
 
-        def is_protected(self, timestamp: int, con=None) -> bool:
+        def is_protected(
+            self,
+            timestamp: float,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> bool:
             return self.get_protected_timestamp(con=con) > timestamp
 
-        def is_expired(self, timestamp: int, con=None) -> bool:
+        def is_expired(
+            self,
+            timestamp: float,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> bool:
             return self.get_expires_timestamp(con=con) < timestamp
 
-        def claim(self, timestamp: int, owner, con=None):
+        def claim(
+            self,
+            timestamp: float,
+            owner: Database.Player,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Database.Creature:
 
-            owner: Database.Player = owner
-            guild: Database.Guild = self.guild
-
-            guild.get_free_creature(self.channel_id, self.message_id)
+            self.guild.get_free_creature(self.channel_id, self.message_id)
 
             if self.is_expired(timestamp):
                 raise ExpiredFreeCreature()
 
-            if self.is_protected(timestamp) and owner != self.roller:
+            if self.is_protected(timestamp) and owner.id != self.roller_id:
                 raise ProtectedFreeCreature(
                     f"This creature is protected until {self.get_protected_timestamp()}"
                 )
 
-            with self.parent.transaction(parent=con) as con:
-                owner.pay_price([Price(Resource.RALLY, self.creature.claim_cost)], con=con)
+            with self.parent.transaction(parent=con) as sub_con:
+                owner.pay_price([Price(Resource.RALLY, self.creature.claim_cost)], con=sub_con)
                 # dont do this for now so that information about claimed creatures can still be queried
-                # guild.remove_free_creature(self, con=con)
-                creature: Database.Creature = guild.add_creature(self.creature, owner, con=con)
-                owner.add_to_discard(creature, con=con)
+                # guild.remove_free_creature(self, con=sub_con)
+                creature = self.guild.add_creature(self.creature, owner, con=sub_con)
+                owner.add_to_discard(creature, con=sub_con)
 
-                event_id = self.parent.fresh_event_id(self.guild, con=con)
-                con.add_event(
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
                     Database.FreeCreature.FreeCreatureClaimedEvent(
                         self.parent,
                         event_id,
@@ -1233,17 +1741,19 @@ class Database:
                     )
                 )
 
+                return creature
+
         class FreeCreatureProtectedEvent(Event):
 
             event_type = "free_creature_protected"
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
             ):
@@ -1251,9 +1761,15 @@ class Database:
                 self.channel_id = channel_id
                 self.message_id = message_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.FreeCreature.FreeCreatureProtectedEvent:
                 return Database.FreeCreature.FreeCreatureProtectedEvent(
                     parent,
                     id,
@@ -1278,11 +1794,11 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
             ):
@@ -1290,9 +1806,15 @@ class Database:
                 self.channel_id = channel_id
                 self.message_id = message_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.FreeCreature.FreeCreatureExpiresEvent:
                 return Database.FreeCreature.FreeCreatureExpiresEvent(
                     parent,
                     id,
@@ -1309,13 +1831,16 @@ class Database:
             def text(self) -> str:
                 return f"<free_creature:({self.channel_id},{self.message_id})> has expired"
 
-            def resolve(self, con=None):
-                with self.parent.transaction(parent=con) as con:
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                with self.parent.transaction(parent=con) as sub_con:
                     try:
                         free_creature: Database.FreeCreature = self.guild.get_free_creature(
-                            self.channel_id, self.message_id, con=con
+                            self.channel_id, self.message_id, con=sub_con
                         )
-                        self.guild.remove_free_creature(free_creature, con=con)
+                        self.guild.remove_free_creature(free_creature, con=sub_con)
                     except CreatureNotFound:
                         pass
 
@@ -1325,11 +1850,11 @@ class Database:
 
             def __init__(
                 self,
-                parent,
+                parent: Database,
                 id: int,
-                timestamp: int,
-                parent_event: Event,
-                guild,
+                timestamp: float,
+                parent_event: Optional[Event],
+                guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
                 player_id: int,
@@ -1341,9 +1866,15 @@ class Database:
                 self.player_id = player_id
                 self.creature_id = creature_id
 
+            @staticmethod
             def from_extra_data(
-                parent, id: int, timestamp: int, parent_event, guild, extra_data: dict
-            ):
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event: Event,
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.FreeCreature.FreeCreatureClaimedEvent:
                 return Database.FreeCreature.FreeCreatureClaimedEvent(
                     parent,
                     id,

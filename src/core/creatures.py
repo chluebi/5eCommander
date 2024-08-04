@@ -1,5 +1,7 @@
+from __future__ import annotations
+from typing import Optional, Any, List
+
 from src.core.base_types import (
-    BaseCreature,
     Resource,
     Price,
     Gain,
@@ -13,12 +15,12 @@ from src.core.regions import RegionCategories
 from src.core.exceptions import CreatureCannotCampaign
 
 
-class SimpleCreature(BaseCreature):
+class SimpleCreature(Database.BasicCreature):
 
     id = -1
     name = "simple creature"
     quest_region_categories = []
-    claim_cost: int = None
+    claim_cost: int = 0
 
     def quest_price(self) -> list[Price]:
         return []
@@ -39,7 +41,13 @@ class SimpleCreature(BaseCreature):
     def quest_ability_effect_full_text(self) -> str:
         return resource_changes_to_string(self.quest_price() + self.quest_gain())
 
-    def quest_ability_effect_price(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_ability_effect_price(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         price = self.quest_price()
 
         if price == []:
@@ -49,7 +57,13 @@ class SimpleCreature(BaseCreature):
             owner: Database.Player = creature_db.owner
             owner.pay_price(price, con=con, extra_data=extra_data)
 
-    def quest_ability_effect(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_ability_effect(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         gain = self.quest_gain()
 
         if gain == []:
@@ -66,7 +80,12 @@ class SimpleCreature(BaseCreature):
     def campaign_ability_effect_full_text(self) -> str:
         return resource_changes_to_string(self.campaign_price() + self.campaign_gain())
 
-    def campaign_ability_effect_price(self, creature_db, con=None, extra_data={}):
+    def campaign_ability_effect_price(
+        self,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         price = self.campaign_price()
 
         if price == []:
@@ -76,11 +95,16 @@ class SimpleCreature(BaseCreature):
             owner: Database.Player = creature_db.owner
             owner.pay_price(price, con=con, extra_data=extra_data)
 
-    def campaign_ability_effect(self, creature_db, con=None, extra_data={}) -> int:
+    def campaign_ability_effect(
+        self,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> int:
         gain = self.campaign_gain()
 
         if gain == []:
-            return
+            return 0
 
         strength = 0
         for g in gain:
@@ -108,11 +132,11 @@ class Commoner(SimpleCreature):
         return [Gain(Resource.RALLY, 1)]
 
 
-creatures = [Commoner()]
+creatures_list = [Commoner()]
 
-assert len(set([c.id for c in creatures])) == len(creatures)
+assert len(set([c.id for c in creatures_list])) == len(creatures_list)
 
-creatures = {c.id: c for c in creatures}
+creatures = {c.id: c for c in creatures_list}
 
 assert all(key == c.id for key, c in creatures.items())
 assert len(set([c.id for c in creatures.values()])) == len(creatures)

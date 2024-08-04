@@ -1,6 +1,8 @@
+from __future__ import annotations
 import time
 import json
-from typing import Union
+
+from typing import Union, Any, Optional
 from enum import Enum
 from collections import namedtuple
 from contextlib import contextmanager
@@ -44,11 +46,9 @@ def resource_to_emoji(resource: Resource) -> str:
             return "🚩"
         case Resource.STRENGTH:
             return "⚔️"
-        case _:
-            return "❓"
 
 
-def resource_change_to_string(resource_change: Union[Price | Gain], third_person=False) -> str:
+def resource_change_to_string(resource_change: Union[Price | Gain], third_person: bool = False) -> str:
 
     change_text = ""
 
@@ -76,7 +76,7 @@ def resource_change_to_string(resource_change: Union[Price | Gain], third_person
     )
 
 
-def resource_changes_to_string(resource_changes: list[Price | Gain], third_person=False) -> str:
+def resource_changes_to_string(resource_changes: list[Price | Gain], third_person: bool = False) -> str:
     resource_changes = [
         resource_change for resource_change in resource_changes if resource_change.amount != 0
     ]
@@ -160,15 +160,15 @@ class BaseRegion:
 
     id = -1
     name = "default_region"
-    category = None
+    category: Optional[RegionCategory] = None
 
-    def __init__(self):
-        pass
+    def __init__(self) -> None:
+        assert False
 
     def __repr__(self) -> str:
         return f"<BaseRegion: {self.id}#{self.name}>"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, BaseRegion):
             return self.id == other.id
         return False
@@ -179,10 +179,22 @@ class BaseRegion:
     def quest_effect_full_text(self) -> str:
         return ""
 
-    def quest_effect_price(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_effect_price(
+        self,
+        region_db: Any,
+        creature_db: Any,
+        con: Optional[Any] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         return
 
-    def quest_effect(self, region_db, creature_db, con=None, extra_data={}):
+    def quest_effect(
+        self,
+        region_db: Any,
+        creature_db: Any,
+        con: Optional[Any] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
         return
 
 
@@ -193,49 +205,65 @@ class BaseCreature:
     quest_region_categories: list[RegionCategory] = []
     claim_cost: int = 0
 
-    def __init__(self):
-        pass
+    def __init__(self) -> None:
+        assert False
 
     def __repr__(self) -> str:
         return f"<BaseCreature: {self.name}>"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, BaseCreature):
             return str(self) == str(other)
         return False
 
     # questing
     def quest_ability_effect_short_text(self) -> str:
-        return ""
+        assert False
 
     def quest_ability_effect_full_text(self) -> str:
-        return ""
+        assert False
 
-    def quest_ability_effect_price(self, region_db, creature_db, con=None, extra_data={}):
-        return
+    def quest_ability_effect_price(
+        self,
+        region_db: Any,
+        creature_db: Any,
+        con: Optional[Any] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
+        assert False
 
-    def quest_ability_effect(self, region_db, creature_db, con=None, extra_data={}):
-        return
+    def quest_ability_effect(
+        self,
+        region_db: Any,
+        creature_db: Any,
+        con: Optional[Any] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
+        assert False
 
     # campaigning
     def campaign_ability_effect_short_text(self) -> str:
-        return ""
+        assert False
 
     def campaign_ability_effect_full_text(self) -> str:
-        return ""
+        assert False
 
-    def campaign_ability_effect_price(self, creature_db, con=None, extra_data={}):
-        return
+    def campaign_ability_effect_price(
+        self, creature_db: Any, con: Optional[Any] = None, extra_data: dict[Any, Any] = {}
+    ) -> None:
+        assert False
 
-    def campaign_ability_effect(self, creature_db, con=None, extra_data={}):
-        return
+    def campaign_ability_effect(
+        self, creature_db: Any, con: Optional[Any] = None, extra_data: dict[Any, Any] = {}
+    ) -> int:
+        assert False
 
 
 class StartCondition:
 
     def __init__(
         self,
-        start_config: dict,
+        start_config: dict[Any, Any],
         start_active_regions: list[BaseRegion],
         start_available_creatures: list[BaseCreature],
         start_deck: list[BaseCreature],
@@ -250,7 +278,14 @@ class Event:
 
     event_type = "base_event"
 
-    def __init__(self, parent, id: int, timestamp: int, parent_event, guild):
+    def __init__(
+        self,
+        parent: Any,
+        id: int,
+        timestamp: float,
+        parent_event: Optional[Event],
+        guild: Any,
+    ):
         self.parent = parent
         self.id = id
         self.timestamp = timestamp
@@ -260,19 +295,27 @@ class Event:
     def __repr__(self) -> str:
         return f"<event: {self.event_type}#{self.id}, timestamp: {self.timestamp}, {self.text()}>"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Event):
             return self.id == other.id
         return False
 
-    def from_extra_data(parent, id: int, timestamp: int, parent_event, guild, extra_data: dict):
+    @staticmethod
+    def from_extra_data(
+        parent: Any,
+        id: int,
+        timestamp: int,
+        parent_event: Event,
+        guild: Any,
+        extra_data: dict[Any, Any],
+    ) -> Event:
         return Event(parent, id, timestamp, parent_event, guild)
 
     def extra_data(self) -> str:
-        return json.dumps({})
+        assert False
 
     def text(self) -> str:
-        return ""
+        assert False
 
-    def resolve(self, con=None):
-        pass
+    def resolve(self, con: Any) -> None:
+        assert False
