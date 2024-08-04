@@ -39,7 +39,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
-          packages = [ pkgs.poetry ];
+          packages = [ pkgs.poetry pkgs.mypy ];
         };
 
         checks = {
