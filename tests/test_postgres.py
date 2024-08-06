@@ -452,7 +452,9 @@ def test_playing() -> None:
         assert new_play_event.play_extra_data == {}
 
         new_creature_recharge_event: Database.Creature.CreatureRechargeEvent = events_by_type(
-            guild_db, Database.Creature.CreatureRechargeEvent
+            guild_db,
+            Database.Creature.CreatureRechargeEvent,
+            end=time.time() + 10 + guild_db.get_config()["creature_recharge"],
         )[0]
         assert guild_db.get_creature(new_creature_recharge_event.creature_id) == creature2_db
         assert new_creature_recharge_event.timestamp > new_play_event.timestamp
