@@ -465,7 +465,7 @@ def test_playing() -> None:
         assert guild_db.get_region(new_region_recharge_event.region_id) == region1_db
         assert new_region_recharge_event.timestamp > new_play_event.timestamp
 
-        assert player8_db.get_played() == [creature2_db]
+        assert player8_db.get_played()[0][0] == creature2_db
 
         resources[Resource.INTEL] += 1
         assert player8_db.get_resources() == resources

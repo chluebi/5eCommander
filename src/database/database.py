@@ -654,7 +654,7 @@ class Database:
 
         def get_played(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> List[Database.Creature]:
+        ) -> List[Tuple[Database.Creature, int]]:
             assert False
 
         def get_full_deck(
@@ -665,7 +665,7 @@ class Database:
                     self.get_deck(con=sub_con)
                     + self.get_hand(con=sub_con)
                     + self.get_discard(con=None)
-                    + self.get_played(con=None),
+                    + list(map(lambda x: x[0], self.get_played(con=None))),
                     key=lambda x: str(x),
                 )
 
@@ -938,6 +938,7 @@ class Database:
         def play_creature(
             self,
             creature: Database.Creature,
+            until: float,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
@@ -989,14 +990,26 @@ class Database:
                     )
                 )
 
+                until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
+                # add directly to parent instead of connection
+                self.parent.add_event(
+                    Database.Creature.CreatureRechargeEvent(
+                        self.parent,
+                        self.parent.fresh_event_id(self.guild, con=sub_con),
+                        until,
+                        None,
+                        self.guild,
+                        creature.id,
+                    )
+                )
+
                 self.pay_price([Price(Resource.ORDERS, 1)], con=sub_con)
                 base_creature.quest_ability_effect_price(
                     region, creature, con=sub_con, extra_data=extra_data
                 )
                 base_region.quest_effect_price(region, creature, con=sub_con, extra_data=extra_data)
-                self.play_creature(creature, con=sub_con)
+                self.play_creature(creature, until, con=sub_con)
                 region.occupy(creature, con=sub_con)
-                creature.play(con=sub_con)
                 base_region.quest_effect(region, creature, con=sub_con, extra_data=extra_data)
                 base_creature.quest_ability_effect(
                     region, creature, con=sub_con, extra_data=extra_data
@@ -1544,23 +1557,6 @@ class Database:
 
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
-
-        def play(self, con: Optional[Database.TransactionManager] = None) -> None:
-            with self.parent.transaction(parent=con) as sub_con:
-                until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
-
-                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                # add directly to parent instead of connection
-                self.parent.add_event(
-                    Database.Creature.CreatureRechargeEvent(
-                        self.parent,
-                        event_id,
-                        until,
-                        None,
-                        self.guild,
-                        self.id,
-                    )
-                )
 
         class CreatureRechargeEvent(Event):
 

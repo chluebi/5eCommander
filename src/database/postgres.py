@@ -242,6 +242,7 @@ class PostgresDatabase(Database):
             Column("player_id", BigInteger, nullable=False),
             Column("guild_id", BigInteger, nullable=False),
             Column("creature_id", BigInteger, nullable=False),
+            Column("timestamp_recharge", BigInteger, nullable=False),
             ForeignKeyConstraint(
                 ["guild_id", "player_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
             ),
@@ -1210,11 +1211,11 @@ class PostgresDatabase(Database):
 
         def get_played(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> List[Database.Creature]:
+        ) -> List[Tuple[Database.Creature, int]]:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     """
-                    SELECT p.creature_id, c.base_creature_id 
+                    SELECT p.creature_id, c.base_creature_id, p.timestamp_recharge 
                     FROM played p 
                     JOIN creatures c ON p.creature_id = c.id 
                     WHERE p.player_id = :player_id AND p.guild_id = :guild_id
@@ -1224,8 +1225,11 @@ class PostgresDatabase(Database):
                     sql, {"player_id": self.id, "guild_id": self.guild.id}
                 ).fetchall()
                 return [
-                    PostgresDatabase.Creature(
-                        self.parent, result[0], creatures[result[1]], self.guild, self
+                    (
+                        PostgresDatabase.Creature(
+                            self.parent, result[0], creatures[result[1]], self.guild, self
+                        ),
+                        cast(int, result[2]),
                     )
                     for result in results
                 ]
@@ -1462,6 +1466,7 @@ class PostgresDatabase(Database):
         def play_creature(
             self,
             creature: Database.Creature,
+            until: float,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
@@ -1473,11 +1478,16 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
                 sql = text(
-                    "INSERT INTO played (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                    "INSERT INTO played (player_id, guild_id, creature_id, timestamp_recharge) VALUES (:player_id, :guild_id, :creature_id, :timestamp_recharge)"
                 )
                 sub_con.execute(
                     sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                    {
+                        "player_id": self.id,
+                        "guild_id": self.guild.id,
+                        "creature_id": creature.id,
+                        "timestamp_recharge": until,
+                    },
                 )
 
         def campaign_creature(
