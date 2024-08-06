@@ -23,7 +23,7 @@ region_categories = [
 ]
 
 
-class SimpleRegion(BaseRegion):
+class SimpleRegion(Database.BasicRegion):
 
     id = -1
     name = "simple region"
@@ -74,7 +74,7 @@ class SimpleRegion(BaseRegion):
             owner.gain(gain, con=con, extra_data=extra_data)
 
 
-class Village(Database.BasicRegion):
+class Village(SimpleRegion):
 
     id = 0
     name = "village"
@@ -84,7 +84,7 @@ class Village(Database.BasicRegion):
         return [Gain(Resource.INTEL, 1)]
 
 
-class SmallMine(Database.BasicRegion):
+class SmallMine(SimpleRegion):
 
     id = 1
     name = "small mine"

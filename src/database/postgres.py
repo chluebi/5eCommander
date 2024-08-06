@@ -394,9 +394,7 @@ class PostgresDatabase(Database):
 
         return guild
 
-    def get_guilds(
-        self, con: Optional[Database.TransactionManager] = None
-    ) -> List[Database.Guild]:
+    def get_guilds(self, con: Optional[Database.TransactionManager] = None) -> List[Database.Guild]:
         with self.transaction(parent=con) as sub_con:
             sql = text("SELECT id FROM guilds")
             result = sub_con.execute(sql)
@@ -522,17 +520,13 @@ class PostgresDatabase(Database):
                     {"guild_id": self.id, "config": json.dumps(config)},
                 )
 
-        def get_config(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> dict[Any, Any]:
+        def get_config(self, con: Optional[Database.TransactionManager] = None) -> dict[Any, Any]:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text("SELECT config FROM guilds WHERE id = :guild_id")
                 result = sub_con.execute(sql, {"guild_id": self.id}).fetchone()
                 return cast(dict[Any, Any], result[0])
 
-        def fresh_region_id(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def fresh_region_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
@@ -625,7 +619,9 @@ class PostgresDatabase(Database):
                 sub_con.execute(sql_player, {"player_id": player_id, "guild_id": self.id})
 
                 for base_creature in self.parent.start_condition.start_deck:
-                    creature = self.add_creature(cast(Database.BasicCreature, base_creature), player, con=sub_con)
+                    creature = self.add_creature(
+                        cast(Database.BasicCreature, base_creature), player, con=sub_con
+                    )
                     player.add_to_discard(creature, con=sub_con)
 
                 player.reshuffle_discard(con=sub_con)
@@ -730,9 +726,7 @@ class PostgresDatabase(Database):
                 )
                 return player
 
-        def fresh_creature_id(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def fresh_creature_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     "SELECT COALESCE(MAX(id), -1) + 1 FROM creatures WHERE guild_id = :guild_id"
@@ -966,7 +960,9 @@ class PostgresDatabase(Database):
 
     class Region(Database.Region):
 
-        def __init__(self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild):
+        def __init__(
+            self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild
+        ):
             super().__init__(parent, id, region, guild)
 
         def occupy(
@@ -1041,9 +1037,7 @@ class PostgresDatabase(Database):
                     return (creature, result[2])
                 return (None, None)
 
-        def is_occupied(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> bool:
+        def is_occupied(self, con: Optional[Database.TransactionManager] = None) -> bool:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     "SELECT COUNT(*) FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"
@@ -1309,7 +1303,7 @@ class PostgresDatabase(Database):
                             "start": timestamp_start,
                             "end": timestamp_end,
                             "player_id": self.id,
-                            "event_type": event_type,
+                            "event_type": event_type.event_type,
                         },
                     ).fetchall()
 
@@ -1382,9 +1376,7 @@ class PostgresDatabase(Database):
 
             return drawn_card
 
-        def reshuffle_discard(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> None:
+        def reshuffle_discard(self, con: Optional[Database.TransactionManager] = None) -> None:
             with self.parent.transaction(parent=con) as sub_con:
                 discard = self.get_discard(con=sub_con)
                 for creature in discard:
@@ -1567,9 +1559,7 @@ class PostgresDatabase(Database):
             self.timestamp_protected = timestamp_protected
             self.timestamp_expires = timestamp_expires
 
-        def get_protected_timestamp(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def get_protected_timestamp(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     """
@@ -1587,9 +1577,7 @@ class PostgresDatabase(Database):
                 ).scalar()
                 return cast(int, result)
 
-        def get_expires_timestamp(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def get_expires_timestamp(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     """

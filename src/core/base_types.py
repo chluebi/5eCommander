@@ -48,7 +48,9 @@ def resource_to_emoji(resource: Resource) -> str:
             return "⚔️"
 
 
-def resource_change_to_string(resource_change: Union[Price | Gain], third_person: bool = False) -> str:
+def resource_change_to_string(
+    resource_change: Union[Price | Gain], third_person: bool = False
+) -> str:
 
     change_text = ""
 
@@ -76,7 +78,9 @@ def resource_change_to_string(resource_change: Union[Price | Gain], third_person
     )
 
 
-def resource_changes_to_string(resource_changes: list[Price | Gain], third_person: bool = False) -> str:
+def resource_changes_to_string(
+    resource_changes: list[Price | Gain], third_person: bool = False
+) -> str:
     resource_changes = [
         resource_change for resource_change in resource_changes if resource_change.amount != 0
     ]
@@ -163,7 +167,7 @@ class BaseRegion:
     category: Optional[RegionCategory] = None
 
     def __init__(self) -> None:
-        assert False
+        return
 
     def __repr__(self) -> str:
         return f"<BaseRegion: {self.id}#{self.name}>"
@@ -206,7 +210,7 @@ class BaseCreature:
     claim_cost: int = 0
 
     def __init__(self) -> None:
-        assert False
+        pass
 
     def __repr__(self) -> str:
         return f"<BaseCreature: {self.name}>"
@@ -218,10 +222,10 @@ class BaseCreature:
 
     # questing
     def quest_ability_effect_short_text(self) -> str:
-        assert False
+        return ""
 
     def quest_ability_effect_full_text(self) -> str:
-        assert False
+        return ""
 
     def quest_ability_effect_price(
         self,
@@ -230,7 +234,7 @@ class BaseCreature:
         con: Optional[Any] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-        assert False
+        return
 
     def quest_ability_effect(
         self,
@@ -239,7 +243,7 @@ class BaseCreature:
         con: Optional[Any] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-        assert False
+        return
 
     # campaigning
     def campaign_ability_effect_short_text(self) -> str:

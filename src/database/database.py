@@ -30,10 +30,7 @@ from src.core.exceptions import (
 )
 
 
-from sqlalchemy import (
-    RootTransaction,
-    Connection
-)
+from sqlalchemy import RootTransaction, Connection
 
 
 class Database:
@@ -70,7 +67,6 @@ class Database:
                 self.con = self.parent_manager.con
                 self.trans = self.parent_manager.trans
                 self.parent_manager.children.append(self)
-
 
             return self
 
@@ -153,9 +149,7 @@ class Database:
     ) -> Database.Guild:
         assert False
 
-    def get_guilds(
-        self, con: Optional[Database.TransactionManager] = None
-    ) -> List[Database.Guild]:
+    def get_guilds(self, con: Optional[Database.TransactionManager] = None) -> List[Database.Guild]:
         assert False
 
     def get_guild(
@@ -209,14 +203,10 @@ class Database:
         ) -> None:
             assert False
 
-        def get_config(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> dict[Any, Any]:
+        def get_config(self, con: Optional[Database.TransactionManager] = None) -> dict[Any, Any]:
             assert False
 
-        def fresh_region_id(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def fresh_region_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             assert False
 
         def add_region(
@@ -269,9 +259,7 @@ class Database:
         ) -> Database.Player:
             assert False
 
-        def fresh_creature_id(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def fresh_creature_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             assert False
 
         def add_creature(
@@ -494,7 +482,7 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> has left"
-            
+
     class BasicRegion(BaseRegion):
 
         id = -1
@@ -502,7 +490,7 @@ class Database:
         category: Optional[RegionCategory] = None
 
         def __init__(self: Database.BasicRegion) -> None:
-            pass
+            return
 
         def __repr__(self) -> str:
             return f"<BaseRegion: {self.id}#{self.name}>"
@@ -538,7 +526,9 @@ class Database:
 
     class Region:
 
-        def __init__(self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild):
+        def __init__(
+            self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild
+        ):
             self.parent = parent
             self.id = id
             self.region = region
@@ -877,9 +867,7 @@ class Database:
         ) -> Database.Creature:
             assert False
 
-        def reshuffle_discard(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> None:
+        def reshuffle_discard(self, con: Optional[Database.TransactionManager] = None) -> None:
             pass
 
         def draw_cards(
@@ -1463,7 +1451,6 @@ class Database:
                         ),
                     )
 
-
     class BasicCreature(BaseCreature):
 
         id = -1
@@ -1472,7 +1459,7 @@ class Database:
         claim_cost: int = 0
 
         def __init__(self: Database.BasicCreature):
-            assert False
+            return
 
         def __repr__(self) -> str:
             return f"<BaseCreature: {self.name}>"
@@ -1484,10 +1471,10 @@ class Database:
 
         # questing
         def quest_ability_effect_short_text(self) -> str:
-            assert False
+            return ""
 
         def quest_ability_effect_full_text(self) -> str:
-            assert False
+            return ""
 
         def quest_ability_effect_price(
             self,
@@ -1496,7 +1483,7 @@ class Database:
             con: Optional[Database.TransactionManager] = None,
             extra_data: dict[Any, Any] = {},
         ) -> None:
-            assert False
+            return
 
         def quest_ability_effect(
             self,
@@ -1505,25 +1492,30 @@ class Database:
             con: Optional[Database.TransactionManager] = None,
             extra_data: dict[Any, Any] = {},
         ) -> None:
-            assert False
+            return
 
         # campaigning
         def campaign_ability_effect_short_text(self) -> str:
-            assert False
+            return ""
 
         def campaign_ability_effect_full_text(self) -> str:
-            assert False
+            return ""
 
         def campaign_ability_effect_price(
-            self, creature_db: Database.Creature, con: Optional[Database.TransactionManager] = None, extra_data: dict[Any, Any] = {}
+            self,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
         ) -> None:
-            assert False
+            return
 
         def campaign_ability_effect(
-            self, creature_db: Database.Creature, con: Optional[Database.TransactionManager] = None, extra_data: dict[Any, Any] = {}
+            self,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+            extra_data: dict[Any, Any] = {},
         ) -> int:
-            assert False
-
+            return 0
 
     class Creature:
 
@@ -1553,9 +1545,7 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
-        def play(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> None:
+        def play(self, con: Optional[Database.TransactionManager] = None) -> None:
             with self.parent.transaction(parent=con) as sub_con:
                 until = self.parent.timestamp_after(self.guild.get_config()["creature_recharge"])
 
@@ -1646,9 +1636,7 @@ class Database:
                 )
             return False
 
-        def create_events(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> None:
+        def create_events(self, con: Optional[Database.TransactionManager] = None) -> None:
             with self.parent.transaction(parent=con) as sub_con:
                 # Notice that we add the events to the parent directly instead of the connection
                 # that is because we do not want these events to be part of the transaction
@@ -1678,14 +1666,10 @@ class Database:
                     )
                 )
 
-        def get_protected_timestamp(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def get_protected_timestamp(self, con: Optional[Database.TransactionManager] = None) -> int:
             return -1
 
-        def get_expires_timestamp(
-            self, con: Optional[Database.TransactionManager] = None
-        ) -> int:
+        def get_expires_timestamp(self, con: Optional[Database.TransactionManager] = None) -> int:
             return -1
 
         def is_protected(
