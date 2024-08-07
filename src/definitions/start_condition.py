@@ -1,6 +1,6 @@
 from src.database.database import Database
-from src.core.regions import *
-from src.core.creatures import *
+from src.definitions.regions import *
+from src.definitions.creatures import *
 
 start_condition = Database.StartCondition(
     {

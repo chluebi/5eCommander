@@ -1,8 +1,8 @@
 from typing import Optional
 import time
 
-from src.core.creatures import *
-from src.core.regions import *
+from src.definitions.creatures import *
+from src.definitions.regions import *
 
 
 def test_text() -> None:

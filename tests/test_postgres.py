@@ -17,11 +17,11 @@ from src.core.exceptions import (
     NotEnoughResourcesException,
     EmptyDeckException,
 )
-from src.core.start_condition import start_condition
+from src.definitions.start_condition import start_condition
 from src.database.database import Database
 from src.database.postgres import PostgresDatabase
-from src.core.creatures import *
-from src.core.regions import *
+from src.definitions.creatures import *
+from src.definitions.regions import *
 
 K = TypeVar("K")
 

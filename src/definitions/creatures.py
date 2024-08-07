@@ -10,7 +10,7 @@ from src.core.base_types import (
     resource_changes_to_short_string,
 )
 from src.database.database import Database
-from src.core.regions import RegionCategories
+from src.definitions.regions import RegionCategories
 from src.core.exceptions import CreatureCannotCampaign
 
 

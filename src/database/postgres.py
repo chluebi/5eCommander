@@ -41,8 +41,8 @@ from src.core.exceptions import (
     EmptyDeckException,
 )
 
-from src.core.regions import regions
-from src.core.creatures import creatures
+from src.definitions.regions import regions
+from src.definitions.creatures import creatures
 
 
 class PostgresDatabase(Database):
