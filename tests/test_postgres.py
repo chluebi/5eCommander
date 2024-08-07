@@ -749,6 +749,7 @@ def test_event_resolver() -> None:
     guild_db: Database.Guild = test_db.add_guild(1)
 
     try:
+        time.sleep(2)
         event_loop_time = time.time()
 
         r, events = asyncio.run(event_loop_test(guild_db, add_player_async_factory))
