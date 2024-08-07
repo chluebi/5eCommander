@@ -365,6 +365,36 @@ class PostgresDatabase(Database):
                 },
             )
 
+    def get_event_by_id(
+        self,
+        event_id: int,
+        con: Optional[Database.TransactionManager] = None,
+    ) -> Event:
+        with self.transaction(parent=con) as sub_con:
+
+            sql = text(
+                f"""
+                        SELECT * FROM events WHERE id = :event_id
+                    """
+            )
+
+            r = sub_con.execute(sql, {"event_id": event_id}).fetchone()
+
+            event = None
+            extra_data = r[5]
+
+            for event_class in event_classes:
+
+                if r[4] == event_class.event_type:
+                    event = event_class.from_extra_data(
+                        self, r[0], r[2], r[3], self.get_guild(r[1], con=sub_con), extra_data
+                    )
+                    break
+
+            assert event is not None
+
+            return event
+
     def add_guild(
         self,
         guild_id: int,

@@ -1,5 +1,17 @@
 import time
-from typing import cast, List, Tuple, Union, Optional, Type, TypeVar, Callable
+from typing import (
+    cast,
+    List,
+    Tuple,
+    Union,
+    Optional,
+    Type,
+    TypeVar,
+    Callable,
+    Awaitable,
+    Coroutine,
+    Any,
+)
 
 import sqlalchemy
 from testcontainers.postgres import PostgresContainer  # type: ignore
@@ -672,3 +684,89 @@ def test_rollback() -> None:
 
     test_db.remove_guild(guild_db1)
     assert test_db.get_guilds() == []
+
+
+import asyncio
+from src.event_resolver.resolver import (
+    add_notification_function,
+    listen_to_notifications,
+    KeepAlive,
+)
+
+
+def event_handler_factory(
+    db: PostgresDatabase, events: List[Event]
+) -> Callable[[Any, Any, Any, str], None]:
+
+    def event_handler(connection: Any, pid: Any, channel: Any, payload: str) -> None:
+        with db.transaction() as con:
+            event = db.get_event_by_id(int(payload), con=con)
+            events.append(event)
+
+    return event_handler
+
+
+def add_player_async_factory(guild_db: Database.Guild) -> Coroutine[Any, Any, Any]:
+
+    async def add_player_async() -> Any:
+        await asyncio.sleep(2)
+        return guild_db.add_player(1)
+
+    return add_player_async()
+
+
+async def event_loop_test(
+    guild_db: Database.Guild, test_function: Callable[[Database.Guild], Awaitable[Any]]
+) -> Tuple[Any, List[Event]]:
+    keep_alive = KeepAlive()
+
+    events: List[Event] = []
+
+    listener_task = asyncio.create_task(
+        listen_to_notifications(
+            test_db, event_handler_factory(test_db, events), keep_alive=keep_alive
+        )
+    )
+
+    r = await test_function(guild_db)
+
+    await asyncio.sleep(2)
+    keep_alive.stop()
+
+    await listener_task
+
+    return r, events
+
+
+def are_event_type_subsets(a: List[Event], b: List[Event], event_type: Type[Event]) -> bool:
+    return are_subsets(
+        [e for e in a if isinstance(e, event_type)], [e for e in b if isinstance(e, event_type)]
+    )
+
+
+def test_event_resolver() -> None:
+    add_notification_function(test_db)
+    guild_db: Database.Guild = test_db.add_guild(1)
+
+    try:
+        event_loop_time = time.time()
+
+        r, events = asyncio.run(event_loop_test(guild_db, add_player_async_factory))
+        guild_events = guild_db.get_events(0, time.time() * 2)
+
+        assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2))
+
+        assert is_subset(events, guild_db.get_events(0, time.time() * 2))
+        assert not are_event_type_subsets(events, guild_events, Database.Guild.RegionAddedEvent)
+        assert are_event_type_subsets(events, guild_events, Database.Guild.PlayerAddedEvent)
+        assert are_event_type_subsets(events, guild_events, Database.Player.PlayerCardRechargeEvent)
+        assert are_event_type_subsets(
+            events, guild_events, Database.Player.PlayerMagicRechargeEvent
+        )
+        assert are_event_type_subsets(
+            events, guild_events, Database.Player.PlayerOrderRechargeEvent
+        )
+
+    finally:
+        test_db.remove_guild(guild_db)
+        assert test_db.get_guilds() == []

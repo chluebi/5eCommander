@@ -204,4 +204,4 @@ class Event:
         assert False
 
     def resolve(self, con: Any) -> None:
-        assert False
+        return
