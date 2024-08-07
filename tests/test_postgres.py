@@ -7,8 +7,6 @@ from testcontainers.postgres import PostgresContainer  # type: ignore
 from src.core.base_types import (
     BaseResources,
     Resource,
-    BaseRegion,
-    StartCondition,
     Event,
     Gain,
     Price,
@@ -79,9 +77,7 @@ def test_guild_creation() -> None:
     try:
         assert test_db.get_guild(guild_db.id) == guild_db
         assert test_db.get_guilds() == [guild_db]
-        assert [r.region for r in guild_db.get_regions()] == cast(
-            List[Database.BasicRegion], start_condition.start_active_regions
-        )
+        assert [r.region for r in guild_db.get_regions()] == start_condition.start_active_regions
         assert [
             c for c in guild_db.get_creature_pool()
         ] == start_condition.start_available_creatures
@@ -106,7 +102,7 @@ def test_player_creation() -> None:
                 guild_db.get_region(e.region_id).region
                 for e in events_by_type(guild_db, Database.Guild.RegionAddedEvent)
             ],
-            cast(List[Database.BasicRegion], start_condition.start_active_regions),
+            start_condition.start_active_regions,
         )
 
         player1_db: Database.Player = guild_db.add_player(1)
@@ -272,17 +268,15 @@ def test_deck() -> None:
 
         assert are_subsets(
             [c.creature for c in player5_db.get_deck()],
-            cast(List[Database.BasicCreature], start_condition.start_deck),
+            start_condition.start_deck,
         )
 
         get_events: Callable[[], List[Database.Player.PlayerDrawEvent]] = lambda: events_by_type(
             guild_db, Database.Player.PlayerDrawEvent
         )
 
-        for _ in cast(List[Database.BasicCreature], start_condition.start_deck):
-            assert player5_db.draw_card_raw().creature in cast(
-                List[Database.BasicCreature], start_condition.start_deck
-            )
+        for _ in start_condition.start_deck:
+            assert player5_db.draw_card_raw().creature in start_condition.start_deck
 
         for _ in range(10):
             try:
@@ -291,16 +285,14 @@ def test_deck() -> None:
             except EmptyDeckException:
                 pass
 
-        for i in range(len(cast(List[Database.BasicCreature], start_condition.start_deck)) * 2):
+        for i in range(len(start_condition.start_deck) * 2):
 
             prev_events = get_events()
             assert len(prev_events) == i
 
             player6_db: Database.Player = guild_db.add_player(6)
 
-            assert [c.creature for c in player6_db.get_deck()] == cast(
-                List[Database.BasicCreature], start_condition.start_deck
-            )
+            assert [c.creature for c in player6_db.get_deck()] == start_condition.start_deck
             assert player6_db.get_hand() == []
 
             cards_drawn, reshuffled, hand_full = player6_db.draw_cards(N=i)
@@ -314,18 +306,14 @@ def test_deck() -> None:
             assert new_events[0].num_cards == len(cards_drawn)
 
             if i <= guild_db.get_config()["max_cards"]:
-                assert len(cards_drawn) == min(
-                    i, len(cast(List[Database.BasicCreature], start_condition.start_deck))
-                )
-                if i <= len(cast(List[Database.BasicCreature], start_condition.start_deck)):
+                assert len(cards_drawn) == min(i, len(start_condition.start_deck))
+                if i <= len(start_condition.start_deck):
                     assert not reshuffled
                 else:
                     assert reshuffled
 
                 for card in cards_drawn:
-                    assert card.creature in cast(
-                        List[Database.BasicCreature], start_condition.start_deck
-                    )
+                    assert card.creature in start_condition.start_deck
             else:
                 assert hand_full
                 assert len(cards_drawn) == guild_db.get_config()["max_cards"]
@@ -334,18 +322,14 @@ def test_deck() -> None:
 
         # drawing creatures
         player7_db: Database.Player = guild_db.add_player(7)
-        assert [c.creature for c in player7_db.get_deck()] == cast(
-            List[Database.BasicCreature], start_condition.start_deck
-        )
+        assert [c.creature for c in player7_db.get_deck()] == start_condition.start_deck
 
         # draw entire deck
         cards_drawn, reshuffled, hand_full = player7_db.draw_cards(
-            N=len(cast(List[Database.BasicCreature], start_condition.start_deck))
+            N=len(start_condition.start_deck)
         )
 
-        assert len(cards_drawn) == len(
-            cast(List[Database.BasicCreature], start_condition.start_deck)
-        )
+        assert len(cards_drawn) == len(start_condition.start_deck)
         assert len(player7_db.get_deck()) == 0
 
         # hand full
@@ -355,10 +339,7 @@ def test_deck() -> None:
 
         # remove a creature to make space
         player7_db.delete_creature_from_hand(player7_db.get_hand()[0])
-        assert (
-            len(player7_db.get_hand())
-            == len(cast(List[Database.BasicCreature], start_condition.start_deck)) - 1
-        )
+        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 1
 
         # deck empty
         cards_drawn, reshuffled, hand_full = player7_db.draw_cards(N=1)
@@ -368,10 +349,7 @@ def test_deck() -> None:
         # discard a creature
         creature_to_discard = player7_db.get_hand()[0]
         player7_db.discard_creature_from_hand(creature_to_discard)
-        assert (
-            len(player7_db.get_hand())
-            == len(cast(List[Database.BasicCreature], start_condition.start_deck)) - 2
-        )
+        assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 2
         assert player7_db.get_deck() == []
 
         # now drawing works as the discarded creature is reshuffled
@@ -382,7 +360,7 @@ def test_deck() -> None:
 
         assert is_subset(
             [c.creature for c in player7_db.get_hand()],
-            cast(List[Database.BasicCreature], start_condition.start_deck),
+            start_condition.start_deck,
         )
 
     finally:
@@ -395,17 +373,15 @@ def test_playing() -> None:
 
     try:
         player8_db: Database.Player = guild_db.add_player(8)
-        assert [c.creature for c in player8_db.get_deck()] == cast(
-            List[Database.BasicCreature], start_condition.start_deck
-        )
+        assert [c.creature for c in player8_db.get_deck()] == start_condition.start_deck
 
         player8_db.draw_cards(5)
         assert are_subsets(
             [c.creature for c in player8_db.get_full_deck()],
-            cast(List[Database.BasicCreature], start_condition.start_deck),
+            start_condition.start_deck,
         )
         for c in player8_db.get_hand():
-            assert c.creature in cast(List[Database.BasicCreature], start_condition.start_deck)
+            assert c.creature in start_condition.start_deck
 
         creature2_db: Database.Creature = player8_db.get_hand()[0]
         assert isinstance(creature2_db.creature, Commoner)

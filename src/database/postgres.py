@@ -27,8 +27,6 @@ from sqlalchemy import (
 from src.core.base_types import (
     Resource,
     BaseResources,
-    BaseRegion,
-    StartCondition,
     Event,
 )
 
@@ -49,7 +47,7 @@ from src.core.creatures import creatures
 
 class PostgresDatabase(Database):
 
-    def __init__(self, start_condition: StartCondition, engine: Engine):
+    def __init__(self, start_condition: Database.StartCondition, engine: Engine):
         super().__init__(start_condition)
         self.engine = engine
 
@@ -388,10 +386,10 @@ class PostgresDatabase(Database):
             )
 
             for base_region in self.start_condition.start_active_regions:
-                guild.add_region(cast(Database.BasicRegion, base_region), con=sub_con)
+                guild.add_region(base_region, con=sub_con)
 
             for base_creature in self.start_condition.start_available_creatures:
-                guild.add_to_creature_pool(cast(Database.BasicCreature, base_creature), con=sub_con)
+                guild.add_to_creature_pool(base_creature, con=sub_con)
 
         return guild
 
@@ -539,7 +537,7 @@ class PostgresDatabase(Database):
 
         def add_region(
             self,
-            base_region: Database.BasicRegion,
+            base_region: Database.BaseRegion,
             con: Optional[Database.TransactionManager] = None,
         ) -> Database.Region:
             with self.parent.transaction(parent=con) as sub_con:
@@ -620,9 +618,7 @@ class PostgresDatabase(Database):
                 sub_con.execute(sql_player, {"player_id": player_id, "guild_id": self.id})
 
                 for base_creature in self.parent.start_condition.start_deck:
-                    creature = self.add_creature(
-                        cast(Database.BasicCreature, base_creature), player, con=sub_con
-                    )
+                    creature = self.add_creature(base_creature, player, con=sub_con)
                     player.add_to_discard(creature, con=sub_con)
 
                 player.reshuffle_discard(con=sub_con)
@@ -739,7 +735,7 @@ class PostgresDatabase(Database):
 
         def add_creature(
             self,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             owner: Database.Player,
             con: Optional[Database.TransactionManager] = None,
         ) -> Database.Creature:
@@ -815,7 +811,7 @@ class PostgresDatabase(Database):
 
         def add_to_creature_pool(
             self,
-            base_creature: Database.BasicCreature,
+            base_creature: Database.BaseCreature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
@@ -824,7 +820,7 @@ class PostgresDatabase(Database):
 
         def get_creature_pool(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> List[Database.BasicCreature]:
+        ) -> List[Database.BaseCreature]:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text("SELECT id FROM base_creatures WHERE guild_id = :guild_id")
                 results = sub_con.execute(sql, {"guild_id": self.id}).fetchall()
@@ -832,7 +828,7 @@ class PostgresDatabase(Database):
 
         def get_random_from_creature_pool(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> Database.BasicCreature:
+        ) -> Database.BaseCreature:
             with self.parent.transaction(parent=con) as sub_con:
                 creature_pool = self.get_creature_pool()
                 if not creature_pool:
@@ -841,7 +837,7 @@ class PostgresDatabase(Database):
 
         def remove_from_creature_pool(
             self,
-            base_creature: Database.BasicCreature,
+            base_creature: Database.BaseCreature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
@@ -850,7 +846,7 @@ class PostgresDatabase(Database):
 
         def add_free_creature(
             self,
-            base_creature: Database.BasicCreature,
+            base_creature: Database.BaseCreature,
             channel_id: int,
             message_id: int,
             roller: Database.Player,
@@ -962,7 +958,7 @@ class PostgresDatabase(Database):
     class Region(Database.Region):
 
         def __init__(
-            self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild
+            self, parent: Database, id: int, region: Database.BaseRegion, guild: Database.Guild
         ):
             super().__init__(parent, id, region, guild)
 
@@ -1537,7 +1533,7 @@ class PostgresDatabase(Database):
             self,
             parent: Database,
             id: int,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             guild: Database.Guild,
             owner: Database.Player,
         ):
@@ -1548,7 +1544,7 @@ class PostgresDatabase(Database):
         def __init__(
             self,
             parent: Database,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             guild: Database.Guild,
             channel_id: int,
             message_id: int,

@@ -1,8 +1,8 @@
-from src.core.base_types import StartCondition
+from src.database.database import Database
 from src.core.regions import *
 from src.core.creatures import *
 
-start_condition = StartCondition(
+start_condition = Database.StartCondition(
     {
         "max_orders": 5,
         "order_recharge": 5,

@@ -4,7 +4,6 @@ from src.core.base_types import (
     Resource,
     Price,
     Gain,
-    BaseRegion,
     RegionCategory,
     resource_changes_to_string,
     resource_changes_to_short_string,
@@ -23,7 +22,7 @@ region_categories = [
 ]
 
 
-class SimpleRegion(Database.BasicRegion):
+class SimpleRegion(Database.BaseRegion):
 
     id = -1
     name = "simple region"

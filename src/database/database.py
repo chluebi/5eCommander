@@ -11,10 +11,7 @@ from src.core.base_types import (
     Price,
     Gain,
     BaseResources,
-    BaseCreature,
-    BaseRegion,
     Event,
-    StartCondition,
     RegionCategory,
     resource_changes_to_string,
     resource_changes_to_short_string,
@@ -166,6 +163,20 @@ class Database:
     ) -> Database.Guild:
         assert False
 
+    class StartCondition:
+
+        def __init__(
+            self,
+            start_config: dict[Any, Any],
+            start_active_regions: list[Database.BaseRegion],
+            start_available_creatures: list[Database.BaseCreature],
+            start_deck: list[Database.BaseCreature],
+        ):
+            self.start_config = start_config
+            self.start_active_regions = start_active_regions
+            self.start_available_creatures = start_available_creatures
+            self.start_deck = start_deck
+
     class Guild:
 
         def __init__(self, parent: Database, id: int):
@@ -211,7 +222,7 @@ class Database:
 
         def add_region(
             self,
-            region: Database.BasicRegion,
+            region: Database.BaseRegion,
             con: Optional[Database.TransactionManager] = None,
         ) -> Database.Region:
             assert False
@@ -264,7 +275,7 @@ class Database:
 
         def add_creature(
             self,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             owner: Database.Player,
             con: Optional[Database.TransactionManager] = None,
         ) -> Database.Creature:
@@ -291,31 +302,31 @@ class Database:
 
         def add_to_creature_pool(
             self,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             assert False
 
         def get_creature_pool(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> List[Database.BasicCreature]:
+        ) -> List[Database.BaseCreature]:
             assert False
 
         def get_random_from_creature_pool(
             self, con: Optional[Database.TransactionManager] = None
-        ) -> Database.BasicCreature:
+        ) -> Database.BaseCreature:
             assert False
 
         def remove_from_creature_pool(
             self,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             assert False
 
         def add_free_creature(
             self,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             channel_id: int,
             message_id: int,
             roller: Database.Player,
@@ -483,20 +494,20 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> has left"
 
-    class BasicRegion(BaseRegion):
+    class BaseRegion:
 
         id = -1
         name = "default_region"
         category: Optional[RegionCategory] = None
 
-        def __init__(self: Database.BasicRegion) -> None:
+        def __init__(self: Database.BaseRegion) -> None:
             return
 
         def __repr__(self) -> str:
             return f"<BaseRegion: {self.id}#{self.name}>"
 
         def __eq__(self, other: Any) -> bool:
-            if isinstance(other, Database.BasicRegion):
+            if isinstance(other, Database.BaseRegion):
                 return self.id == other.id
             return False
 
@@ -527,7 +538,7 @@ class Database:
     class Region:
 
         def __init__(
-            self, parent: Database, id: int, region: Database.BasicRegion, guild: Database.Guild
+            self, parent: Database, id: int, region: Database.BaseRegion, guild: Database.Guild
         ):
             self.parent = parent
             self.id = id
@@ -971,8 +982,8 @@ class Database:
                     f"Region is {region.region.category} but creature can only go to {creature.creature.quest_region_categories}"
                 )
 
-            base_region: Database.BasicRegion = region.region
-            base_creature: Database.BasicCreature = creature.creature
+            base_region: Database.BaseRegion = region.region
+            base_creature: Database.BaseCreature = creature.creature
 
             with self.parent.transaction(parent=con) as sub_con:
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
@@ -1022,7 +1033,7 @@ class Database:
             extra_data: dict[Any, Any] = {},
         ) -> None:
 
-            base_creature: Database.BasicCreature = creature.creature
+            base_creature: Database.BaseCreature = creature.creature
 
             with self.parent.transaction(parent=con) as sub_con:
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
@@ -1464,21 +1475,21 @@ class Database:
                         ),
                     )
 
-    class BasicCreature(BaseCreature):
+    class BaseCreature:
 
         id = -1
         name = "default_creature"
         quest_region_categories: list[RegionCategory] = []
         claim_cost: int = 0
 
-        def __init__(self: Database.BasicCreature):
+        def __init__(self: Database.BaseCreature):
             return
 
         def __repr__(self) -> str:
             return f"<BaseCreature: {self.name}>"
 
         def __eq__(self, other: Any) -> bool:
-            if isinstance(other, BaseCreature):
+            if isinstance(other, Database.BaseCreature):
                 return str(self) == str(other)
             return False
 
@@ -1536,7 +1547,7 @@ class Database:
             self,
             parent: Database,
             id: int,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             guild: Database.Guild,
             owner: Database.Player,
         ):
@@ -1606,7 +1617,7 @@ class Database:
         def __init__(
             self,
             parent: Database,
-            creature: Database.BasicCreature,
+            creature: Database.BaseCreature,
             guild: Database.Guild,
             channel_id: int,
             message_id: int,

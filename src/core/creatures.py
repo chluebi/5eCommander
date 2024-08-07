@@ -5,7 +5,6 @@ from src.core.base_types import (
     Resource,
     Price,
     Gain,
-    BaseRegion,
     RegionCategory,
     resource_changes_to_string,
     resource_changes_to_short_string,
@@ -15,7 +14,7 @@ from src.core.regions import RegionCategories
 from src.core.exceptions import CreatureCannotCampaign
 
 
-class SimpleCreature(Database.BasicCreature):
+class SimpleCreature(Database.BaseCreature):
 
     id = -1
     name = "simple creature"
