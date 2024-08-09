@@ -6,12 +6,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   bot:
     image: 5ecommander:latest
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: runner
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +23,7 @@ services:
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DEVELOPMENT_GUILD_ID: ${DEVELOPMENT_GUILD_ID}
-    command: python run_bot.py
+    command: python -m src.bot.main
 
 
 volumes:
