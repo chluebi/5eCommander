@@ -86,98 +86,98 @@ async def on_command_error(ctx: commands.Context[Bot], error: Exception) -> None
     await ctx.send(embed=error_embed("Internal Error", m))
 
 
-@bot.tree.command()
+@bot.hybrid_command()
 @commands.has_permissions(administrator=True)
-async def init_guild(interaction: discord.Interaction) -> None:
+async def init_guild(ctxt: commands.Context[Bot]) -> None:
     """Initialises the guild to play 5eCommander. Needs administator permissions."""
 
-    if interaction.guild is None:
-        await interaction.response.send_message(
+    if ctxt.guild is None:
+        await ctxt.send(
             embed=error_embed("User Error", f"You are not currently in a guild.")
         )
         return
 
     try:
-        guild_db = bot.db.add_guild(interaction.guild.id)
+        guild_db = bot.db.add_guild(ctxt.guild.id)
     except sqlalchemy.exc.IntegrityError as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"Guild already exists")
         )
 
-    await interaction.response.send_message(
+    await ctxt.send(
         embed=success_embed("Guild initialised", f"Config loaded: {guild_db.get_config()}")
     )
 
 
-@bot.tree.command()
+@bot.hybrid_command()
 @commands.has_permissions(administrator=True)
-async def guild_info(interaction: discord.Interaction) -> None:
+async def guild_info(ctxt: commands.Context[Bot]) -> None:
     """Gives you the guild configuration"""
 
-    if interaction.guild is None:
-        await interaction.response.send_message(
+    if ctxt.guild is None:
+        await ctxt.send(
             embed=error_embed("User Error", f"You are not currently in a guild.")
         )
         return
 
     try:
-        guild_db = bot.db.get_guild(interaction.guild.id)
+        guild_db = bot.db.get_guild(ctxt.guild.id)
     except GuildNotFound as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"The guild on this server has not been initialised")
         )
         return
 
-    await interaction.response.send_message(
+    await ctxt.send(
         embed=success_embed("Guild initialised", f"Server config: ``{guild_db.get_config()}``")
     )
 
 
-@bot.tree.command()
-async def join(interaction: discord.Interaction) -> None:
+@bot.hybrid_command()
+async def join(ctxt: commands.Context[Bot]) -> None:
     """Join the game"""
 
-    if interaction.guild is None:
-        await interaction.response.send_message(
+    if ctxt.guild is None:
+        await ctxt.send(
             embed=error_embed("User Error", f"You are not currently in a guild.")
         )
         return
 
     try:
-        guild_db = bot.db.get_guild(interaction.guild.id)
+        guild_db = bot.db.get_guild(ctxt.guild.id)
     except GuildNotFound as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"The guild on this server has not been initialised")
         )
         return
 
     try:
-        player_db = guild_db.add_player(interaction.user.id)
+        player_db = guild_db.add_player(ctxt.author.id)
     except sqlalchemy.exc.IntegrityError as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"You already joined")
         )
         return
 
-    await interaction.response.send_message(
+    await ctxt.send(
         embed=success_embed("Success", f"You have joined the game!")
     )
 
 
-@bot.tree.command()
-async def player_info(interaction: discord.Interaction, member: discord.Member) -> None:
+@bot.hybrid_command()
+async def player_info(ctxt: commands.Context[Bot], *, member: discord.Member) -> None:
     """Gives you the info about a user"""
 
-    if interaction.guild is None:
-        await interaction.response.send_message(
+    if ctxt.guild is None:
+        await ctxt.send(
             embed=error_embed("User Error", f"You are not currently in a guild.")
         )
         return
 
     try:
-        guild_db = bot.db.get_guild(interaction.guild.id)
+        guild_db = bot.db.get_guild(ctxt.guild.id)
     except GuildNotFound as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"The guild on this server has not been initialised")
         )
         return
@@ -185,12 +185,12 @@ async def player_info(interaction: discord.Interaction, member: discord.Member) 
     try:
         player_db = guild_db.get_player(member.id)
     except PlayerNotFound as e:
-        await interaction.response.send_message(
+        await ctxt.send(
             embed=error_embed("User Error", f"No player of this name found")
         )
         return
 
-    await interaction.response.send_message(
+    await ctxt.send(
         embed=success_embed("User info", f"Resources: ``{player_db.get_resources()}``")
     )
 
