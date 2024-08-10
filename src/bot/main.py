@@ -8,6 +8,7 @@ import sqlalchemy
 import discord
 from discord.ext import commands
 
+from src.bot.setup_logging import logger, setup_logging
 from src.database.postgres import PostgresDatabase
 from src.definitions.start_condition import start_condition
 
@@ -17,24 +18,6 @@ from src.definitions.start_condition import start_condition
 DEVELOPMENT_GUILD = discord.Object(id=int(os.environ["DEVELOPMENT_GUILD_ID"]))
 
 
-dt_fmt = "%Y-%m-%d %H:%M:%S"
-formatter = logging.Formatter("[{asctime}] [{levelname:<8}] {name}: {message}", dt_fmt, style="{")
-color_formatter = logging.Formatter(
-    "\033[34m[{asctime}] \033[1;34m[{levelname:<8}]\033[0m {name}: {message}", dt_fmt, style="{"
-)
-
-print_handler = logging.StreamHandler(sys.stdout)
-file_handler = logging.FileHandler(
-    filename="/var/log/5eCommander/bot.log", encoding="utf-8", mode="a"
-)
-
-print_handler.setFormatter(color_formatter)
-file_handler.setFormatter(formatter)
-
-
-logger = logging.getLogger("discord")
-logger.addHandler(print_handler)
-logger.addHandler(file_handler)
 
 
 def connect_to_db() -> PostgresDatabase:
@@ -42,7 +25,7 @@ def connect_to_db() -> PostgresDatabase:
         drivername="postgresql+psycopg2",
         username=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
-        host="db",
+        host=str(os.environ["POSTGRES_HOST"]),
         port=5432,
         database=os.environ["POSTGRES_DB"],
     )
@@ -61,14 +44,15 @@ class Bot(commands.Bot):
 
         self.initial_extensions = initial_extensions
         self.db = cast(PostgresDatabase, None)
+        self.logger = cast(logging.Logger, None)
 
     async def setup_hook(self) -> None:
         for extension in self.initial_extensions:
             await self.load_extension(extension)
 
-        self.tree.clear_commands(guild=DEVELOPMENT_GUILD)
-        self.tree.copy_global_to(guild=DEVELOPMENT_GUILD)
-        await self.tree.sync(guild=DEVELOPMENT_GUILD)
+        # self.tree.clear_commands(guild=DEVELOPMENT_GUILD)
+        # self.tree.copy_global_to(guild=DEVELOPMENT_GUILD)
+        # await self.tree.sync(guild=DEVELOPMENT_GUILD)
 
 
 bot = Bot([])
@@ -78,6 +62,7 @@ bot = Bot([])
 async def on_ready() -> None:
     assert bot.user is not None
 
+    bot.logger = logger
     bot.db = connect_to_db()
 
     logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
@@ -88,7 +73,7 @@ async def on_ready() -> None:
 @bot.tree.command()
 async def hello(interaction: discord.Interaction) -> None:
     """Says hello!"""
-    logger.info("info command called")
+    logger.info("hello command called!")
     await interaction.response.send_message(f"Hi, {interaction.user.mention}")
 
 
@@ -100,4 +85,5 @@ async def sync(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(f"Synced {len(synced)} commands globally")
 
 
-bot.run(os.environ["DISCORD_TOKEN"], log_handler=None)
+
+bot.run(os.environ["DISCORD_TOKEN"])

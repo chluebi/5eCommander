@@ -3,4 +3,7 @@
 **/__pycache__/*
 
 .env
+.testenv
+
 logs/*
+botlogs/*
