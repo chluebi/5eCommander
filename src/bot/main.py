@@ -44,23 +44,22 @@ class Bot(commands.Bot):
         super().__init__(command_prefix=commands.when_mentioned_or("com "), intents=intents)
 
         self.initial_extensions = initial_extensions
-        self.db = cast(PostgresDatabase, None)
-        self.logger = cast(logging.Logger, None)
+        self.db = connect_to_db()
+        self.logger = logger
 
     async def setup_hook(self) -> None:
-        for extension in self.initial_extensions:
-            await self.load_extension(extension)
+        pass
 
 
-bot = Bot(["src.bot.basic"])
+bot = Bot(["src.bot.basic", "src.bot.event_handler"])
 
 
 @bot.event
 async def on_ready() -> None:
     assert bot.user is not None
 
-    bot.logger = logger
-    bot.db = connect_to_db()
+    for extension in bot.initial_extensions:
+        await bot.load_extension(extension)
 
     logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
     logger.info("------")

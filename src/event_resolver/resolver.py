@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, cast
+from typing import Callable, cast, Union, Coroutine
 import asyncio
 import asyncpg  # type: ignore
 
@@ -30,7 +30,10 @@ def get_db_url(db: PostgresDatabase) -> str:
 
 async def listen_to_notifications(
     db: PostgresDatabase,
-    handler: Callable[[str, str, str, str], None],
+    handler: Union[
+        Callable[[str, str, str, str], None],
+        Callable[[str, str, str, str], Coroutine[None, None, None]],
+    ],
     keep_alive: KeepAlive = KeepAlive(),
 ) -> None:
     url = get_db_url(db)

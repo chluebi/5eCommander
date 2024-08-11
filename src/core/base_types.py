@@ -169,13 +169,13 @@ class Event:
         parent: Any,
         id: int,
         timestamp: float,
-        parent_event: Optional[Event],
+        parent_event_id: Optional[int],
         guild: Any,
     ):
         self.parent = parent
         self.id = id
         self.timestamp = timestamp
-        self.parent_event = parent_event
+        self.parent_event_id = parent_event_id
         self.guild = guild
 
     def __repr__(self) -> str:
@@ -191,11 +191,11 @@ class Event:
         parent: Any,
         id: int,
         timestamp: int,
-        parent_event: Event,
+        parent_event_id: Optional[int],
         guild: Any,
         extra_data: dict[Any, Any],
     ) -> Event:
-        return Event(parent, id, timestamp, parent_event, guild)
+        return Event(parent, id, timestamp, parent_event_id, guild)
 
     def extra_data(self) -> str:
         assert False

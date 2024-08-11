@@ -722,14 +722,14 @@ from src.event_resolver.resolver import (
 
 
 def event_handler_factory(
-    db: PostgresDatabase, events: List[Event]
+    guild_db: Database.Guild, events: List[Event]
 ) -> Callable[[Any, Any, Any, str], None]:
 
     def event_handler(connection: Any, pid: Any, channel: Any, payload: str) -> None:
-        with db.transaction() as con:
-            event = db.get_event_by_id(int(payload), con=con)
+        with guild_db.parent.transaction() as con:
+            event = guild_db.get_event_by_id(int(payload), con=con)
             events.append(event)
-            db.mark_event_as_resolved(event, con=con)
+            guild_db.mark_event_as_resolved(event, con=con)
 
     return event_handler
 
@@ -752,7 +752,7 @@ async def event_loop_test(
 
     listener_task = asyncio.create_task(
         listen_to_notifications(
-            test_db, event_handler_factory(test_db, events), keep_alive=keep_alive
+            test_db, event_handler_factory(guild_db, events), keep_alive=keep_alive
         )
     )
 
@@ -784,7 +784,9 @@ def test_event_resolver() -> None:
         guild_events = guild_db.get_events(0, time.time() * 2)
 
         assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2))
-        assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2, resolved=True))
+        assert are_subsets(
+            events, guild_db.get_events(event_loop_time, time.time() * 2, resolved=True)
+        )
 
         assert is_subset(events, guild_db.get_events(0, time.time() * 2))
         assert not are_event_type_subsets(events, guild_events, Database.Guild.RegionAddedEvent)

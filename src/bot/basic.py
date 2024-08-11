@@ -1,6 +1,7 @@
 from typing import Optional, Any, List, cast, TYPE_CHECKING
 
 import os
+import time
 import sys
 import logging
 import traceback
@@ -44,7 +45,6 @@ class GuildAdmin(commands.Cog):
 
         except sqlalchemy.exc.IntegrityError as e:
             raise commands.UserInputError("Guild already exists")
-        
 
         await ctxt.send(
             embed=success_embed("Guild initialised", f"Config loaded: {guild_db.get_config()}")
@@ -89,7 +89,7 @@ class GuildAdmin(commands.Cog):
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         await ctxt.send(
-            embed=success_embed("Guild initialised", f"Server config: ``{guild_db.get_config()}``")
+            embed=success_embed("Guild initialised", f"Server config: ``{guild_db.get_config()}``\n Events: ``{guild_db.get_events(0, time.time())}``")
         )
 
 
