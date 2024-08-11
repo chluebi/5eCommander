@@ -105,6 +105,34 @@ def test_guild_creation() -> None:
         assert test_db.get_guilds() == []
 
 
+def test_guild_config() -> None:
+    guild_db: Database.Guild = test_db.add_guild(1)
+
+    try:
+        assert guild_db.get_config() == start_condition.start_config
+
+        guild_db.set_config(guild_db.get_config())
+
+        assert guild_db.get_config() == start_condition.start_config
+
+        config = guild_db.get_config()
+        config["max_orders"] = 10
+        guild_db.set_config(config)
+
+        assert guild_db.get_config() == config
+    finally:
+        test_db.remove_guild(guild_db)
+
+        try:
+            test_db.get_guild(guild_db.id)
+            assert False
+        except GuildNotFound:
+            pass
+
+        assert test_db.get_guilds() == []
+
+
+
 def test_player_creation() -> None:
     guild_db: Database.Guild = test_db.add_guild(1)
 
