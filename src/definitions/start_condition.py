@@ -4,6 +4,7 @@ from src.definitions.creatures import *
 
 start_condition = Database.StartCondition(
     {
+        "channel_id": 0,
         "max_orders": 5,
         "order_recharge": 5,
         "max_magic": 10,

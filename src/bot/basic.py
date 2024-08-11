@@ -36,10 +36,15 @@ class GuildAdmin(commands.Cog):
         assert ctxt.guild is not None
 
         try:
-            guild_db = self.bot.db.add_guild(ctxt.guild.id)
+            with self.bot.db.transaction() as con:
+                guild_db = self.bot.db.add_guild(ctxt.guild.id, con=con)
+                config = guild_db.get_config(con=con)
+                config["channel_id"] = ctxt.channel.id
+                guild_db.set_config(config, con=con)
+
         except sqlalchemy.exc.IntegrityError as e:
-            await ctxt.send(embed=error_embed("User Error", f"Guild already exists"))
-            return
+            raise commands.UserInputError("Guild already exists")
+        
 
         await ctxt.send(
             embed=success_embed("Guild initialised", f"Config loaded: {guild_db.get_config()}")

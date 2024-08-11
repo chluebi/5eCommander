@@ -541,7 +541,7 @@ class PostgresDatabase(Database):
                 sql = text(
                     """
                     UPDATE Guilds SET config = :config 
-                    WHERE guild_id = :guild_id
+                    WHERE id = :guild_id
                 """
                 )
                 sub_con.execute(
