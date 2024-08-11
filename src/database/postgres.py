@@ -359,7 +359,7 @@ class PostgresDatabase(Database):
                     "id": event.id,
                     "guild_id": event.guild.id,
                     "timestamp": event.timestamp,
-                    "parent_event_id": event.parent_event.id if event.parent_event else None,
+                    "parent_event_id": event.parent_event_id if event.parent_event_id else None,
                     "event_type": event.event_type,
                     "extra_data": event.extra_data(),
                     "resolved": False,
@@ -368,54 +368,6 @@ class PostgresDatabase(Database):
                     "creature_id": searched_dict["creature_id"],
                 },
             )
-
-    def mark_event_as_resolved(
-        self, event: Event, con: Optional[Database.TransactionManager] = None
-    ) -> None:
-        with self.transaction(parent=con) as sub_con:
-            sql = text(
-                """UPDATE events 
-                SET resolved = :resolved 
-                WHERE id = :id"""
-            )
-
-            sub_con.execute(
-                sql,
-                {
-                    "resolved": True,
-                    "id": event.id,
-                },
-            )
-
-    def get_event_by_id(
-        self,
-        event_id: int,
-        con: Optional[Database.TransactionManager] = None,
-    ) -> Event:
-        with self.transaction(parent=con) as sub_con:
-
-            sql = text(
-                f"""
-                        SELECT * FROM events WHERE id = :event_id
-                    """
-            )
-
-            r = sub_con.execute(sql, {"event_id": event_id}).fetchone()
-
-            event = None
-            extra_data = r[5]
-
-            for event_class in event_classes:
-
-                if r[4] == event_class.event_type:
-                    event = event_class.from_extra_data(
-                        self, r[0], r[2], r[3], self.get_guild(r[1], con=sub_con), extra_data
-                    )
-                    break
-
-            assert event is not None
-
-            return event
 
     def add_guild(
         self,
@@ -506,7 +458,13 @@ class PostgresDatabase(Database):
                     )
 
                     results = sub_con.execute(
-                        sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end, "resolved": resolved}
+                        sql,
+                        {
+                            "guild_id": self.id,
+                            "start": timestamp_start,
+                            "end": timestamp_end,
+                            "resolved": resolved,
+                        },
                     ).fetchall()
                 else:
                     sql = text(
@@ -527,7 +485,7 @@ class PostgresDatabase(Database):
                             "start": timestamp_start,
                             "end": timestamp_end,
                             "event_type": event_type.event_type,
-                            "resolved": resolved
+                            "resolved": resolved,
                         },
                     ).fetchall()
 
@@ -548,6 +506,51 @@ class PostgresDatabase(Database):
                     events.append(event)
 
                 return events
+
+        def get_event_by_id(
+            self,
+            event_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Event:
+            with self.parent.transaction(parent=con) as sub_con:
+
+                sql = text(
+                    f"""
+                    SELECT * FROM events WHERE id = :event_id AND guild_id = :guild_id
+                    """
+                )
+
+                r = sub_con.execute(sql, {"event_id": event_id, "guild_id": self.id}).fetchone()
+
+                event = None
+                extra_data = r[5]
+
+                for event_class in event_classes:
+
+                    if r[4] == event_class.event_type:
+                        event = event_class.from_extra_data(
+                            self, r[0], r[2], r[3], self, extra_data
+                        )
+                        break
+
+                assert event is not None
+
+                return event
+
+        def mark_event_as_resolved(
+            self, event: Event, con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    """UPDATE events 
+                        SET resolved = :resolved 
+                        WHERE id = :id AND guild_id = :guild_id"""
+                )
+
+                sub_con.execute(
+                    sql,
+                    {"resolved": True, "id": event.id, "guild_id": self.id},
+                )
 
         def remove_event(
             self,

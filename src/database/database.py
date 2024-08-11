@@ -108,8 +108,8 @@ class Database:
                 while parent.events == [] and parent.parent_manager:
                     parent = parent.parent_manager
 
-                if parent.events != [] and event.parent_event is None:
-                    event.parent_event = parent.events[-1]
+                if parent.events != [] and event.parent_event_id is None:
+                    event.parent_event_id = parent.events[-1].id
             self.events.append(event)
 
         def get_events(self) -> List[Event]:
@@ -199,6 +199,18 @@ class Database:
             resolved: Optional[bool] = None,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
+            assert False
+
+        def get_event_by_id(
+            self,
+            event_id: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> Event:
+            assert False
+
+        def mark_event_as_resolved(
+            self, event: Event, con: Optional[Database.TransactionManager] = None
+        ) -> None:
             assert False
 
         def remove_event(
@@ -364,11 +376,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 region_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.region_id = region_id
 
             @staticmethod
@@ -376,12 +388,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Guild.RegionAddedEvent:
                 return Database.Guild.RegionAddedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["region_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["region_id"]
                 )
 
             def extra_data(self) -> str:
@@ -399,11 +411,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 region_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.region_id = region_id
 
             @staticmethod
@@ -411,12 +423,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Guild.RegionRemovedEvent:
                 return Database.Guild.RegionRemovedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["region_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["region_id"]
                 )
 
             def extra_data(self) -> str:
@@ -434,11 +446,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
 
             @staticmethod
@@ -446,12 +458,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Guild.PlayerAddedEvent:
                 return Database.Guild.PlayerAddedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
                 )
 
             def extra_data(self) -> str:
@@ -469,11 +481,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
 
             @staticmethod
@@ -481,12 +493,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Guild.PlayerRemovedEvent:
                 return Database.Guild.PlayerRemovedEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
                 )
 
             def extra_data(self) -> str:
@@ -586,11 +598,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 region_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.region_id = region_id
 
             @staticmethod
@@ -598,12 +610,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Region.RegionRechargeEvent:
                 return Database.Region.RegionRechargeEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["region_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["region_id"]
                 )
 
             def extra_data(self) -> str:
@@ -1068,12 +1080,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
                 num_cards: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.num_cards = num_cards
 
@@ -1082,7 +1094,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerDrawEvent:
@@ -1090,7 +1102,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["player_id"],
                     extra_data["num_cards"],
@@ -1111,12 +1123,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
                 changes: List[Tuple[int, int]],
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.changes = changes
 
@@ -1125,7 +1137,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerGainEvent:
@@ -1133,7 +1145,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["player_id"],
                     list(map(tuple, extra_data["changes"])),
@@ -1158,12 +1170,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
                 changes: List[Tuple[int, int]],
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.changes = changes
 
@@ -1172,7 +1184,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerPayEvent:
@@ -1180,7 +1192,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["player_id"],
                     list(map(tuple, extra_data["changes"])),
@@ -1205,14 +1217,14 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
                 region_id: int,
                 play_extra_data: dict[Any, Any],
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.creature_id = creature_id
                 self.region_id = region_id
@@ -1223,7 +1235,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerPlayToRegionEvent:
@@ -1231,7 +1243,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["player_id"],
                     extra_data["creature_id"],
@@ -1261,13 +1273,13 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
                 play_extra_data: dict[Any, Any],
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.creature_id = creature_id
                 self.play_extra_data = play_extra_data
@@ -1277,7 +1289,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerPlayToCampaignEvent:
@@ -1285,7 +1297,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["player_id"],
                     extra_data["creature_id"],
@@ -1313,11 +1325,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
 
             @staticmethod
@@ -1325,12 +1337,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerOrderRechargeEvent:
                 return Database.Player.PlayerOrderRechargeEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
                 )
 
             def extra_data(self) -> str:
@@ -1371,11 +1383,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
 
             @staticmethod
@@ -1383,12 +1395,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerMagicRechargeEvent:
                 return Database.Player.PlayerMagicRechargeEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
                 )
 
             def extra_data(self) -> str:
@@ -1429,11 +1441,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 player_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
 
             @staticmethod
@@ -1441,12 +1453,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Player.PlayerCardRechargeEvent:
                 return Database.Player.PlayerCardRechargeEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["player_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
                 )
 
             def extra_data(self) -> str:
@@ -1579,11 +1591,11 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 creature_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.creature_id = creature_id
 
             @staticmethod
@@ -1591,12 +1603,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.Creature.CreatureRechargeEvent:
                 return Database.Creature.CreatureRechargeEvent(
-                    parent, id, timestamp, parent_event, guild, extra_data["creature_id"]
+                    parent, id, timestamp, parent_event_id, guild, extra_data["creature_id"]
                 )
 
             def extra_data(self) -> str:
@@ -1744,12 +1756,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.channel_id = channel_id
                 self.message_id = message_id
 
@@ -1758,7 +1770,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.FreeCreature.FreeCreatureProtectedEvent:
@@ -1766,7 +1778,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["channel_id"],
                     extra_data["message_id"],
@@ -1789,12 +1801,12 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.channel_id = channel_id
                 self.message_id = message_id
 
@@ -1803,7 +1815,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.FreeCreature.FreeCreatureExpiresEvent:
@@ -1811,7 +1823,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["channel_id"],
                     extra_data["message_id"],
@@ -1845,14 +1857,14 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Optional[Event],
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 channel_id: int,
                 message_id: int,
                 player_id: int,
                 creature_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event, guild)
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.channel_id = channel_id
                 self.message_id = message_id
                 self.player_id = player_id
@@ -1863,7 +1875,7 @@ class Database:
                 parent: Database,
                 id: int,
                 timestamp: float,
-                parent_event: Event,
+                parent_event_id: Optional[int],
                 guild: Database.Guild,
                 extra_data: dict[Any, Any],
             ) -> Database.FreeCreature.FreeCreatureClaimedEvent:
@@ -1871,7 +1883,7 @@ class Database:
                     parent,
                     id,
                     timestamp,
-                    parent_event,
+                    parent_event_id,
                     guild,
                     extra_data["channel_id"],
                     extra_data["message_id"],
