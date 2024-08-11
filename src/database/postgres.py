@@ -17,6 +17,7 @@ from sqlalchemy import (
     Column,
     Integer,
     BigInteger,
+    Boolean,
     JSON,
     String,
     ForeignKeyConstraint,
@@ -69,6 +70,7 @@ class PostgresDatabase(Database):
             Column("parent_event_id", BigInteger, nullable=True),
             Column("event_type", String, nullable=False),
             Column("extra_data", JSON, nullable=True),
+            Column("resolved", Boolean, nullable=False),
             # extra arguments for efficiency
             Column("region_id", BigInteger, nullable=True),
             Column("player_id", BigInteger, nullable=True),
@@ -348,7 +350,8 @@ class PostgresDatabase(Database):
                         searched_dict[key] = value
 
             event_sql = text(
-                "INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data, region_id, player_id, creature_id) VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data, :region_id, :player_id, :creature_id)"
+                """INSERT INTO events (id, guild_id, timestamp, parent_event_id, event_type, extra_data, resolved, region_id, player_id, creature_id) 
+                VALUES (:id, :guild_id, :timestamp, :parent_event_id, :event_type, :extra_data, :resolved, :region_id, :player_id, :creature_id)"""
             )
             sub_con.execute(
                 event_sql,
@@ -359,9 +362,28 @@ class PostgresDatabase(Database):
                     "parent_event_id": event.parent_event.id if event.parent_event else None,
                     "event_type": event.event_type,
                     "extra_data": event.extra_data(),
+                    "resolved": False,
                     "region_id": searched_dict["region_id"],
                     "player_id": searched_dict["player_id"],
                     "creature_id": searched_dict["creature_id"],
+                },
+            )
+
+    def mark_event_as_resolved(
+        self, event: Event, con: Optional[Database.TransactionManager] = None
+    ) -> None:
+        with self.transaction(parent=con) as sub_con:
+            sql = text(
+                """UPDATE events 
+                SET resolved = :resolved 
+                WHERE id = :id"""
+            )
+
+            sub_con.execute(
+                sql,
+                {
+                    "resolved": True,
+                    "id": event.id,
                 },
             )
 
@@ -465,9 +487,12 @@ class PostgresDatabase(Database):
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
+            resolved: Optional[bool] = None,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             with self.parent.transaction(parent=con) as sub_con:
+
+                resolved_string = "" if resolved is None else "AND resolved = :resolved"
 
                 if event_type is None:
                     sql = text(
@@ -475,12 +500,13 @@ class PostgresDatabase(Database):
                         SELECT * FROM events
                         WHERE guild_id = :guild_id
                         AND timestamp BETWEEN :start AND :end
+                        {resolved_string}
                         ORDER BY timestamp
                     """
                     )
 
                     results = sub_con.execute(
-                        sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end}
+                        sql, {"guild_id": self.id, "start": timestamp_start, "end": timestamp_end, "resolved": resolved}
                     ).fetchall()
                 else:
                     sql = text(
@@ -489,6 +515,7 @@ class PostgresDatabase(Database):
                         WHERE guild_id = :guild_id
                         AND timestamp BETWEEN :start AND :end
                         AND event_type LIKE :event_type
+                        {resolved_string}
                         ORDER BY timestamp
                     """
                     )
@@ -500,6 +527,7 @@ class PostgresDatabase(Database):
                             "start": timestamp_start,
                             "end": timestamp_end,
                             "event_type": event_type.event_type,
+                            "resolved": resolved
                         },
                     ).fetchall()
 

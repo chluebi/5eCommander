@@ -196,6 +196,7 @@ class Database:
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
+            resolved: Optional[bool] = None,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             assert False

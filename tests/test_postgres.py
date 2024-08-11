@@ -132,7 +132,6 @@ def test_guild_config() -> None:
         assert test_db.get_guilds() == []
 
 
-
 def test_player_creation() -> None:
     guild_db: Database.Guild = test_db.add_guild(1)
 
@@ -730,6 +729,7 @@ def event_handler_factory(
         with db.transaction() as con:
             event = db.get_event_by_id(int(payload), con=con)
             events.append(event)
+            db.mark_event_as_resolved(event, con=con)
 
     return event_handler
 
@@ -784,6 +784,7 @@ def test_event_resolver() -> None:
         guild_events = guild_db.get_events(0, time.time() * 2)
 
         assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2))
+        assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2, resolved=True))
 
         assert is_subset(events, guild_db.get_events(0, time.time() * 2))
         assert not are_event_type_subsets(events, guild_events, Database.Guild.RegionAddedEvent)
