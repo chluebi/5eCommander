@@ -196,7 +196,7 @@ class Database:
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
-            resolved: Optional[bool] = None,
+            also_resolved: Optional[bool] = True,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             assert False
@@ -703,9 +703,29 @@ class Database:
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
+            also_resolved: Optional[bool] = True,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             assert False
+
+        def test_recharges(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> dict[str, List[Event]]:
+            recharge_event_classes: list[type[Event]] = [
+                Database.Player.PlayerOrderRechargeEvent,
+                Database.Player.PlayerMagicRechargeEvent,
+                Database.Player.PlayerCardRechargeEvent,
+            ]
+
+            r: dict[str, List[Event]] = {}
+
+            for c in recharge_event_classes:
+                events = self.get_events(
+                    0, time.time() * 2, event_type=c, also_resolved=False, con=con
+                )
+                r[c.event_type] = events
+
+            return r
 
         def get_recharges(
             self, con: Optional[Database.TransactionManager] = None
@@ -719,9 +739,11 @@ class Database:
             r: dict[str, Event] = {}
 
             for c in recharge_event_classes:
-                events = self.get_events(0, time.time() * 2, event_type=c)
-                assert len(events) == 1
-                recharge_event = events[0]
+                events = self.get_events(
+                    0, time.time() * 2, event_type=c, also_resolved=False, con=con
+                )
+
+                recharge_event = sorted(events, key=lambda x: x.timestamp)[0]
                 r[c.event_type] = recharge_event
 
             return r
@@ -923,18 +945,19 @@ class Database:
                     card = self.draw_card_raw(con=sub_con)
                     cards_drawn.append(card)
 
-                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                sub_con.add_event(
-                    Database.Player.PlayerDrawEvent(
-                        self.parent,
-                        event_id,
-                        time.time(),
-                        None,
-                        self.guild,
-                        self.id,
-                        len(cards_drawn),
-                    ),
-                )
+                if len(cards_drawn) > 0:
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    sub_con.add_event(
+                        Database.Player.PlayerDrawEvent(
+                            self.parent,
+                            event_id,
+                            time.time(),
+                            None,
+                            self.guild,
+                            self.id,
+                            len(cards_drawn),
+                        ),
+                    )
 
                 return cards_drawn, discard_reshuffled, hand_full
 
@@ -1362,17 +1385,25 @@ class Database:
                     if player_orders + 1 <= guild_config["max_orders"]:
                         player.gain([Gain(resource=Resource.ORDERS, amount=1)], con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                    sub_con.add_event(
-                        Database.Player.PlayerOrderRechargeEvent(
-                            self.parent,
-                            event_id,
-                            time.time() + guild_config["order_recharge"],
-                            None,
-                            self.guild,
-                            self.player_id,
-                        ),
-                    )
+                    if (
+                        len(
+                            player.test_recharges(con=con)[
+                                Database.Player.PlayerOrderRechargeEvent.event_type
+                            ]
+                        )
+                        == 1
+                    ):
+                        event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                        sub_con.add_event(
+                            Database.Player.PlayerOrderRechargeEvent(
+                                self.parent,
+                                event_id,
+                                time.time() + guild_config["order_recharge"],
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
 
         class PlayerMagicRechargeEvent(Event):
 
@@ -1420,17 +1451,25 @@ class Database:
                     if player_magic + 1 <= guild_config["max_magic"]:
                         player.gain([Gain(resource=Resource.MAGIC, amount=1)], con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                    sub_con.add_event(
-                        Database.Player.PlayerMagicRechargeEvent(
-                            self.parent,
-                            event_id,
-                            time.time() + guild_config["magic_recharge"],
-                            None,
-                            self.guild,
-                            self.player_id,
-                        ),
-                    )
+                    if (
+                        len(
+                            player.test_recharges(con=con)[
+                                Database.Player.PlayerMagicRechargeEvent.event_type
+                            ]
+                        )
+                        == 1
+                    ):
+                        event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                        sub_con.add_event(
+                            Database.Player.PlayerMagicRechargeEvent(
+                                self.parent,
+                                event_id,
+                                time.time() + guild_config["magic_recharge"],
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
 
         class PlayerCardRechargeEvent(Event):
 
@@ -1476,17 +1515,25 @@ class Database:
                     guild_config = self.guild.get_config(con=sub_con)
                     player.draw_cards(1, con=sub_con)
 
-                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                    sub_con.add_event(
-                        Database.Player.PlayerCardRechargeEvent(
-                            self.parent,
-                            event_id,
-                            time.time() + guild_config["card_recharge"],
-                            None,
-                            self.guild,
-                            self.player_id,
-                        ),
-                    )
+                    if (
+                        len(
+                            player.test_recharges(con=con)[
+                                Database.Player.PlayerCardRechargeEvent.event_type
+                            ]
+                        )
+                        == 1
+                    ):
+                        event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                        sub_con.add_event(
+                            Database.Player.PlayerCardRechargeEvent(
+                                self.parent,
+                                event_id,
+                                time.time() + guild_config["card_recharge"],
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
 
     class BaseCreature:
 
@@ -1581,6 +1628,12 @@ class Database:
 
         def __repr__(self) -> str:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
+
+        def text(self) -> str:
+            region_category_string = " ".join(
+                [r.emoji for r in self.creature.quest_region_categories]
+            )
+            return f"{self.creature.name}  {region_category_string}"
 
         class CreatureRechargeEvent(Event):
 

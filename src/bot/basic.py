@@ -12,7 +12,7 @@ import discord
 from discord.ext import commands
 
 from src.bot.setup_logging import logger, setup_logging
-from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed
+from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed, player_embed
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
@@ -89,7 +89,10 @@ class GuildAdmin(commands.Cog):
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         await ctxt.send(
-            embed=success_embed("Guild initialised", f"Server config: ``{guild_db.get_config()}``\n Events: ``{guild_db.get_events(0, time.time())}``")
+            embed=success_embed(
+                "Guild initialised",
+                f"Server config: ``{guild_db.get_config()}``\n Events: ``{guild_db.get_events(0, time.time())}``",
+            )
         )
 
 
@@ -108,15 +111,7 @@ class PlayerAdmin(commands.Cog):
             await ctxt.send(embed=error_embed("User Error", f"You are not currently in a guild."))
             return
 
-        try:
-            guild_db = self.bot.db.get_guild(ctxt.guild.id)
-        except GuildNotFound as e:
-            await ctxt.send(
-                embed=error_embed(
-                    "User Error", f"The guild on this server has not been initialised"
-                )
-            )
-            return
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         try:
             player_db = guild_db.add_player(ctxt.author.id)
@@ -132,19 +127,8 @@ class PlayerAdmin(commands.Cog):
     async def player_info(self, ctxt: commands.Context["Bot"], *, member: discord.Member) -> None:
         """Gives you the info about a player"""
 
-        if ctxt.guild is None:
-            await ctxt.send(embed=error_embed("User Error", f"You are not currently in a guild."))
-            return
-
-        try:
-            guild_db = self.bot.db.get_guild(ctxt.guild.id)
-        except GuildNotFound as e:
-            await ctxt.send(
-                embed=error_embed(
-                    "User Error", f"The guild on this server has not been initialised"
-                )
-            )
-            return
+        assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         try:
             player_db = guild_db.get_player(member.id)
@@ -152,9 +136,24 @@ class PlayerAdmin(commands.Cog):
             await ctxt.send(embed=error_embed("User Error", f"No player of this name found"))
             return
 
-        await ctxt.send(
-            embed=success_embed("User info", f"Resources: ``{player_db.get_resources()}``")
-        )
+        await ctxt.send(embed=player_embed(member, player_db, private=True))
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def me(self, ctxt: commands.Context["Bot"]) -> None:
+        """Gives you the info about yourself, privately"""
+
+        if ctxt.interaction is None:
+            raise commands.CheckFailure("This command can only be called as a slash command")
+
+        assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
+        player_db = guild_db.get_player(ctxt.author.id)
+
+        assert isinstance(ctxt.author, discord.Member)
+
+        await ctxt.send(embed=player_embed(ctxt.author, player_db, private=False), ephemeral=True)
 
 
 async def setup(bot: "Bot") -> None:

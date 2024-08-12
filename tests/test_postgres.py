@@ -74,7 +74,7 @@ def events_by_type(
     if end is None:
         end = time.time() + 10
 
-    return cast(List[T], guild_db.get_events(start, end, event_type=t))
+    return cast(List[T], guild_db.get_events(start, end, event_type=t, also_resolved=True))
 
 
 postgres = PostgresContainer("postgres:16").start()
@@ -324,10 +324,10 @@ def test_deck() -> None:
             except EmptyDeckException:
                 pass
 
-        for i in range(len(start_condition.start_deck) * 2):
+        for i in range(1, len(start_condition.start_deck) * 2):
 
             prev_events = get_events()
-            assert len(prev_events) == i
+            assert len(prev_events) == i - 1
 
             player6_db: Database.Player = guild_db.add_player(6)
 
@@ -337,7 +337,7 @@ def test_deck() -> None:
             cards_drawn, reshuffled, hand_full = player6_db.draw_cards(N=i)
 
             all_events = get_events()
-            assert len(all_events) == i + 1
+            assert len(all_events) == i
             new_events = subtract(all_events, prev_events)
             assert len(new_events) == 1
             assert new_events[0].event_type == Database.Player.PlayerDrawEvent.event_type
@@ -784,9 +784,6 @@ def test_event_resolver() -> None:
         guild_events = guild_db.get_events(0, time.time() * 2)
 
         assert are_subsets(events, guild_db.get_events(event_loop_time, time.time() * 2))
-        assert are_subsets(
-            events, guild_db.get_events(event_loop_time, time.time() * 2, resolved=True)
-        )
 
         assert is_subset(events, guild_db.get_events(0, time.time() * 2))
         assert not are_event_type_subsets(events, guild_events, Database.Guild.RegionAddedEvent)

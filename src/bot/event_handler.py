@@ -5,6 +5,7 @@ import sys
 import asyncio
 import time
 import logging
+import random
 import traceback
 
 import sqlalchemy
@@ -29,14 +30,15 @@ if TYPE_CHECKING:
 
 
 handler_lock = asyncio.Lock()
+waiting_lock = asyncio.Lock()
 
 
 banned_events: List[Type[Event]] = [
-    PostgresDatabase.Player.PlayerCardRechargeEvent,
-    PostgresDatabase.Player.PlayerMagicRechargeEvent,
-    PostgresDatabase.Player.PlayerOrderRechargeEvent,
-    PostgresDatabase.Player.PlayerDrawEvent,
-    PostgresDatabase.Player.PlayerGainEvent,
+    # PostgresDatabase.Player.PlayerCardRechargeEvent,
+    # PostgresDatabase.Player.PlayerMagicRechargeEvent,
+    # PostgresDatabase.Player.PlayerOrderRechargeEvent,
+    # PostgresDatabase.Player.PlayerDrawEvent,
+    # PostgresDatabase.Player.PlayerGainEvent,
 ]
 
 
@@ -55,13 +57,25 @@ class EventHandler(commands.Cog):
 
         embeds_to_send: List[Tuple[discord.Embed, discord.PartialMessageable]] = []
 
+        if waiting_lock.locked():
+            return
+
+        async with waiting_lock:
+            pass
+
+        identifier = random.randint(1, 10000)
+
         async with handler_lock:
+            print("acquired", handler_lock)
 
             for guild_db in self.bot.db.get_guilds():
 
                 with self.bot.db.transaction() as con:
 
-                    events = guild_db.get_events(0, time.time(), resolved=False, con=con)
+                    events = sorted(
+                        guild_db.get_events(0, time.time(), also_resolved=False, con=con),
+                        key=lambda x: x.id,
+                    )
 
                     event_cache = {event.id: event for event in events}
                     event_children: dict[int, List[Event]] = {event.id: [] for event in events}
@@ -112,20 +126,22 @@ class EventHandler(commands.Cog):
                     channel = guild.get_channel_or_thread(channel_id)
 
                     if channel is None:
-                        channels = (
-                            await guild.fetch_channels()
-                        )  # very inefficient but sometimes the only thing that works
-                        channel = discord.utils.get(channels, id=channel_id)
-
-                    if channel is None:
                         threads = (
                             await guild.active_threads()
                         )  # very inefficient but sometimes the only thing that works
                         channel = discord.utils.get(threads, id=channel_id)
 
                     if channel is None:
+                        channels = (
+                            await guild.fetch_channels()
+                        )  # very inefficient but sometimes the only thing that works
+                        channel = discord.utils.get(channels, id=channel_id)
+
+                    if channel is None:
                         self.bot.logger.error("channel is none still")
                         continue
+
+                    print("flat event tree", flat_event_tree)
 
                     for root_event_id, children in flat_event_tree.items():
 
@@ -141,7 +157,7 @@ class EventHandler(commands.Cog):
                             continue
 
                         event_text = root_event.text()
-                        embed = standard_embed("Event Triggered", event_text)
+                        embed = standard_embed(f"Event Triggered #{root_event.id}", event_text)
 
                         for child, grandchildren in children:
                             child_title = child.text()
@@ -162,11 +178,11 @@ class EventHandler(commands.Cog):
                             event, con=con
                         )
 
-        for embed, channel in embeds_to_send:
-            cast_channel = cast(discord.PartialMessageable, channel)
+            for embed, channel in embeds_to_send:
+                cast_channel = cast(discord.PartialMessageable, channel)
 
-            await cast_channel.send(embed=embed)
-            await asyncio.sleep(2)  # rate limit
+                await cast_channel.send(embed=embed)
+                await asyncio.sleep(2)  # rate limit
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:

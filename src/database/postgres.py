@@ -439,12 +439,12 @@ class PostgresDatabase(Database):
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
-            resolved: Optional[bool] = None,
+            also_resolved: Optional[bool] = True,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             with self.parent.transaction(parent=con) as sub_con:
 
-                resolved_string = "" if resolved is None else "AND resolved = :resolved"
+                resolved_string = "" if also_resolved else "AND resolved = :resolved"
 
                 if event_type is None:
                     sql = text(
@@ -463,7 +463,7 @@ class PostgresDatabase(Database):
                             "guild_id": self.id,
                             "start": timestamp_start,
                             "end": timestamp_end,
-                            "resolved": resolved,
+                            "resolved": False,
                         },
                     ).fetchall()
                 else:
@@ -485,7 +485,7 @@ class PostgresDatabase(Database):
                             "start": timestamp_start,
                             "end": timestamp_end,
                             "event_type": event_type.event_type,
-                            "resolved": resolved,
+                            "resolved": False,
                         },
                     ).fetchall()
 
@@ -1321,9 +1321,12 @@ class PostgresDatabase(Database):
             timestamp_start: float,
             timestamp_end: float,
             event_type: Optional[Type[Event]] = None,
+            also_resolved: Optional[bool] = True,
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             with self.parent.transaction(parent=con) as sub_con:
+
+                resolved_string = "" if also_resolved else "AND resolved = :resolved"
 
                 if event_type is None:
                     sql = text(
@@ -1332,6 +1335,7 @@ class PostgresDatabase(Database):
                         WHERE guild_id = :guild_id
                         AND timestamp BETWEEN :start AND :end
                         AND player_id = :player_id
+                        {resolved_string}
                         ORDER BY timestamp
                     """
                     )
@@ -1343,6 +1347,7 @@ class PostgresDatabase(Database):
                             "start": timestamp_start,
                             "end": timestamp_end,
                             "player_id": self.id,
+                            "resolved": False,
                         },
                     ).fetchall()
                 else:
@@ -1353,6 +1358,7 @@ class PostgresDatabase(Database):
                         AND timestamp BETWEEN :start AND :end
                         AND player_id = :player_id
                         AND event_type LIKE :event_type
+                        {resolved_string}
                         ORDER BY timestamp
                     """
                     )
@@ -1365,6 +1371,7 @@ class PostgresDatabase(Database):
                             "end": timestamp_end,
                             "player_id": self.id,
                             "event_type": event_type.event_type,
+                            "resolved": False,
                         },
                     ).fetchall()
 
