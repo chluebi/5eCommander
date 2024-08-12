@@ -1,4 +1,4 @@
-from typing import Optional, Any, List, cast, TYPE_CHECKING, Tuple
+from typing import Optional, Any, List, cast, TYPE_CHECKING, Tuple, Type
 
 import os
 import sys
@@ -17,7 +17,11 @@ from src.database.postgres import PostgresDatabase
 from src.core.base_types import Event
 from src.core.exceptions import GuildNotFound, PlayerNotFound
 from src.definitions.start_condition import start_condition
-from src.event_resolver.resolver import KeepAlive, listen_to_notifications, add_notification_function
+from src.event_resolver.resolver import (
+    KeepAlive,
+    listen_to_notifications,
+    add_notification_function,
+)
 
 
 if TYPE_CHECKING:
@@ -25,6 +29,15 @@ if TYPE_CHECKING:
 
 
 handler_lock = asyncio.Lock()
+
+
+banned_events: List[Type[Event]] = [
+    PostgresDatabase.Player.PlayerCardRechargeEvent,
+    PostgresDatabase.Player.PlayerMagicRechargeEvent,
+    PostgresDatabase.Player.PlayerOrderRechargeEvent,
+    PostgresDatabase.Player.PlayerDrawEvent,
+    PostgresDatabase.Player.PlayerGainEvent,
+]
 
 
 class EventHandler(commands.Cog):
@@ -38,7 +51,6 @@ class EventHandler(commands.Cog):
     async def cog_unload(self) -> None:
         self.event_handler_loop.cancel()
 
-
     async def event_handler(self, connection: Any, pid: Any, channel: Any, payload: str) -> None:
 
         embeds_to_send: List[Tuple[discord.Embed, discord.PartialMessageable]] = []
@@ -48,7 +60,7 @@ class EventHandler(commands.Cog):
             for guild_db in self.bot.db.get_guilds():
 
                 with self.bot.db.transaction() as con:
-                    
+
                     events = guild_db.get_events(0, time.time(), resolved=False, con=con)
 
                     event_cache = {event.id: event for event in events}
@@ -67,19 +79,25 @@ class EventHandler(commands.Cog):
                             valid_events.append(event)
                             root_events.append(event)
 
-                    def build_tree(event: Event, depth: int, parent_tree: List[Tuple[Event, List[Any]]], max_depth: int = 3) -> None:
+                    def build_tree(
+                        event: Event,
+                        depth: int,
+                        parent_tree: List[Tuple[Event, List[Any]]],
+                        max_depth: int = 3,
+                    ) -> None:
                         if depth > max_depth:
                             parent_tree.append((event, []))
                             return
-                        
+
                         current_branch: List[Any] = []
                         parent_tree.append((event, current_branch))
-                        
+
                         for child in event_children[event.id]:
                             build_tree(child, depth + 1, current_branch)
 
-
-                    flat_event_tree: dict[int, List[Tuple[Event, Any]]] = {event.id: [] for event in events}
+                    flat_event_tree: dict[int, List[Tuple[Event, Any]]] = {
+                        event.id: [] for event in events
+                    }
                     for root_event in root_events:
                         build_tree(root_event, 1, flat_event_tree[root_event.id])
 
@@ -90,15 +108,19 @@ class EventHandler(commands.Cog):
                         guild = await self.bot.fetch_guild(guild_db.id)
                     except discord.NotFound:
                         continue
-                    
+
                     channel = guild.get_channel_or_thread(channel_id)
 
                     if channel is None:
-                        channels = await guild.fetch_channels() # very inefficient but sometimes the only thing that works
+                        channels = (
+                            await guild.fetch_channels()
+                        )  # very inefficient but sometimes the only thing that works
                         channel = discord.utils.get(channels, id=channel_id)
 
                     if channel is None:
-                        threads = await guild.active_threads() # very inefficient but sometimes the only thing that works
+                        threads = (
+                            await guild.active_threads()
+                        )  # very inefficient but sometimes the only thing that works
                         channel = discord.utils.get(threads, id=channel_id)
 
                     if channel is None:
@@ -109,17 +131,26 @@ class EventHandler(commands.Cog):
 
                         root_event = event_cache[root_event_id]
 
+                        allowed = True
+                        for banned_event_type in banned_events:
+                            if isinstance(root_event, banned_event_type):
+                                allowed = False
+                                break
+
+                        if not allowed:
+                            continue
+
                         event_text = root_event.text()
                         embed = standard_embed("Event Triggered", event_text)
 
                         for child, grandchildren in children:
                             child_title = child.text()
-                            child_text = ''
+                            child_text = ""
                             for grandchild in grandchildren:
-                                child_text += f'- {cast(Event, grandchild).text()}\n'
-                            
-                            if child_text == '':
-                                event_text += f'- {child.text()}\n'
+                                child_text += f"- {cast(Event, grandchild).text()}\n"
+
+                            if child_text == "":
+                                event_text += f"- {child.text()}\n"
                             else:
                                 embed.add_field(name=child_title, value=child_text)
 
@@ -135,8 +166,7 @@ class EventHandler(commands.Cog):
             cast_channel = cast(discord.PartialMessageable, channel)
 
             await cast_channel.send(embed=embed)
-            await asyncio.sleep(2) # rate limit
-
+            await asyncio.sleep(2)  # rate limit
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:
@@ -155,13 +185,10 @@ class EventHandler(commands.Cog):
         )
         await listener_task
 
-
     @tasks.loop(seconds=3, reconnect=True)
     async def event_handler_loop(self) -> None:
         await self.bot.wait_until_ready()
         await self.event_handler(None, None, None, "0")
-
-
 
 
 async def setup(bot: "Bot") -> None:
