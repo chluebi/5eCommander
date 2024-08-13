@@ -201,8 +201,9 @@ class PlayerAdmin(commands.Cog):
                 )
             )
 
+
     @play.autocomplete("card")
-    async def card_in_hand_autocomplete(
+    async def play_card_in_hand_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> List[discord.app_commands.Choice[int]]:
         assert interaction.guild is not None
@@ -257,6 +258,55 @@ class PlayerAdmin(commands.Cog):
             for r in filtered_regions
             if r.text().startswith(current)
         ]
+    
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def campaign(self, ctxt: commands.Context["Bot"], card: int) -> None:
+        """Play a creature to the campaign. Creature is out of deck until campaign ends."""
+
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+            player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+            creatures = player_db.get_hand(con=con)
+            creature_db = [c for c in creatures if c.id == card][0]
+
+            player_db.play_creature_to_campaign(creature_db, con=con)
+
+            await ctxt.send(
+                embed=success_embed(
+                    "Creature Campaigned",
+                    f"Successfully sent {creature_db.text()} to campaign",
+                )
+            )
+            
+
+    @campaign.autocomplete("card")
+    async def campaign_card_in_hand_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+        guild_db = self.bot.db.get_guild(interaction.guild.id)
+        player_db = guild_db.get_player(interaction.user.id)
+        creatures = player_db.get_hand()
+
+        return [
+            discord.app_commands.Choice(
+                name=(
+                    f"{c.text()}: {c.creature.campaign_ability_effect_full_text()}"
+                    if c.creature.campaign_ability_effect_full_text()
+                    else c.text()
+                ),
+                value=c.id,
+            )
+            for c in creatures
+            if c.text().startswith(current)
+        ]
+    
 
 
 async def setup(bot: "Bot") -> None:

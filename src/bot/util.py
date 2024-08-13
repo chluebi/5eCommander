@@ -123,7 +123,7 @@ def player_embed(
     )
     campaign_text += "\n" + "\n".join(
         [
-            f"{c.text()}: {i} {resource_to_emoji(Resource.STRENGTH)}" if i > 0 else str(c)
+            f"{c.text()}: {i} {resource_to_emoji(Resource.STRENGTH)}" if i > 0 else c.text()
             for c, i in campaign
         ]
     )
