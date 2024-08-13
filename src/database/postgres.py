@@ -1052,7 +1052,8 @@ class PostgresDatabase(Database):
                 )
 
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                sub_con.add_event(
+                # add directly to parent instead of connection
+                self.parent.add_event(
                     Database.Region.RegionRechargeEvent(
                         self.parent, event_id, until, None, self.guild, self.id
                     ),

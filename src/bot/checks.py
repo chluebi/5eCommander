@@ -34,6 +34,8 @@ async def guild_exists(ctxt: commands.Context["Bot"]) -> bool:
             "Guild has not been initialised. Ask an administrator to initialise the guild."
         )
 
+    ctxt.bot.channel_cache[ctxt.channel.id] = cast(discord.PartialMessageable, ctxt.channel)
+
     return True
 
 

@@ -573,6 +573,10 @@ class Database:
         def __repr__(self) -> str:
             return f"<DatabaseRegion: {self.region} in {self.guild}, status: {self.occupied()}>"
 
+        def text(self) -> str:
+            assert self.region.category is not None
+            return f"{self.region.name} {self.region.category.emoji}"
+
         def occupy(
             self,
             creature: Database.Creature,
@@ -625,13 +629,14 @@ class Database:
                 return json.dumps({"region_id": self.region_id})
 
             def text(self) -> str:
-                return f"{self.region_id} has recharged"
+                return f"<region:{self.region_id}> has recharged"
 
             def resolve(
                 self,
                 con: Optional[Database.TransactionManager] = None,
             ) -> None:
-                self.guild.get_region(self.region_id).unoccupy(self.timestamp, con=con)
+                self.guild = cast(Database.Guild, self.guild)
+                self.guild.get_region(self.region_id).unoccupy(int(self.timestamp), con=con)
 
     class Player:
 
@@ -1780,15 +1785,16 @@ class Database:
                 return json.dumps({"creature_id": self.creature_id})
 
             def text(self) -> str:
-                return "{creature_id} has recharged"
+                return f"<creature:{self.creature_id}> has recharged"
 
             def resolve(
                 self,
                 con: Optional[Database.TransactionManager] = None,
             ) -> None:
                 with self.parent.transaction(parent=con) as sub_con:
-                    creature = self.guild.get_creature(self.creature_id)
-                    creature.owner.recharge_creature(creature)
+                    self.guild = cast(Database.Guild, self.guild)
+                    creature = self.guild.get_creature(self.creature_id, con=sub_con)
+                    creature.owner.recharge_creature(creature, con=sub_con)
 
     class FreeCreature:
 

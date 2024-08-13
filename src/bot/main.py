@@ -46,6 +46,7 @@ class Bot(commands.Bot):
         self.initial_extensions = initial_extensions
         self.db = connect_to_db()
         self.logger = logger
+        self.channel_cache: dict[int, discord.PartialMessageable] = {}
 
     async def setup_hook(self) -> None:
         pass

@@ -37,8 +37,11 @@ banned_events: List[Type[Event]] = [
     PostgresDatabase.Player.PlayerCardRechargeEvent,
     PostgresDatabase.Player.PlayerMagicRechargeEvent,
     PostgresDatabase.Player.PlayerOrderRechargeEvent,
-    # PostgresDatabase.Player.PlayerDrawEvent,
-    # PostgresDatabase.Player.PlayerGainEvent,
+    PostgresDatabase.Player.PlayerCardRechargedEvent,
+    PostgresDatabase.Player.PlayerMagicRechargedEvent,
+    PostgresDatabase.Player.PlayerOrderRechargedEvent,
+    PostgresDatabase.Player.PlayerDrawEvent,
+    PostgresDatabase.Player.PlayerGainEvent,
 ]
 
 
@@ -77,6 +80,9 @@ class EventHandler(commands.Cog):
                         key=lambda x: x.id,
                     )
 
+                    if events == []:
+                        continue
+
                     event_cache = {event.id: event for event in events}
                     event_children: dict[int, List[Event]] = {event.id: [] for event in events}
                     valid_events: List[Event] = []
@@ -88,6 +94,12 @@ class EventHandler(commands.Cog):
                             if event.parent_event_id in event_children:
                                 event_children[event.parent_event_id].append(event)
                                 valid_events.append(event)
+
+                            if event.timestamp + 60 < time.time():
+                                # this is a sanity check where basically we count something as a root event if should've happened a minute ago
+                                # we assume the parent isnt arriving
+                                valid_events.append(event)
+                                root_events.append(event)
 
                         else:
                             valid_events.append(event)
@@ -122,7 +134,12 @@ class EventHandler(commands.Cog):
                     except discord.NotFound:
                         continue
 
-                    channel = guild.get_channel_or_thread(channel_id)
+                    t = time.time()
+
+                    channel = self.bot.channel_cache.get(channel_id)
+
+                    if channel is None:
+                        channel = guild.get_channel_or_thread(channel_id)
 
                     if channel is None:
                         threads = (
@@ -139,6 +156,8 @@ class EventHandler(commands.Cog):
                     if channel is None:
                         self.bot.logger.error("channel is none still")
                         continue
+
+                    self.bot.channel_cache[channel_id] = channel
 
                     for root_event_id, children in flat_event_tree.items():
 

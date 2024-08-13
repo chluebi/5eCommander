@@ -9,6 +9,7 @@ import traceback
 import sqlalchemy
 import sqlalchemy.exc
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from src.bot.setup_logging import logger, setup_logging
@@ -172,6 +173,90 @@ class PlayerAdmin(commands.Cog):
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         await ctxt.send(embed=regions_embed(guild_db))
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def play(self, ctxt: commands.Context["Bot"], card: int, region: int) -> None:
+        """Uses a order to play a card to a region"""
+
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+            player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+            creatures = player_db.get_hand(con=con)
+            creature_db = [c for c in creatures if c.id == card][0]
+
+            regions = guild_db.get_regions(con=con)
+            region_db = [r for r in regions if r.id == region][0]
+
+            player_db.play_creature_to_region(creature_db, region_db, con=con)
+
+            await ctxt.send(
+                embed=success_embed(
+                    "Creature Played",
+                    f"Successfully played {creature_db.text()} to {region_db.text()}",
+                )
+            )
+
+    @play.autocomplete("card")
+    async def card_in_hand_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+        guild_db = self.bot.db.get_guild(interaction.guild.id)
+        player_db = guild_db.get_player(interaction.user.id)
+        creatures = player_db.get_hand()
+
+        return [
+            discord.app_commands.Choice(
+                name=(
+                    f"{c.text()}: {c.creature.quest_ability_effect_full_text()}"
+                    if c.creature.quest_ability_effect_full_text()
+                    else c.text()
+                ),
+                value=c.id,
+            )
+            for c in creatures
+            if c.text().startswith(current)
+        ]
+
+    @play.autocomplete("region")
+    async def region_to_play_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+
+        guild_db = self.bot.db.get_guild(interaction.guild.id)
+        regions = guild_db.get_regions()
+        regions = [r for r in regions if r.occupied() == (None, None)]
+
+        creature_id = cast(int, interaction.namespace["card"])
+        if creature_id != 0:
+            player_db = guild_db.get_player(interaction.user.id)
+            creatures = player_db.get_hand()
+            creatures_filtered = [c for c in creatures if c.id == creature_id]
+            if len(creatures_filtered) < 1:
+                filtered_regions = regions
+            else:
+                creature = creatures_filtered[0]
+                filtered_regions = [
+                    r
+                    for r in regions
+                    if r.region.category in creature.creature.quest_region_categories
+                ]
+        else:
+            filtered_regions = regions
+
+        return [
+            discord.app_commands.Choice(
+                name=f"{r.text()}: {r.region.quest_effect_full_text()}", value=r.id
+            )
+            for r in filtered_regions
+            if r.text().startswith(current)
+        ]
 
 
 async def setup(bot: "Bot") -> None:
