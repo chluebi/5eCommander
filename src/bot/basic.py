@@ -20,6 +20,7 @@ from src.bot.util import (
     error_embed,
     player_embed,
     regions_embed,
+    conflict_embed,
 )
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
@@ -103,6 +104,28 @@ class GuildAdmin(commands.Cog):
             )
         )
 
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(guild_exists)
+    async def map(self, ctxt: commands.Context["Bot"]) -> None:
+        """Gives you info about the locations in the game"""
+
+        assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
+
+        await ctxt.send(embed=regions_embed(guild_db))
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(guild_exists)
+    async def conflict(self, ctxt: commands.Context["Bot"]) -> None:
+        """Gives you info about the current conflict in the guild"""
+
+        assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
+
+        await ctxt.send(embed=conflict_embed(guild_db))
+
 
 class PlayerAdmin(commands.Cog):
 
@@ -166,17 +189,6 @@ class PlayerAdmin(commands.Cog):
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
-    async def map(self, ctxt: commands.Context["Bot"]) -> None:
-        """Gives you info about the locations in the game"""
-
-        assert ctxt.guild is not None
-        guild_db = self.bot.db.get_guild(ctxt.guild.id)
-
-        await ctxt.send(embed=regions_embed(guild_db))
-
-    @commands.hybrid_command()  # type: ignore
-    @commands.guild_only()
-    @commands.check(player_exists)
     async def play(self, ctxt: commands.Context["Bot"], card: int, region: int) -> None:
         """Uses a order to play a card to a region"""
 
@@ -200,7 +212,6 @@ class PlayerAdmin(commands.Cog):
                     f"Successfully played {creature_db.text()} to {region_db.text()}",
                 )
             )
-
 
     @play.autocomplete("card")
     async def play_card_in_hand_autocomplete(
@@ -258,7 +269,6 @@ class PlayerAdmin(commands.Cog):
             for r in filtered_regions
             if r.text().startswith(current)
         ]
-    
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
@@ -283,7 +293,6 @@ class PlayerAdmin(commands.Cog):
                     f"Successfully sent {creature_db.text()} to campaign",
                 )
             )
-            
 
     @campaign.autocomplete("card")
     async def campaign_card_in_hand_autocomplete(
@@ -306,7 +315,6 @@ class PlayerAdmin(commands.Cog):
             for c in creatures
             if c.text().startswith(current)
         ]
-    
 
 
 async def setup(bot: "Bot") -> None:

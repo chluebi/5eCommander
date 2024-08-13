@@ -15,6 +15,7 @@ start_condition = Database.StartCondition(
         "creature_recharge": 10,
         "free_protection": 30,
         "free_expire": 180,
+        "conflict_duration": 60,
     },
     [Village(), SmallMine()],
     [Commoner()],

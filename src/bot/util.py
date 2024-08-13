@@ -2,6 +2,7 @@ from typing import Any, Union, List, cast
 
 import asyncio
 import os
+import time
 from collections import defaultdict
 
 from discord import Embed, Color
@@ -163,12 +164,47 @@ def regions_embed(guild_db: Database.Guild) -> discord.Embed:
 
             if creature is not None and timestamp is not None:
                 r_text = f"~~{r_text}~~"
-                r_text += (
-                    f" (occupied by {creature.text()} until {get_relative_timestamp(timestamp)})"
-                )
+                r_text += f" ({get_relative_timestamp(timestamp)})"
 
             rc_text += f"{r_text}\n\n"
 
         embed.add_field(name=str(rc.name).capitalize(), value=rc_text)
+
+    return embed
+
+
+def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
+
+    conflict_text = ""
+
+    end_events = guild_db.get_events(
+        time.time(), time.time() * 2, Database.Guild.ConflictEndEvent, also_resolved=False
+    )
+    if end_events != []:
+        end_event = end_events[0]
+        conflict_text += f"Ends in {get_relative_timestamp(end_event.timestamp)}\n"
+
+    player_scores: dict[int, int] = {}
+    players = guild_db.get_players()
+    player_cache = {p.id: p for p in players}
+
+    if len(players) > 0:
+        for player_db in guild_db.get_players():
+            player_strength = 0
+            for c, s in player_db.get_campaign():
+                player_strength += s
+
+            player_scores[player_db.id] = player_strength
+
+        sorted_scores = sorted(player_scores.items(), key=lambda x: x[1], reverse=True)
+        for i, (p_id, strength) in enumerate(sorted_scores, 1):
+            conflict_text += (
+                f"#{i} <player:{p_id}>: {strength} {resource_to_emoji(Resource.STRENGTH)}\n"
+            )
+
+    else:
+        conflict_text = "No players currently playing"
+
+    embed = standard_embed("Conflict", conflict_text)
 
     return embed

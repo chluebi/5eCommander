@@ -15,6 +15,7 @@ from src.core.base_types import (
     RegionCategory,
     resource_changes_to_string,
     resource_changes_to_short_string,
+    resource_to_emoji,
 )
 from src.core.exceptions import (
     MissingExtraData,
@@ -269,7 +270,9 @@ class Database:
         ) -> Database.Player:
             assert False
 
-        def get_players(self) -> List[Database.Player]:
+        def get_players(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.Player]:
             assert False
 
         def get_player(
@@ -509,6 +512,186 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> has left"
+
+        class ConflictStartEvent(Event):
+
+            event_type = "conflict_start"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.ConflictStartEvent:
+                return Database.Guild.ConflictStartEvent(
+                    parent, id, timestamp, parent_event_id, guild
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({})
+
+            def text(self) -> str:
+                return f"A new conflict has started!"
+
+            def resolve(self, con: Any) -> None:
+
+                con = cast(Database.TransactionManager, con)
+                self.parent = cast(Database, self.parent)
+                self.guild = cast(Database.Guild, self.guild)
+
+                with self.parent.transaction(parent=con) as sub_con:
+
+                    until = self.parent.timestamp_after(
+                        self.guild.get_config(con=sub_con)["conflict_duration"]
+                    )
+
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    # add directly to parent instead of connection
+                    self.parent.add_event(
+                        Database.Guild.ConflictEndEvent(
+                            self.parent, event_id, until, None, self.guild
+                        ),
+                    )
+
+        class ConflictEndEvent(Event):
+
+            event_type = "conflict_end"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.ConflictEndEvent:
+                return Database.Guild.ConflictEndEvent(
+                    parent, id, timestamp, parent_event_id, guild
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({})
+
+            def text(self) -> str:
+                return f"The conflict has ended, all campaigning creatures are returned."
+
+            def resolve(self, con: Any) -> None:
+
+                con = cast(Database.TransactionManager, con)
+                self.parent = cast(Database, self.parent)
+                self.guild = cast(Database.Guild, self.guild)
+
+                with self.parent.transaction(parent=con) as sub_con:
+
+                    player_scores: dict[int, int] = {}
+                    players = self.guild.get_players(con=sub_con)
+
+                    if len(players) > 0:
+
+                        for player_db in self.guild.get_players(con=sub_con):
+
+                            player_strength = 0
+
+                            for c, s in player_db.get_campaign(con=sub_con):
+                                player_db.uncampaign_creature(c, con=sub_con)
+                                player_strength += s
+
+                            player_scores[player_db.id] = player_strength
+
+                        event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                        # add directly to parent instead of connection
+                        sub_con.add_event(
+                            Database.Guild.ConflictResultEvent(
+                                self.parent,
+                                event_id,
+                                time.time(),
+                                None,
+                                self.guild,
+                                list(
+                                    map(
+                                        list,
+                                        sorted(
+                                            player_scores.items(), key=lambda x: x[1], reverse=True
+                                        ),
+                                    )
+                                ),
+                            ),
+                        )
+
+                    event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                    # add directly to parent instead of connection
+                    sub_con.add_event(
+                        Database.Guild.ConflictStartEvent(
+                            self.parent, event_id, time.time(), None, self.guild
+                        ),
+                    )
+
+        class ConflictResultEvent(Event):
+
+            event_type = "conflict_result"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                scores: List[List[int]],
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+                self.scores = scores
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.ConflictResultEvent:
+                return Database.Guild.ConflictResultEvent(
+                    parent, id, timestamp, parent_event_id, guild, extra_data["scores"]
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"scores": self.scores})
+
+            def text(self) -> str:
+                winner, winner_strength = cast(Tuple[int, int], tuple(self.scores[0]))
+                winner_text = f"<player:{winner}> has won"
+                ranking_text = "\n".join(
+                    [
+                        f"#{i} <player:{p}>: {score} {resource_to_emoji(Resource.STRENGTH)}"
+                        for i, (p, score) in enumerate(self.scores, 1)
+                    ]
+                )
+                return f"**{winner_text}**\n\n{ranking_text}"
 
     class BaseRegion:
 
@@ -1002,6 +1185,13 @@ class Database:
             self,
             creature: Database.Creature,
             strength: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            pass
+
+        def uncampaign_creature(
+            self,
+            creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
@@ -2081,6 +2271,9 @@ event_classes: list[type[Event]] = [
     Database.Guild.RegionRemovedEvent,
     Database.Guild.PlayerAddedEvent,
     Database.Guild.PlayerRemovedEvent,
+    Database.Guild.ConflictStartEvent,
+    Database.Guild.ConflictEndEvent,
+    Database.Guild.ConflictResultEvent,
     Database.Region.RegionRechargeEvent,
     Database.Creature.CreatureRechargeEvent,
     Database.FreeCreature.FreeCreatureProtectedEvent,

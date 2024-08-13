@@ -395,6 +395,12 @@ class PostgresDatabase(Database):
             for base_creature in self.start_condition.start_available_creatures:
                 guild.add_to_creature_pool(base_creature, con=sub_con)
 
+            sub_con.add_event(
+                Database.Guild.ConflictStartEvent(
+                    self, self.fresh_event_id(guild, con=sub_con), time.time(), None, guild
+                )
+            )
+
         return guild
 
     def get_guilds(self, con: Optional[Database.TransactionManager] = None) -> List[Database.Guild]:
@@ -1580,6 +1586,27 @@ class PostgresDatabase(Database):
                         "creature_id": creature.id,
                         "strength": strength,
                     },
+                )
+
+        def uncampaign_creature(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    "DELETE FROM campaign WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+                sql = text(
+                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
 
         def add_to_discard(
