@@ -12,7 +12,14 @@ import discord
 from discord.ext import commands
 
 from src.bot.setup_logging import logger, setup_logging
-from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed, player_embed
+from src.bot.util import (
+    DEVELOPMENT_GUILD,
+    standard_embed,
+    success_embed,
+    error_embed,
+    player_embed,
+    regions_embed,
+)
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
@@ -154,6 +161,17 @@ class PlayerAdmin(commands.Cog):
         assert isinstance(ctxt.author, discord.Member)
 
         await ctxt.send(embed=player_embed(ctxt.author, player_db, private=False), ephemeral=True)
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def map(self, ctxt: commands.Context["Bot"]) -> None:
+        """Gives you info about the locations in the game"""
+
+        assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
+
+        await ctxt.send(embed=regions_embed(guild_db))
 
 
 async def setup(bot: "Bot") -> None:

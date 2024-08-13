@@ -119,9 +119,9 @@ def resource_changes_to_string(
 
 def resource_change_to_short_string(resource_change: Union[Price | Gain]) -> str:
     if isinstance(resource_change, Gain):
-        change_text = "+{0}{1}"
+        change_text = "+{0} {1}"
     elif isinstance(resource_change, Price):
-        change_text = "-{0}{1}"
+        change_text = "-{0} {1}"
 
     return change_text.format(resource_change.amount, resource_to_emoji(resource_change.resource))
 

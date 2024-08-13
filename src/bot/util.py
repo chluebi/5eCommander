@@ -1,7 +1,8 @@
-from typing import Any, Union
+from typing import Any, Union, List, cast
 
 import asyncio
 import os
+from collections import defaultdict
 
 from discord import Embed, Color
 from discord import DMChannel, TextChannel
@@ -9,7 +10,8 @@ import discord
 from discord.ext import commands
 
 from src.database.database import Database
-from src.core.base_types import Resource, resource_to_emoji, Event, BaseResources
+from src.core.base_types import Resource, resource_to_emoji, Event, BaseResources, RegionCategory
+from src.definitions.regions import region_categories
 
 
 DEVELOPMENT_GUILD = discord.Object(id=int(os.environ["DEVELOPMENT_GUILD_ID"]))
@@ -136,5 +138,37 @@ def player_embed(
         embed.add_field(name="Played", value=played_text)
     if campaign_text:
         embed.add_field(name="Campaign", value=campaign_text)
+
+    return embed
+
+
+def regions_embed(guild_db: Database.Guild) -> discord.Embed:
+
+    regions = sorted(guild_db.get_regions(), key=lambda x: x.id)
+    regions_cache = {r.id: r for r in regions}
+    regions_occupied = {r.id: r.occupied() for r in regions}
+
+    region_categories: defaultdict[RegionCategory, List[int]] = defaultdict(lambda: [])
+    for r in regions:
+        assert r.region.category is not None
+        region_categories[r.region.category].append(r.id)
+
+    embed = standard_embed("Map", "All locations")
+
+    for rc, sub_regions in region_categories.items():
+        rc_text = ""
+        for rid in sub_regions:
+            creature, timestamp = regions_occupied[rid]
+            r_text = f"{regions_cache[rid].region.name}:  **{regions_cache[rid].region.quest_effect_short_text()}**"
+
+            if creature is not None and timestamp is not None:
+                r_text = f"~~{r_text}~~"
+                r_text += (
+                    f" (occupied by {creature.text()} until {get_relative_timestamp(timestamp)})"
+                )
+
+            rc_text += f"{r_text}\n\n"
+
+        embed.add_field(name=str(rc.name).capitalize(), value=rc_text)
 
     return embed
