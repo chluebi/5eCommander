@@ -103,13 +103,16 @@ class Database:
             assert False
 
         def add_event(self, event: Event) -> None:
+
             if self.parent_manager:
+
                 parent = self.parent_manager
                 while parent.events == [] and parent.parent_manager:
                     parent = parent.parent_manager
 
                 if parent.events != [] and event.parent_event_id is None:
                     event.parent_event_id = parent.events[-1].id
+
             self.events.append(event)
 
         def get_events(self) -> List[Event]:
@@ -1382,7 +1385,20 @@ class Database:
                     player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
                     guild_config = self.guild.get_config(con=sub_con)
                     player_orders = player.get_resources(con=sub_con)[Resource.ORDERS]
+
                     if player_orders + 1 <= guild_config["max_orders"]:
+
+                        sub_con.add_event(
+                            Database.Player.PlayerOrderRechargedEvent(
+                                self.parent,
+                                self.parent.fresh_event_id(self.guild, con=sub_con),
+                                time.time(),
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
+
                         player.gain([Gain(resource=Resource.ORDERS, amount=1)], con=sub_con)
 
                     if (
@@ -1404,6 +1420,29 @@ class Database:
                                 self.player_id,
                             ),
                         )
+
+        class PlayerOrderRechargedEvent(PlayerOrderRechargeEvent):
+
+            event_type = "player_order_recharged"
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerOrderRechargedEvent:
+                return Database.Player.PlayerOrderRechargedEvent(
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
+                )
+
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                pass
 
         class PlayerMagicRechargeEvent(Event):
 
@@ -1448,7 +1487,20 @@ class Database:
                     player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
                     guild_config = self.guild.get_config(con=sub_con)
                     player_magic = player.get_resources(con=sub_con)[Resource.MAGIC]
+
                     if player_magic + 1 <= guild_config["max_magic"]:
+
+                        sub_con.add_event(
+                            Database.Player.PlayerMagicRechargedEvent(
+                                self.parent,
+                                self.parent.fresh_event_id(self.guild, con=sub_con),
+                                time.time(),
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
+
                         player.gain([Gain(resource=Resource.MAGIC, amount=1)], con=sub_con)
 
                     if (
@@ -1470,6 +1522,29 @@ class Database:
                                 self.player_id,
                             ),
                         )
+
+        class PlayerMagicRechargedEvent(PlayerMagicRechargeEvent):
+
+            event_type = "player_magic_recharged"
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerMagicRechargedEvent:
+                return Database.Player.PlayerMagicRechargedEvent(
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
+                )
+
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                pass
 
         class PlayerCardRechargeEvent(Event):
 
@@ -1513,7 +1588,21 @@ class Database:
                 with self.parent.transaction(parent=con) as sub_con:
                     player: Database.Player = self.guild.get_player(self.player_id, con=sub_con)
                     guild_config = self.guild.get_config(con=sub_con)
-                    player.draw_cards(1, con=sub_con)
+
+                    if len(player.get_hand(con=sub_con)) < guild_config["max_cards"]:
+
+                        sub_con.add_event(
+                            Database.Player.PlayerCardRechargedEvent(
+                                self.parent,
+                                self.parent.fresh_event_id(self.guild, con=sub_con),
+                                time.time(),
+                                None,
+                                self.guild,
+                                self.player_id,
+                            ),
+                        )
+
+                        player.draw_cards(1, con=sub_con)
 
                     if (
                         len(
@@ -1534,6 +1623,29 @@ class Database:
                                 self.player_id,
                             ),
                         )
+
+        class PlayerCardRechargedEvent(PlayerCardRechargeEvent):
+
+            event_type = "player_card_recharged"
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerCardRechargedEvent:
+                return Database.Player.PlayerCardRechargedEvent(
+                    parent, id, timestamp, parent_event_id, guild, extra_data["player_id"]
+                )
+
+            def resolve(
+                self,
+                con: Optional[Database.TransactionManager] = None,
+            ) -> None:
+                pass
 
     class BaseCreature:
 
@@ -1974,6 +2086,9 @@ event_classes: list[type[Event]] = [
     Database.Player.PlayerPlayToCampaignEvent,
     Database.FreeCreature.FreeCreatureClaimedEvent,
     Database.Player.PlayerOrderRechargeEvent,
+    Database.Player.PlayerOrderRechargedEvent,
     Database.Player.PlayerMagicRechargeEvent,
+    Database.Player.PlayerMagicRechargedEvent,
     Database.Player.PlayerCardRechargeEvent,
+    Database.Player.PlayerCardRechargedEvent,
 ]

@@ -34,9 +34,9 @@ waiting_lock = asyncio.Lock()
 
 
 banned_events: List[Type[Event]] = [
-    # PostgresDatabase.Player.PlayerCardRechargeEvent,
-    # PostgresDatabase.Player.PlayerMagicRechargeEvent,
-    # PostgresDatabase.Player.PlayerOrderRechargeEvent,
+    PostgresDatabase.Player.PlayerCardRechargeEvent,
+    PostgresDatabase.Player.PlayerMagicRechargeEvent,
+    PostgresDatabase.Player.PlayerOrderRechargeEvent,
     # PostgresDatabase.Player.PlayerDrawEvent,
     # PostgresDatabase.Player.PlayerGainEvent,
 ]
@@ -103,14 +103,13 @@ class EventHandler(commands.Cog):
                             parent_tree.append((event, []))
                             return
 
-                        current_branch: List[Any] = []
-                        parent_tree.append((event, current_branch))
-
                         for child in event_children[event.id]:
-                            build_tree(child, depth + 1, current_branch)
+                            child_tree: List[Tuple[Event, List[Any]]] = []
+                            parent_tree.append((child, child_tree))
+                            build_tree(child, depth + 1, child_tree)
 
                     flat_event_tree: dict[int, List[Tuple[Event, Any]]] = {
-                        event.id: [] for event in events
+                        event.id: [] for event in root_events
                     }
                     for root_event in root_events:
                         build_tree(root_event, 1, flat_event_tree[root_event.id])
@@ -141,34 +140,36 @@ class EventHandler(commands.Cog):
                         self.bot.logger.error("channel is none still")
                         continue
 
-                    print("flat event tree", flat_event_tree)
-
                     for root_event_id, children in flat_event_tree.items():
 
                         root_event = event_cache[root_event_id]
 
                         allowed = True
                         for banned_event_type in banned_events:
-                            if isinstance(root_event, banned_event_type):
+                            if root_event.event_type == banned_event_type.event_type:
                                 allowed = False
                                 break
 
                         if not allowed:
                             continue
 
-                        event_text = root_event.text()
-                        embed = standard_embed(f"Event Triggered #{root_event.id}", event_text)
+                        event_text = root_event.text() + "\n"
 
+                        fields: List[Tuple[str, str]] = []
                         for child, grandchildren in children:
                             child_title = child.text()
                             child_text = ""
-                            for grandchild in grandchildren:
+                            for grandchild, _ in grandchildren:
                                 child_text += f"- {cast(Event, grandchild).text()}\n"
 
                             if child_text == "":
                                 event_text += f"- {child.text()}\n"
                             else:
-                                embed.add_field(name=child_title, value=child_text)
+                                fields.append((child_title, child_text))
+
+                        embed = standard_embed(f"Event Triggered #{root_event.id}", event_text)
+                        for name, value in fields:
+                            embed.add_field(name=name, value=value)
 
                         embeds_to_send.append((embed, channel))
 
