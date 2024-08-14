@@ -305,6 +305,11 @@ class Database:
         ) -> List[Database.Creature]:
             assert False
 
+        def get_basecreatures(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.BaseCreature]:
+            assert False
+
         def get_creature(
             self,
             creature_id: int,
@@ -1860,6 +1865,10 @@ class Database:
                 return str(self) == str(other)
             return False
 
+        def text(self) -> str:
+            region_category_string = " ".join([r.emoji for r in self.quest_region_categories])
+            return f"{self.name.capitalize()}  {region_category_string}"
+
         # questing
         def quest_ability_effect_short_text(self) -> str:
             return ""
@@ -1937,10 +1946,7 @@ class Database:
             return f"<DatabaseCreature: {self.creature} in {self.guild} as {self.id} owned by {self.owner}>"
 
         def text(self) -> str:
-            region_category_string = " ".join(
-                [r.emoji for r in self.creature.quest_region_categories]
-            )
-            return f"{self.creature.name}  {region_category_string}"
+            return self.creature.text()
 
         class CreatureRechargeEvent(Event):
 

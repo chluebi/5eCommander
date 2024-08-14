@@ -13,7 +13,7 @@ import sqlalchemy.exc
 import discord
 from discord.ext import commands, tasks
 
-from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed
+from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed, format_embed
 from src.database.postgres import PostgresDatabase
 from src.core.base_types import Event
 from src.core.exceptions import GuildNotFound, PlayerNotFound
@@ -190,7 +190,7 @@ class EventHandler(commands.Cog):
                         for name, value in fields:
                             embed.add_field(name=name, value=value)
 
-                        embeds_to_send.append((embed, channel))
+                        embeds_to_send.append((format_embed(embed, guild, guild_db), channel))
 
                     for event in valid_events:
                         event.resolve(con=con)

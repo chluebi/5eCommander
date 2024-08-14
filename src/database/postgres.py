@@ -844,6 +844,18 @@ class PostgresDatabase(Database):
                     for row in results
                 ]
 
+        def get_basecreatures(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.BaseCreature]:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    """SELECT DISTINCT base_creature_id FROM creatures WHERE guild_id = :guild_id 
+                    UNION 
+                    SELECT id FROM base_creatures WHERE guild_id = :guild_id"""
+                )
+                results = sub_con.execute(sql, {"guild_id": self.id}).fetchall()
+                return [creatures[row[0]] for row in results]
+
         def get_creature(
             self,
             creature_id: int,

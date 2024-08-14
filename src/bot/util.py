@@ -1,8 +1,9 @@
-from typing import Any, Union, List, cast
+from typing import Any, Union, List, cast, Callable
 
 import asyncio
 import os
 import time
+import re
 from collections import defaultdict
 
 from discord import Embed, Color
@@ -12,6 +13,7 @@ from discord.ext import commands
 
 from src.database.database import Database
 from src.core.base_types import Resource, resource_to_emoji, Event, BaseResources, RegionCategory
+from src.core.exceptions import CreatureNotFound, RegionNotFound
 from src.definitions.regions import region_categories
 
 
@@ -173,6 +175,15 @@ def regions_embed(guild_db: Database.Guild) -> discord.Embed:
     return embed
 
 
+def creature_embed(creature: Database.BaseCreature) -> discord.Embed:
+
+    creature_title = creature.text()
+    creature_text = f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
+    creature_text += f"**When sent to campaign**: {creature.campaign_ability_effect_full_text() if creature.campaign_ability_effect_full_text() else '*no special ability*'}\n"
+
+    return standard_embed(creature_title, creature_text)
+
+
 def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
 
     conflict_text = ""
@@ -208,3 +219,63 @@ def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
     embed = standard_embed("Conflict", conflict_text)
 
     return embed
+
+
+def format_player(id: int, guild: discord.Guild, guild_db: Database.Guild) -> str:
+    return f"<@{id}>"
+
+
+def format_creature(id: int, guild: discord.Guild, guild_db: Database.Guild) -> str:
+    try:
+        return guild_db.get_creature(id).text()
+    except CreatureNotFound:
+        return f"<creature:{id}>"
+
+
+def format_region(id: int, guild: discord.Guild, guild_db: Database.Guild) -> str:
+    try:
+        return guild_db.get_region(id).text()
+    except RegionNotFound:
+        return f"<region:{id}>"
+
+
+format_lookup: dict[str, Callable[[int, discord.Guild, Database.Guild], str]] = {
+    "player": format_player,
+    "creature": format_creature,
+    "region": format_region,
+}
+
+
+def format_str(s: str, guild: discord.Guild, guild_db: Database.Guild) -> str:
+    matches = re.findall(r"<(.+?):(\d+)>", s)
+
+    new_s = s
+
+    for t, id in matches:
+        old = f"<{t}:{id}>"
+
+        formatter = format_lookup.get(t)
+        if formatter is not None:
+            new_s = new_s.replace(old, formatter(id, guild, guild_db))
+
+    return new_s
+
+
+def format_embed(
+    embed: discord.Embed, guild: discord.Guild, guild_db: Database.Guild
+) -> discord.Embed:
+
+    assert embed.title is not None
+    assert embed.description is not None
+
+    embed.title = format_str(embed.title, guild, guild_db)
+    embed.description = format_str(embed.description, guild, guild_db)
+
+    try:
+        for f in embed._fields:
+            f["name"] = format_str(str(f["name"]), guild, guild_db)
+            f["value"] = format_str(str(f["value"]), guild, guild_db)
+
+        return embed
+    except AttributeError:
+        return embed

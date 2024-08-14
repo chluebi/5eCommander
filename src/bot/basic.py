@@ -21,11 +21,14 @@ from src.bot.util import (
     player_embed,
     regions_embed,
     conflict_embed,
+    creature_embed,
+    format_embed,
 )
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
 from src.definitions.start_condition import start_condition
+from src.definitions.creatures import creatures
 
 
 if TYPE_CHECKING:
@@ -313,6 +316,36 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in creatures
+            if c.text().startswith(current)
+        ]
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(guild_exists)
+    async def card(self, ctxt: commands.Context["Bot"], card: int) -> None:
+        """Shows the info about a card"""
+
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            basecreature = creatures[card]
+
+            await ctxt.send(embed=creature_embed(basecreature))
+
+    @card.autocomplete("card")
+    async def card_in_guild_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+        guild_db = self.bot.db.get_guild(interaction.guild.id)
+        basecreatures = guild_db.get_basecreatures()
+
+        return [
+            discord.app_commands.Choice(
+                name=(f"{c.text()}"),
+                value=c.id,
+            )
+            for c in basecreatures
             if c.text().startswith(current)
         ]
 
