@@ -2114,9 +2114,9 @@ class Database:
 
                 return creature
 
-        class FreeCreatureProtectedEvent(Event):
+        class FreeCreatureEvent(Event):
 
-            event_type = "free_creature_protected"
+            event_type = "free_creature_base_event"
 
             def __init__(
                 self,
@@ -2131,6 +2131,41 @@ class Database:
                 super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.channel_id = channel_id
                 self.message_id = message_id
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.FreeCreature.FreeCreatureEvent:
+                assert False
+
+            def extra_data(self) -> str:
+                assert False
+
+            def text(self) -> str:
+                assert False
+
+        class FreeCreatureProtectedEvent(FreeCreatureEvent):
+
+            event_type = "free_creature_protected"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                channel_id: int,
+                message_id: int,
+            ):
+                super().__init__(
+                    parent, id, timestamp, parent_event_id, guild, channel_id, message_id
+                )
 
             @staticmethod
             def from_extra_data(
@@ -2159,7 +2194,7 @@ class Database:
                     f"<free_creature:({self.channel_id},{self.message_id})> is no longer protected"
                 )
 
-        class FreeCreatureExpiresEvent(Event):
+        class FreeCreatureExpiresEvent(FreeCreatureEvent):
 
             event_type = "free_creature_expires"
 
@@ -2173,9 +2208,9 @@ class Database:
                 channel_id: int,
                 message_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event_id, guild)
-                self.channel_id = channel_id
-                self.message_id = message_id
+                super().__init__(
+                    parent, id, timestamp, parent_event_id, guild, channel_id, message_id
+                )
 
             @staticmethod
             def from_extra_data(
@@ -2215,7 +2250,7 @@ class Database:
                     except CreatureNotFound:
                         pass
 
-        class FreeCreatureClaimedEvent(Event):
+        class FreeCreatureClaimedEvent(FreeCreatureEvent):
 
             event_type = "free_creature_claimed"
 
@@ -2231,9 +2266,9 @@ class Database:
                 player_id: int,
                 creature_id: int,
             ):
-                super().__init__(parent, id, timestamp, parent_event_id, guild)
-                self.channel_id = channel_id
-                self.message_id = message_id
+                super().__init__(
+                    parent, id, timestamp, parent_event_id, guild, channel_id, message_id
+                )
                 self.player_id = player_id
                 self.creature_id = creature_id
 
@@ -2269,7 +2304,7 @@ class Database:
                 )
 
             def text(self) -> str:
-                return f"<free_creature:({self.channel_id},{self.message_id})> has been claimed by <player:{self.player_id}>: <creature:{self.creature_id}>"
+                return f"<free_creature:({self.channel_id},{self.message_id})> has been claimed by <player:{self.player_id}>"
 
 
 event_classes: list[type[Event]] = [

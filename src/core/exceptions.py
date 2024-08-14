@@ -1,32 +1,34 @@
 from __future__ import annotations
 from typing import Any, Optional
 
+from discord.ext import commands
 
-class GuildNotFound(Exception):
+
+class GuildNotFound(commands.UserInputError):
     pass
 
 
-class PlayerNotFound(Exception):
+class PlayerNotFound(commands.UserInputError):
     pass
 
 
-class CreatureNotFound(Exception):
+class CreatureNotFound(commands.UserInputError):
     pass
 
 
-class RegionNotFound(Exception):
+class RegionNotFound(commands.UserInputError):
     pass
 
 
-class NotEnoughResourcesException(Exception):
+class NotEnoughResourcesException(commands.UserInputError):
     pass
 
 
-class EmptyDeckException(Exception):
+class EmptyDeckException(commands.UserInputError):
     pass
 
 
-class MissingExtraData(Exception):
+class MissingExtraData(commands.UserInputError):
 
     def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
         super().__init__(message)
@@ -38,7 +40,7 @@ class MissingExtraData(Exception):
         return super().__str__()
 
 
-class BadExtraData(Exception):
+class BadExtraData(commands.UserInputError):
 
     def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
         super().__init__(message)
@@ -50,17 +52,17 @@ class BadExtraData(Exception):
         return super().__str__()
 
 
-class CreatureCannotQuestHere(Exception):
+class CreatureCannotQuestHere(commands.UserInputError):
     pass
 
 
-class ProtectedFreeCreature(Exception):
+class ProtectedFreeCreature(commands.UserInputError):
     pass
 
 
-class ExpiredFreeCreature(Exception):
+class ExpiredFreeCreature(commands.UserInputError):
     pass
 
 
-class CreatureCannotCampaign(Exception):
+class CreatureCannotCampaign(commands.UserInputError):
     pass

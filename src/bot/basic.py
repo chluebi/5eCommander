@@ -2,6 +2,7 @@ from typing import Optional, Any, List, cast, TYPE_CHECKING
 
 import os
 import time
+import asyncio
 import sys
 import logging
 import traceback
@@ -15,6 +16,7 @@ from discord.ext import commands
 from src.bot.setup_logging import logger, setup_logging
 from src.bot.util import (
     DEVELOPMENT_GUILD,
+    get_relative_timestamp,
     standard_embed,
     success_embed,
     error_embed,
@@ -22,11 +24,14 @@ from src.bot.util import (
     regions_embed,
     conflict_embed,
     creature_embed,
+    free_creature_embed,
+    free_creature_protected_embed,
     format_embed,
 )
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
+from src.core.base_types import Resource, Price
 from src.definitions.start_condition import start_condition
 from src.definitions.creatures import creatures
 
@@ -348,6 +353,40 @@ class PlayerAdmin(commands.Cog):
             for c in basecreatures
             if c.text().startswith(current)
         ]
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def roll(self, ctxt: commands.Context["Bot"], amount: int = 1) -> None:
+        """Roll for new creatures"""
+
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+            player_db = guild_db.get_player(ctxt.author.id, con=con)
+            creatures = [guild_db.get_random_from_creature_pool(con=con) for i in range(amount)]
+
+        for c in creatures:
+            with self.bot.db.transaction() as con:
+                player_db.pay_price([Price(resource=Resource.MAGIC, amount=1)], con=con)
+
+                embed = free_creature_embed(c, cast(discord.Member, ctxt.author))
+                message = await ctxt.send(embed=embed)
+                free_creature = guild_db.add_free_creature(
+                    c, ctxt.channel.id, message.id, player_db, con=con
+                )
+                free_creature.create_events(con=con)
+
+                embed, view = free_creature_protected_embed(
+                    free_creature,
+                    cast(discord.Member, ctxt.author),
+                    free_creature.get_protected_timestamp(con=con),
+                )
+
+                await message.edit(embed=embed, view=view)
+
+            await asyncio.sleep(0.5)
 
 
 async def setup(bot: "Bot") -> None:

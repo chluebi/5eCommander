@@ -1,4 +1,4 @@
-from typing import Any, Union, List, cast, Callable
+from typing import Any, Union, List, cast, Callable, Tuple, Optional
 
 import asyncio
 import os
@@ -184,6 +184,163 @@ def creature_embed(creature: Database.BaseCreature) -> discord.Embed:
     return standard_embed(creature_title, creature_text)
 
 
+class ClaimView(discord.ui.View):
+
+    interaction: discord.Interaction | None = None
+    message: discord.Message | None = None
+
+    def __init__(self, free_creature: Database.FreeCreature):
+        super().__init__(timeout=None)
+        self.free_creature = free_creature
+
+
+def free_creature_embed_text(
+    creature: Database.BaseCreature, roller: discord.Member
+) -> Tuple[str, str, str, Optional[str]]:
+
+    creature_title = "Roll"
+    creature_text: str = f"**{creature.text()}**\n\n"
+    creature_text += f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
+    creature_text += f"**When sent to campaign**: {creature.campaign_ability_effect_full_text() if creature.campaign_ability_effect_full_text() else '*no special ability*'}\n\n"
+
+    creature_text += (
+        f"Can be claimed for **{creature.claim_cost}** {resource_to_emoji(Resource.RALLY)}"
+    )
+
+    return (
+        creature_title,
+        creature_text,
+        f"Rolled by {roller}",
+        roller.avatar.url if roller.avatar else None,
+    )
+
+
+def creature_claim_callback_factory(free_creature: Database.FreeCreature) -> Any:
+
+    async def callback(interaction: discord.Interaction) -> None:
+        player_db = free_creature.guild.get_player(interaction.user.id)
+        try:
+            free_creature.claim(time.time(), player_db)
+        except Exception as e:
+            await interaction.response.send_message(
+                embed=error_embed("Error when claiming", f"Failed to claim\n ```\n{e}```")
+            )
+
+        await interaction.response.send_message(
+            embed=success_embed("Claimed", f"Successfully claimed {free_creature.creature.text()}")
+        )
+        return
+
+    return callback
+
+
+def free_creature_embed(creature: Database.BaseCreature, roller: discord.Member) -> discord.Embed:
+
+    creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
+        creature, roller
+    )
+
+    embed = standard_embed(creature_title, creature_text)
+    embed.set_footer(
+        text=footer_text,
+        icon_url=footer_url,
+    )
+
+    return embed
+
+
+def free_creature_protected_embed(
+    free_creature: Database.FreeCreature, roller: discord.Member, timestamp: float
+) -> Tuple[discord.Embed, discord.ui.View]:
+
+    creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
+        free_creature.creature, roller
+    )
+
+    creature_text += (
+        f"\n\nCan only be claimed by {roller.mention} until {get_relative_timestamp(timestamp)}"
+    )
+
+    embed = standard_embed(creature_title, creature_text)
+    embed.set_footer(
+        text=footer_text,
+        icon_url=footer_url,
+    )
+
+    view = ClaimView(free_creature)
+    button: discord.ui.Button[Any] = discord.ui.Button(
+        label="Claim", style=discord.ButtonStyle.blurple
+    )
+    button.callback = creature_claim_callback_factory(free_creature)  # type: ignore
+    view.add_item(button)
+
+    return embed, view
+
+
+def free_creature_claimed_embed(
+    free_creature: Database.FreeCreature, roller: discord.Member, claimer: discord.Member
+) -> discord.Embed:
+
+    creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
+        free_creature.creature, roller
+    )
+
+    creature_text += f"\n\nClaimed by {claimer.mention}"
+
+    embed = standard_embed(creature_title, creature_text)
+    embed.set_footer(
+        text=footer_text,
+        icon_url=footer_url,
+    )
+
+    return embed
+
+
+def free_creature_unprotected_embed(
+    free_creature: Database.FreeCreature, roller: discord.Member, timestamp: float
+) -> Tuple[discord.Embed, discord.ui.View]:
+
+    creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
+        free_creature.creature, roller
+    )
+
+    creature_text += f"\n\nExpires {get_relative_timestamp(timestamp)}"
+
+    embed = standard_embed(creature_title, creature_text)
+    embed.set_footer(
+        text=footer_text,
+        icon_url=footer_url,
+    )
+
+    view = ClaimView(free_creature)
+    button: discord.ui.Button[Any] = discord.ui.Button(
+        label="Claim", style=discord.ButtonStyle.blurple
+    )
+    button.callback = creature_claim_callback_factory(free_creature)  # type: ignore
+    view.add_item(button)
+
+    return embed, view
+
+
+def free_creature_expired_embed(
+    free_creature: Database.FreeCreature, roller: discord.Member
+) -> discord.Embed:
+
+    creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
+        free_creature.creature, roller
+    )
+
+    creature_text += f"\n\n❌ Expired ❌"
+
+    embed = standard_embed(creature_title, creature_text)
+    embed.set_footer(
+        text=footer_text,
+        icon_url=footer_url,
+    )
+
+    return embed
+
+
 def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
 
     conflict_text = ""
@@ -239,22 +396,38 @@ def format_region(id: int, guild: discord.Guild, guild_db: Database.Guild) -> st
         return f"<region:{id}>"
 
 
-format_lookup: dict[str, Callable[[int, discord.Guild, Database.Guild], str]] = {
+def format_free_creature(id: str, guild: discord.Guild, guild_db: Database.Guild) -> str:
+    m = re.match(r"\((\d+),\s*(\d+)\)", id)
+
+    if m:
+        return f"[{guild_db.get_free_creature(int(m.group(1)), int(m.group(2))).creature.text()}](https://discord.com/channels/{guild.id}/{m.group(1)}/{m.group(2)})"
+    else:
+        return f"<free_creature:{id}>"
+
+
+format_lookup: dict[str, Callable[[Any, discord.Guild, Database.Guild], str]] = {
     "player": format_player,
     "creature": format_creature,
     "region": format_region,
+    "free_creature": format_free_creature,
 }
 
 
 def format_str(s: str, guild: discord.Guild, guild_db: Database.Guild) -> str:
-    matches = re.findall(r"<(.+?):(\d+)>", s)
+    matches = list(re.findall(r"<([^:]+):(\d+)>", s)) + list(
+        re.findall(r"<([^:]+):(\(\d+,\d+\))>", s)
+    )
 
     new_s = s
+
+    print("matches", matches)
 
     for t, id in matches:
         old = f"<{t}:{id}>"
 
         formatter = format_lookup.get(t)
+        print("t, id, formatter", t, id, formatter)
+
         if formatter is not None:
             new_s = new_s.replace(old, formatter(id, guild, guild_db))
 

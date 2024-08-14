@@ -13,10 +13,20 @@ import sqlalchemy.exc
 import discord
 from discord.ext import commands, tasks
 
-from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed, format_embed
+from src.bot.util import (
+    DEVELOPMENT_GUILD,
+    standard_embed,
+    success_embed,
+    error_embed,
+    free_creature_protected_embed,
+    free_creature_unprotected_embed,
+    free_creature_expired_embed,
+    free_creature_claimed_embed,
+    format_embed,
+)
 from src.database.postgres import PostgresDatabase
 from src.core.base_types import Event
-from src.core.exceptions import GuildNotFound, PlayerNotFound
+from src.core.exceptions import GuildNotFound, PlayerNotFound, CreatureNotFound
 from src.definitions.start_condition import start_condition
 from src.event_resolver.resolver import (
     KeepAlive,
@@ -42,7 +52,43 @@ banned_events: List[Type[Event]] = [
     PostgresDatabase.Player.PlayerOrderRechargedEvent,
     PostgresDatabase.Player.PlayerDrawEvent,
     PostgresDatabase.Player.PlayerGainEvent,
+    PostgresDatabase.Player.PlayerPayEvent,
 ]
+
+
+async def get_channel_exhaustively(
+    bot: "Bot", guild: discord.Guild, channel_id: int
+) -> Optional[discord.PartialMessageable]:
+
+    channel = bot.channel_cache.get(channel_id)
+
+    if channel is None:
+        channel = cast(
+            Optional[discord.PartialMessageable], guild.get_channel_or_thread(channel_id)
+        )
+
+    if channel is None:
+        threads = (
+            await guild.active_threads()
+        )  # very inefficient but sometimes the only thing that works
+        channel = cast(
+            Optional[discord.PartialMessageable], discord.utils.get(threads, id=channel_id)
+        )
+
+    if channel is None:
+        channels = (
+            await guild.fetch_channels()
+        )  # very inefficient but sometimes the only thing that works
+        channel = cast(
+            Optional[discord.PartialMessageable], discord.utils.get(channels, id=channel_id)
+        )
+
+    if channel is None:
+        bot.logger.error("channel is none still")
+        return None
+
+    bot.channel_cache[channel_id] = channel
+    return channel
 
 
 class EventHandler(commands.Cog):
@@ -52,9 +98,53 @@ class EventHandler(commands.Cog):
         self.keep_alive = KeepAlive()
         self.event_handler_listener.start()
         self.event_handler_loop.start()
+        self.refresh_free_creature_views.start()
 
     async def cog_unload(self) -> None:
         self.event_handler_loop.cancel()
+
+    @tasks.loop(seconds=0, count=1)
+    async def refresh_free_creature_views(self) -> None:
+
+        for guild_db in self.bot.db.get_guilds():
+
+            try:
+                guild = await self.bot.fetch_guild(guild_db.id)
+            except discord.NotFound:
+                continue
+
+            free_creatures = guild_db.get_free_creatures()
+
+            for fc in free_creatures:
+
+                channel = await get_channel_exhaustively(self.bot, guild, fc.channel_id)
+                if channel is None:
+                    continue
+
+                message = await channel.fetch_message(fc.message_id)
+
+                with self.bot.db.transaction() as con:
+                    if fc.is_expired(time.time(), con=con):
+                        continue
+                    if "Claimed by" in message.content:
+                        continue
+
+                    roller = await guild.fetch_member(fc.roller_id)
+
+                    if fc.is_protected(time.time(), con=con):
+                        embed, view = free_creature_protected_embed(
+                            fc,
+                            roller,
+                            fc.get_protected_timestamp(),
+                        )
+                        await message.edit(embed=embed, view=view)
+                    else:
+                        embed, view = free_creature_unprotected_embed(
+                            fc,
+                            roller,
+                            fc.get_expires_timestamp(),
+                        )
+                        await message.edit(embed=embed, view=view)
 
     async def event_handler(self, connection: Any, pid: Any, channel: Any, payload: str) -> None:
 
@@ -135,29 +225,7 @@ class EventHandler(commands.Cog):
                         continue
 
                     t = time.time()
-
-                    channel = self.bot.channel_cache.get(channel_id)
-
-                    if channel is None:
-                        channel = guild.get_channel_or_thread(channel_id)
-
-                    if channel is None:
-                        threads = (
-                            await guild.active_threads()
-                        )  # very inefficient but sometimes the only thing that works
-                        channel = discord.utils.get(threads, id=channel_id)
-
-                    if channel is None:
-                        channels = (
-                            await guild.fetch_channels()
-                        )  # very inefficient but sometimes the only thing that works
-                        channel = discord.utils.get(channels, id=channel_id)
-
-                    if channel is None:
-                        self.bot.logger.error("channel is none still")
-                        continue
-
-                    self.bot.channel_cache[channel_id] = channel
+                    channel = await get_channel_exhaustively(self.bot, guild, channel_id)
 
                     for root_event_id, children in flat_event_tree.items():
 
@@ -194,6 +262,61 @@ class EventHandler(commands.Cog):
 
                     for event in valid_events:
                         event.resolve(con=con)
+
+                        if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
+                            try:
+                                free_creature = guild_db.get_free_creature(
+                                    event.channel_id, event.message_id
+                                )
+                                channel = await get_channel_exhaustively(
+                                    self.bot, guild, event.channel_id
+                                )
+                                roller = await guild.fetch_member(free_creature.roller_id)
+                                if channel is not None:
+                                    message = await cast(
+                                        discord.PartialMessageable, channel
+                                    ).fetch_message(event.message_id)
+
+                                    if isinstance(
+                                        event,
+                                        PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent,
+                                    ):
+                                        embed, view = free_creature_unprotected_embed(
+                                            free_creature,
+                                            roller,
+                                            free_creature.get_expires_timestamp(),
+                                        )
+                                        await message.edit(embed=embed, view=view)
+                                    elif isinstance(
+                                        event,
+                                        PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent,
+                                    ):
+                                        claimer = await guild.fetch_member(event.player_id)
+                                        if claimer is not None:
+                                            await message.edit(
+                                                embed=free_creature_claimed_embed(
+                                                    free_creature, roller, claimer
+                                                ),
+                                                view=None,
+                                            )
+                                    elif isinstance(
+                                        event,
+                                        PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent,
+                                    ):
+                                        if "Claimed by" in message.content:
+                                            continue
+                                        await message.edit(
+                                            embed=free_creature_expired_embed(
+                                                free_creature, roller
+                                            ),
+                                            view=None,
+                                        )
+
+                                await asyncio.sleep(2)
+
+                            except CreatureNotFound:
+                                pass
+
                         cast(PostgresDatabase.Guild, event.guild).mark_event_as_resolved(
                             event, con=con
                         )
