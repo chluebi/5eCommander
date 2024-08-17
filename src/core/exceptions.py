@@ -64,5 +64,9 @@ class ExpiredFreeCreature(commands.UserInputError):
     pass
 
 
+class CreatureCannotQuest(commands.UserInputError):
+    pass
+
+
 class CreatureCannotCampaign(commands.UserInputError):
     pass

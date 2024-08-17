@@ -1,4 +1,5 @@
 import time
+import copy
 from typing import (
     cast,
     List,
@@ -80,6 +81,8 @@ def events_by_type(
 postgres = PostgresContainer("postgres:16").start()
 
 engine = sqlalchemy.create_engine(postgres.get_connection_url())
+start_condition = copy.deepcopy(start_condition)
+start_condition.start_deck = [Spy() for i in range(10)]
 test_db = PostgresDatabase(start_condition, engine)
 
 
@@ -423,11 +426,13 @@ def test_playing() -> None:
             assert c.creature in start_condition.start_deck
 
         creature2_db: Database.Creature = player8_db.get_hand()[0]
-        assert isinstance(creature2_db.creature, Commoner)
+        assert isinstance(creature2_db.creature, Spy)
 
-        region1_db: Database.Region = guild_db.get_regions()[0]
+        region1_db: Database.Region = [
+            r for r in guild_db.get_regions() if isinstance(r.region, Collections)
+        ][0]
         assert region1_db.occupied() == (None, None)
-        assert isinstance(region1_db.region, Village)
+        assert isinstance(region1_db.region, Collections)
 
         resources: dict[Resource, int] = player8_db.get_resources()
 
@@ -444,12 +449,17 @@ def test_playing() -> None:
 
         player8_db.play_creature_to_region(creature2_db, region1_db)
 
-        new_gain_event: Database.Player.PlayerGainEvent = subtract(
+        new_gain_events: List[Database.Player.PlayerGainEvent] = subtract(
             events_by_type(guild_db, Database.Player.PlayerGainEvent),
             prev_gain_events,
-        )[0]
-        assert new_gain_event.event_type == Database.Player.PlayerGainEvent.event_type
-        assert new_gain_event.changes == [(Resource.INTEL.value, 1)]
+        )
+        assert is_subset(
+            [e.event_type for e in new_gain_events], [Database.Player.PlayerGainEvent.event_type]
+        )
+        assert are_subsets(
+            [e.changes for e in new_gain_events],
+            [[(Resource.INTEL.value, 1)], [(Resource.GOLD.value, 3)]],
+        )
 
         new_pay_event: Database.Player.PlayerPayEvent = events_by_type(
             guild_db, Database.Player.PlayerPayEvent
@@ -484,6 +494,7 @@ def test_playing() -> None:
 
         assert player8_db.get_played()[0][0] == creature2_db
 
+        resources[Resource.GOLD] += 3
         resources[Resource.INTEL] += 1
         assert player8_db.get_resources() == resources
 
@@ -493,7 +504,7 @@ def test_playing() -> None:
         # campaign
 
         creature3_db: Database.Creature = player8_db.get_hand()[0]
-        assert isinstance(creature3_db.creature, Commoner)
+        assert isinstance(creature3_db.creature, Spy)
 
         resources2: dict[Resource, int] = player8_db.get_resources()
 
@@ -513,7 +524,7 @@ def test_playing() -> None:
         assert player8_db.get_campaign() == [(creature3_db, 0)]
         assert are_subsets(subtract(old_deck, [creature3_db]), player8_db.get_full_deck())
 
-        resources2[Resource.RALLY] += 1
+        resources2[Resource.INTEL] += 2
         assert player8_db.get_resources() == resources2
 
     finally:

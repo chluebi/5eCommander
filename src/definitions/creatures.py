@@ -10,8 +10,8 @@ from src.core.base_types import (
     resource_changes_to_short_string,
 )
 from src.database.database import Database
-from src.definitions.regions import RegionCategories
-from src.core.exceptions import CreatureCannotCampaign
+from src.core.base_types import RegionCategories
+from src.core.exceptions import CreatureCannotCampaign, CreatureCannotQuest
 
 
 class SimpleCreature(Database.BaseCreature):
@@ -21,13 +21,13 @@ class SimpleCreature(Database.BaseCreature):
     quest_region_categories = []
     claim_cost: int = 0
 
-    def quest_price(self) -> list[Price]:
+    def quest_price(self) -> Optional[list[Price]]:
         return []
 
     def quest_gain(self) -> list[Gain]:
         return []
 
-    def campaign_price(self) -> list[Price]:
+    def campaign_price(self) -> Optional[list[Price]]:
         return []
 
     def campaign_gain(self) -> list[Gain]:
@@ -35,10 +35,16 @@ class SimpleCreature(Database.BaseCreature):
 
     # questing
     def quest_ability_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.quest_price() + self.quest_gain())
+        price = self.quest_price()
+        if price is None:
+            return "❌"
+        return resource_changes_to_short_string(price + self.quest_gain())
 
     def quest_ability_effect_full_text(self) -> str:
-        return resource_changes_to_string(self.quest_price() + self.quest_gain())
+        price = self.quest_price()
+        if price is None:
+            return "Cannot be sent to locations."
+        return resource_changes_to_string(price + self.quest_gain())
 
     def quest_ability_effect_price(
         self,
@@ -48,6 +54,9 @@ class SimpleCreature(Database.BaseCreature):
         extra_data: dict[Any, Any] = {},
     ) -> None:
         price = self.quest_price()
+
+        if price is None:
+            raise CreatureCannotQuest()
 
         if price == []:
             return
@@ -74,10 +83,16 @@ class SimpleCreature(Database.BaseCreature):
 
     # campaigning
     def campaign_ability_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.campaign_price() + self.campaign_gain())
+        price = self.campaign_price()
+        if price is None:
+            return "❌"
+        return resource_changes_to_short_string(price + self.campaign_gain())
 
     def campaign_ability_effect_full_text(self) -> str:
-        return resource_changes_to_string(self.campaign_price() + self.campaign_gain())
+        price = self.campaign_price()
+        if price is None:
+            return "Creature cannot campaign."
+        return resource_changes_to_string(price + self.campaign_gain())
 
     def campaign_ability_effect_price(
         self,
@@ -86,6 +101,9 @@ class SimpleCreature(Database.BaseCreature):
         extra_data: dict[Any, Any] = {},
     ) -> None:
         price = self.campaign_price()
+
+        if price is None:
+            raise CreatureCannotCampaign()
 
         if price == []:
             return
@@ -121,17 +139,220 @@ class Commoner(SimpleCreature):
 
     id = 0
     name = "commoner"
-    quest_region_categories: list[RegionCategory] = [
-        RegionCategories.settlement,
-        RegionCategories.mine,
-    ]
+    quest_region_categories: list[RegionCategory] = [RegionCategories.market]
     claim_cost: int = 1
 
+    def campaign_price(self) -> Optional[list[Price]]:
+        return None
+
+
+class Ruffian(SimpleCreature):
+
+    id = 1
+    name = "ruffian"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.market]
+    claim_cost: int = 2
+
+    def campaign_price(self) -> List[Price]:
+        return [Price(Resource.GOLD, 2)]
+
     def campaign_gain(self) -> list[Gain]:
+        return [Gain(Resource.STRENGTH, 2)]
+
+
+class Knight(SimpleCreature):
+
+    id = 2
+    name = "knight"
+    quest_region_categories: list[RegionCategory] = [
+        RegionCategories.noble,
+        RegionCategories.market,
+    ]
+    claim_cost: int = 3
+
+    def campaign_price(self) -> List[Price]:
+        return [Price(Resource.GOLD, 3)]
+
+    def campaign_gain(self) -> list[Gain]:
+        return [Gain(Resource.STRENGTH, 4)]
+
+
+class Aristocrat(SimpleCreature):
+
+    id = 3
+    name = "aristocrat"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
+    claim_cost: int = 3
+
+    def campaign_gain(self) -> list[Gain]:
+        return [Gain(Resource.RALLY, 3)]
+
+
+class Servant(SimpleCreature):
+
+    id = 4
+    name = "knight"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
+    claim_cost: int = 1
+
+    def campaign_price(self) -> Optional[list[Price]]:
+        return None
+
+
+class Beggar(SimpleCreature):
+
+    id = 5
+    name = "beggar"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.market]
+    claim_cost: int = 1
+
+    def campaign_price(self) -> Optional[list[Price]]:
+        return None
+
+
+class Messenger(SimpleCreature):
+
+    id = 6
+    name = "messenger"
+    quest_region_categories: list[RegionCategory] = [
+        RegionCategories.noble,
+        RegionCategories.market,
+        RegionCategories.arcane,
+    ]
+    claim_cost: int = 2
+
+    def campaign_price(self) -> Optional[list[Price]]:
+        return None
+
+
+class NoviceAdventurer(SimpleCreature):
+
+    id = 7
+    name = "novice adventurer"
+    quest_region_categories: list[RegionCategory] = [
+        RegionCategories.market,
+        RegionCategories.dungeon,
+    ]
+    claim_cost: int = 2
+
+    def campaign_gain(self) -> List[Gain]:
+        return [Gain(Resource.STRENGTH, 1)]
+
+
+class Towncrier(SimpleCreature):
+
+    id = 8
+    name = "towncrier"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.market]
+    claim_cost: int = 2
+
+    def quest_gain(self) -> List[Gain]:
         return [Gain(Resource.RALLY, 1)]
 
 
-creatures_list = [Commoner()]
+class Spy(SimpleCreature):
+
+    id = 9
+    name = "spy"
+    quest_region_categories: list[RegionCategory] = [
+        RegionCategories.noble,
+        RegionCategories.market,
+        RegionCategories.dungeon,
+    ]
+    claim_cost: int = 4
+
+    def quest_gain(self) -> List[Gain]:
+        return [Gain(Resource.INTEL, 1)]
+
+    def campaign_gain(self) -> List[Gain]:
+        return [Gain(Resource.INTEL, 2)]
+
+
+class General(SimpleCreature):
+
+    id = 10
+    name = "general"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
+    claim_cost: int = 5
+
+    def campaign_gain(self) -> List[Gain]:
+        return [Gain(Resource.RALLY, 3), Gain(Resource.STRENGTH, 3)]
+
+
+class Scout(SimpleCreature):
+
+    id = 11
+    name = "scout"
+    quest_region_categories: list[RegionCategory] = [
+        RegionCategories.dungeon,
+        RegionCategories.wild,
+    ]
+    claim_cost: int = 2
+
+    def campaign_gain(self) -> List[Gain]:
+        return [Gain(Resource.STRENGTH, 1)]
+
+
+class NoviceMage(SimpleCreature):
+
+    id = 12
+    name = "novice mage"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.arcane]
+    claim_cost: int = 2
+
+
+class Mentor(SimpleCreature):
+
+    id = 13
+    name = "mentor"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.arcane]
+    claim_cost: int = 3
+
+    def quest_ability_effect_short_text(self) -> str:
+        return "+1 🃏"
+
+    def quest_ability_effect_full_text(self) -> str:
+        return "Draw 1 Card."
+
+    def quest_ability_effect(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: dict[Any, Any] = {},
+    ) -> None:
+
+        with region_db.parent.transaction(parent=con) as con:
+            owner: Database.Player = creature_db.owner
+            owner.draw_cards(N=1, con=con)
+
+
+class Druid(SimpleCreature):
+
+    id = 14
+    name = "druid"
+    quest_region_categories: list[RegionCategory] = [RegionCategories.arcane, RegionCategories.wild]
+    claim_cost: int = 3
+
+
+creatures_list = [
+    Commoner(),
+    Ruffian(),
+    Knight(),
+    Aristocrat(),
+    Servant(),
+    Beggar(),
+    Messenger(),
+    NoviceAdventurer(),
+    Towncrier(),
+    Spy(),
+    General(),
+    Scout(),
+    NoviceMage(),
+    Mentor(),
+    Druid(),
+]
+
 
 assert len(set([c.id for c in creatures_list])) == len(creatures_list)
 

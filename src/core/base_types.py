@@ -22,7 +22,6 @@ BaseResources = [
     Resource.INTEL,
     Resource.MAGIC,
     Resource.RALLY,
-    Resource.STRENGTH,
 ]
 
 Price = namedtuple("Price", ["resource", "amount"], defaults=[Resource.GOLD, 0])
@@ -205,3 +204,20 @@ class Event:
 
     def resolve(self, con: Any) -> None:
         return
+
+
+class RegionCategories:
+    noble = RegionCategory("Noble", "👑")
+    market = RegionCategory("Market", "⚖️")
+    dungeon = RegionCategory("Dungeon", "🕸️")
+    arcane = RegionCategory("Arcane", "🔮")
+    wild = RegionCategory("Wild", "🐗")
+
+
+region_categories = [
+    RegionCategories.noble,
+    RegionCategories.market,
+    RegionCategories.dungeon,
+    RegionCategories.arcane,
+    RegionCategories.wild,
+]

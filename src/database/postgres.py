@@ -123,11 +123,6 @@ class PostgresDatabase(Database):
             ForeignKeyConstraint(
                 ["guild_id", "owner_id"], ["players.guild_id", "players.id"], ondelete="CASCADE"
             ),
-            ForeignKeyConstraint(
-                ["guild_id", "base_creature_id"],
-                ["base_creatures.guild_id", "base_creatures.id"],
-                ondelete="CASCADE",
-            ),
             PrimaryKeyConstraint("id", "guild_id", name="pk_creatures"),
         )
 
@@ -1498,6 +1493,36 @@ class PostgresDatabase(Database):
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
+                sql = text(
+                    "DELETE FROM creatures WHERE owner_id = :player_id AND guild_id = :guild_id AND id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
+        def delete_creature_from_played(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
+                sql = text(
+                    "DELETE FROM creatures WHERE owner_id = :player_id AND guild_id = :guild_id AND id = :creature_id"
                 )
                 sub_con.execute(
                     sql,

@@ -1164,6 +1164,13 @@ class Database:
         ) -> None:
             pass
 
+        def delete_creature_from_played(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            pass
+
         def recharge_creature(
             self,
             creature: Database.Creature,

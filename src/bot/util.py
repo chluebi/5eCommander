@@ -12,9 +12,15 @@ import discord
 from discord.ext import commands
 
 from src.database.database import Database
-from src.core.base_types import Resource, resource_to_emoji, Event, BaseResources, RegionCategory
+from src.core.base_types import (
+    Resource,
+    resource_to_emoji,
+    Event,
+    BaseResources,
+    RegionCategory,
+    region_categories,
+)
 from src.core.exceptions import CreatureNotFound, RegionNotFound
-from src.definitions.regions import region_categories
 
 
 DEVELOPMENT_GUILD = discord.Object(id=int(os.environ["DEVELOPMENT_GUILD_ID"]))
