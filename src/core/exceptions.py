@@ -65,8 +65,12 @@ class ExpiredFreeCreature(commands.UserInputError):
 
 
 class CreatureCannotQuest(commands.UserInputError):
-    pass
+
+    def __init__(self) -> None:
+        super().__init__("Creature cannot quest.")
 
 
 class CreatureCannotCampaign(commands.UserInputError):
-    pass
+
+    def __init__(self) -> None:
+        super().__init__("Creature cannot campaign.")

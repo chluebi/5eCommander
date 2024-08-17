@@ -32,6 +32,7 @@ start_condition = Database.StartCondition(
         BindingSpell(),
         HiddenCache(),
         Hunt(),
+        Abandon(),
     ],
     [
         Commoner(),

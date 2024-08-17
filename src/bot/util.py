@@ -426,13 +426,10 @@ def format_str(s: str, guild: discord.Guild, guild_db: Database.Guild) -> str:
 
     new_s = s
 
-    print("matches", matches)
-
     for t, id in matches:
         old = f"<{t}:{id}>"
 
         formatter = format_lookup.get(t)
-        print("t, id, formatter", t, id, formatter)
 
         if formatter is not None:
             new_s = new_s.replace(old, formatter(id, guild, guild_db))

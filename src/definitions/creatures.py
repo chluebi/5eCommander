@@ -191,7 +191,7 @@ class Aristocrat(SimpleCreature):
 class Servant(SimpleCreature):
 
     id = 4
-    name = "knight"
+    name = "servant"
     quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
     claim_cost: int = 1
 

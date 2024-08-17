@@ -318,9 +318,9 @@ class Hunt(Database.BaseRegion):
 
     def quest_effect_full_text(self) -> str:
         return (
-            "Have 5 or more"
+            "Have 5 or more "
             + resource_to_emoji(Resource.STRENGTH)
-            + "strength."
+            + "strength. "
             + resource_changes_to_string(list(self.quest_gain()))
         )
 

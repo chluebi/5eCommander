@@ -221,7 +221,35 @@ class PlayerAdmin(commands.Cog):
                 )
             )
 
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def play_to(self, ctxt: commands.Context["Bot"], region: int, card: int) -> None:
+        """Uses a order to play a card to a region, but region is chosen first"""
+
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+            player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+            creatures = player_db.get_hand(con=con)
+            creature_db = [c for c in creatures if c.id == card][0]
+
+            regions = guild_db.get_regions(con=con)
+            region_db = [r for r in regions if r.id == region][0]
+
+            player_db.play_creature_to_region(creature_db, region_db, con=con)
+
+            await ctxt.send(
+                embed=success_embed(
+                    "Creature Played",
+                    f"Successfully played {creature_db.text()} to {region_db.text()}",
+                )
+            )
+
     @play.autocomplete("card")
+    @play_to.autocomplete("card")
     async def play_card_in_hand_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> List[discord.app_commands.Choice[int]]:
@@ -229,6 +257,17 @@ class PlayerAdmin(commands.Cog):
         guild_db = self.bot.db.get_guild(interaction.guild.id)
         player_db = guild_db.get_player(interaction.user.id)
         creatures = player_db.get_hand()
+
+        print("namespace", interaction.namespace)
+
+        if "region" in interaction.namespace and cast(int, interaction.namespace["region"]) != 0:
+            region_id = cast(int, interaction.namespace["region"])
+            region = guild_db.get_region(region_id)
+            filtered_creatures = [
+                c for c in creatures if region.region.category in c.creature.quest_region_categories
+            ]
+        else:
+            filtered_creatures = creatures
 
         return [
             discord.app_commands.Choice(
@@ -239,11 +278,12 @@ class PlayerAdmin(commands.Cog):
                 ),
                 value=c.id,
             )
-            for c in creatures
+            for c in filtered_creatures
             if c.text().startswith(current)
         ]
 
     @play.autocomplete("region")
+    @play_to.autocomplete("region")
     async def region_to_play_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> List[discord.app_commands.Choice[int]]:
@@ -253,8 +293,8 @@ class PlayerAdmin(commands.Cog):
         regions = guild_db.get_regions()
         regions = [r for r in regions if r.occupied() == (None, None)]
 
-        creature_id = cast(int, interaction.namespace["card"])
-        if creature_id != 0:
+        if "card" in interaction.namespace and cast(int, interaction.namespace["card"]) != 0:
+            creature_id = cast(int, interaction.namespace["card"])
             player_db = guild_db.get_player(interaction.user.id)
             creatures = player_db.get_hand()
             creatures_filtered = [c for c in creatures if c.id == creature_id]
