@@ -1080,7 +1080,7 @@ class PostgresDatabase(Database):
             with self.parent.transaction(parent=con) as sub_con:
                 occupant, until = self.occupied(con=sub_con)
                 if occupant is None or until is None:
-                    raise Exception("Trying to unoccupy an already free region")
+                    return
                 if current < until:
                     raise Exception("Trying to unoccupy with too early timestamp")
 

@@ -132,7 +132,7 @@ class GuildAdmin(commands.Cog):
         assert ctxt.guild is not None
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
-        await ctxt.send(embed=conflict_embed(guild_db))
+        await ctxt.send(embed=conflict_embed(ctxt.guild, guild_db))
 
 
 class PlayerAdmin(commands.Cog):
@@ -279,7 +279,7 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in filtered_creatures
-            if c.text().startswith(current)
+            if current in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}"
         ]
 
     @play.autocomplete("region")
@@ -315,7 +315,7 @@ class PlayerAdmin(commands.Cog):
                 name=f"{r.text()}: {r.region.quest_effect_full_text()}", value=r.id
             )
             for r in filtered_regions
-            if r.text().startswith(current)
+            if current in f"{r.text()}: {r.region.quest_effect_full_text()}"
         ]
 
     @commands.hybrid_command()  # type: ignore

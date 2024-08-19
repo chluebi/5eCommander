@@ -117,6 +117,11 @@ class EventHandler(commands.Cog):
 
             for fc in free_creatures:
 
+                print("refreshing fc", fc)
+
+                if fc.is_expired(time.time()):
+                    continue
+
                 channel = await get_channel_exhaustively(self.bot, guild, fc.channel_id)
                 if channel is None:
                     continue
@@ -146,6 +151,8 @@ class EventHandler(commands.Cog):
                         )
                         await message.edit(embed=embed, view=view)
 
+                await asyncio.sleep(4)
+
     async def event_handler(self, connection: Any, pid: Any, channel: Any, payload: str) -> None:
 
         embeds_to_send: List[Tuple[discord.Embed, discord.PartialMessageable]] = []
@@ -169,6 +176,8 @@ class EventHandler(commands.Cog):
                         guild_db.get_events(0, time.time(), also_resolved=False, con=con),
                         key=lambda x: x.id,
                     )
+
+                    print("events", events)
 
                     if events == []:
                         continue
@@ -260,72 +269,86 @@ class EventHandler(commands.Cog):
 
                         embeds_to_send.append((format_embed(embed, guild, guild_db), channel))
 
+                    print("embeds to send computed")
+
                     for event in valid_events:
+                        print("resolving", event)
                         event.resolve(con=con)
-
-                        if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
-                            try:
-                                free_creature = guild_db.get_free_creature(
-                                    event.channel_id, event.message_id
-                                )
-                                channel = await get_channel_exhaustively(
-                                    self.bot, guild, event.channel_id
-                                )
-                                roller = await guild.fetch_member(free_creature.roller_id)
-                                if channel is not None:
-                                    message = await cast(
-                                        discord.PartialMessageable, channel
-                                    ).fetch_message(event.message_id)
-
-                                    if isinstance(
-                                        event,
-                                        PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent,
-                                    ):
-                                        embed, view = free_creature_unprotected_embed(
-                                            free_creature,
-                                            roller,
-                                            free_creature.get_expires_timestamp(),
-                                        )
-                                        await message.edit(embed=embed, view=view)
-                                    elif isinstance(
-                                        event,
-                                        PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent,
-                                    ):
-                                        claimer = await guild.fetch_member(event.player_id)
-                                        if claimer is not None:
-                                            await message.edit(
-                                                embed=free_creature_claimed_embed(
-                                                    free_creature, roller, claimer
-                                                ),
-                                                view=None,
-                                            )
-                                    elif isinstance(
-                                        event,
-                                        PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent,
-                                    ):
-                                        if "Claimed by" in message.content:
-                                            continue
-                                        await message.edit(
-                                            embed=free_creature_expired_embed(
-                                                free_creature, roller
-                                            ),
-                                            view=None,
-                                        )
-
-                                await asyncio.sleep(2)
-
-                            except CreatureNotFound:
-                                pass
 
                         cast(PostgresDatabase.Guild, event.guild).mark_event_as_resolved(
                             event, con=con
                         )
+
+                print("transaction done")
+
+                for event in valid_events:
+
+                    print("trying event for free creature stuff", event)
+
+                    if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
+
+                        print("is one")
+
+                        try:
+                            free_creature = guild_db.get_free_creature(
+                                event.channel_id, event.message_id
+                            )
+                            channel = await get_channel_exhaustively(
+                                self.bot, guild, event.channel_id
+                            )
+                            roller = await guild.fetch_member(free_creature.roller_id)
+                            if channel is not None:
+                                message = await cast(
+                                    discord.PartialMessageable, channel
+                                ).fetch_message(event.message_id)
+
+                                if isinstance(
+                                    event,
+                                    PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent,
+                                ):
+                                    embed, view = free_creature_unprotected_embed(
+                                        free_creature,
+                                        roller,
+                                        free_creature.get_expires_timestamp(),
+                                    )
+                                    await message.edit(embed=embed, view=view)
+                                elif isinstance(
+                                    event,
+                                    PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent,
+                                ):
+                                    claimer = await guild.fetch_member(event.player_id)
+                                    if claimer is not None:
+                                        await message.edit(
+                                            embed=free_creature_claimed_embed(
+                                                free_creature, roller, claimer
+                                            ),
+                                            view=None,
+                                        )
+                                elif isinstance(
+                                    event,
+                                    PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent,
+                                ):
+                                    if "Claimed by" in message.content:
+                                        continue
+                                    await message.edit(
+                                        embed=free_creature_expired_embed(free_creature, roller),
+                                        view=None,
+                                    )
+
+                            await asyncio.sleep(4)
+
+                        except CreatureNotFound:
+                            pass
+
+            print("now sending embeds")
 
             for embed, channel in embeds_to_send:
                 cast_channel = cast(discord.PartialMessageable, channel)
 
                 await cast_channel.send(embed=embed)
                 await asyncio.sleep(2)  # rate limit
+
+            print("full event list resolved")
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:

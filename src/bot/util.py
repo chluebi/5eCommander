@@ -347,7 +347,7 @@ def free_creature_expired_embed(
     return embed
 
 
-def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
+def conflict_embed(guild: discord.Guild, guild_db: Database.Guild) -> discord.Embed:
 
     conflict_text = ""
 
@@ -380,6 +380,7 @@ def conflict_embed(guild_db: Database.Guild) -> discord.Embed:
         conflict_text = "No players currently playing"
 
     embed = standard_embed("Conflict", conflict_text)
+    embed = format_embed(embed, guild, guild_db)
 
     return embed
 
@@ -406,7 +407,11 @@ def format_free_creature(id: str, guild: discord.Guild, guild_db: Database.Guild
     m = re.match(r"\((\d+),\s*(\d+)\)", id)
 
     if m:
-        return f"[{guild_db.get_free_creature(int(m.group(1)), int(m.group(2))).creature.text()}](https://discord.com/channels/{guild.id}/{m.group(1)}/{m.group(2)})"
+        try:
+            free_creature_db = guild_db.get_free_creature(int(m.group(1)), int(m.group(2)))
+            return f"[{free_creature_db.creature.text()}](https://discord.com/channels/{guild.id}/{m.group(1)}/{m.group(2)})"
+        except CreatureNotFound:
+            return f"<free_creature:{id}>"
     else:
         return f"<free_creature:{id}>"
 

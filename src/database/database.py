@@ -1997,7 +1997,8 @@ class Database:
                 with self.parent.transaction(parent=con) as sub_con:
                     self.guild = cast(Database.Guild, self.guild)
                     creature = self.guild.get_creature(self.creature_id, con=sub_con)
-                    creature.owner.recharge_creature(creature, con=sub_con)
+                    if creature in [c for c, _ in creature.owner.get_played()]:
+                        creature.owner.recharge_creature(creature, con=sub_con)
 
     class FreeCreature:
 
