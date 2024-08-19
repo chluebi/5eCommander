@@ -248,6 +248,9 @@ class Towncrier(SimpleCreature):
 
     def quest_gain(self) -> List[Gain]:
         return [Gain(Resource.RALLY, 1)]
+    
+    def campaign_price(self) -> Optional[list[Price]]:
+        return None
 
 
 class Spy(SimpleCreature):
