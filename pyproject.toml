@@ -30,6 +30,7 @@ pytest = "^8.1.1"
 pylint = "^3.0.0"
 testcontainers = "^4.4.0"
 mypy = "^1.4.1"
+ruff = "^0.4.3"
 
 [tool.poetry.scripts]
 start = "bot:run"
@@ -47,3 +48,9 @@ warn_no_return = true
 warn_redundant_casts = true
 warn_unreachable = true
 strict_equality = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "W", "C", "D", "RUF100"]
+ignore = []

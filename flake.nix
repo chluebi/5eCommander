@@ -16,7 +16,8 @@
       in
       {
         packages = {
-          default = poetry2nix.mkPoetryApplication { 
+          default = poetry2nix.mkPoetryApplication {
+            python = pkgs.python311;
             projectDir = self;
 
             overrides = poetry2nix.overrides.withDefaults (self: super: {
