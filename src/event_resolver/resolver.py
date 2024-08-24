@@ -10,7 +10,6 @@ from src.database.postgres import PostgresDatabase
 
 
 class KeepAlive:
-
     def __init__(self) -> None:
         self.keep_alive = True
 
@@ -50,7 +49,7 @@ async def listen_to_notifications(
 def add_notification_function(db: PostgresDatabase) -> None:
     with db.transaction(parent=None) as sub_con:
         sql = text(
-            f"""
+            """
 CREATE FUNCTION notify_event_insert() RETURNS trigger AS $$
 BEGIN
     PERFORM pg_notify('event_insert', NEW.id::text);

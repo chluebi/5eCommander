@@ -16,7 +16,6 @@ from src.definitions.creatures import Ruffian
 
 
 class SimpleRegion(Database.BaseRegion):
-
     id = -1
     name = "simple region"
     category: Optional[RegionCategory] = None
@@ -67,7 +66,6 @@ class SimpleRegion(Database.BaseRegion):
 
 
 class RoyalGift(SimpleRegion):
-
     id = 0
     name = "royal gift"
     category = RegionCategories.noble
@@ -80,7 +78,6 @@ class RoyalGift(SimpleRegion):
 
 
 class CourtPolitics(SimpleRegion):
-
     id = 1
     name = "court politics"
     category = RegionCategories.noble
@@ -90,7 +87,6 @@ class CourtPolitics(SimpleRegion):
 
 
 class Delegation(Database.BaseRegion):
-
     id = 2
     name = "delegation"
     category = RegionCategories.noble
@@ -127,7 +123,6 @@ class Delegation(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.gain(self.quest_gain(), con=con, extra_data=extra_data)
@@ -135,7 +130,6 @@ class Delegation(Database.BaseRegion):
 
 
 class ArtefactFence(SimpleRegion):
-
     id = 3
     name = "artefact fence"
     category = RegionCategories.market
@@ -148,7 +142,6 @@ class ArtefactFence(SimpleRegion):
 
 
 class Collections(SimpleRegion):
-
     id = 4
     name = "collections"
     category = RegionCategories.market
@@ -158,7 +151,6 @@ class Collections(SimpleRegion):
 
 
 class Ruffians(Database.BaseRegion):
-
     id = 5
     name = "ruffians"
     category = RegionCategories.market
@@ -195,7 +187,6 @@ class Ruffians(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             new_creature_db = creature_db.guild.add_creature(Ruffian(), owner, con=con)
@@ -203,7 +194,6 @@ class Ruffians(Database.BaseRegion):
 
 
 class Cave(SimpleRegion):
-
     id = 6
     name = "cave"
     category = RegionCategories.dungeon
@@ -213,7 +203,6 @@ class Cave(SimpleRegion):
 
 
 class Dungeon(SimpleRegion):
-
     id = 7
     name = "dungeon"
     category = RegionCategories.dungeon
@@ -226,7 +215,6 @@ class Dungeon(SimpleRegion):
 
 
 class HiddenLair(SimpleRegion):
-
     id = 8
     name = "hidden lair"
     category = RegionCategories.dungeon
@@ -239,7 +227,6 @@ class HiddenLair(SimpleRegion):
 
 
 class Ritual(SimpleRegion):
-
     id = 9
     name = "ritual"
     category = RegionCategories.arcane
@@ -252,7 +239,6 @@ class Ritual(SimpleRegion):
 
 
 class Library(Database.BaseRegion):
-
     id = 10
     name = "library"
     category = RegionCategories.arcane
@@ -270,14 +256,12 @@ class Library(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.draw_cards(N=2, con=con)
 
 
 class BindingSpell(SimpleRegion):
-
     id = 11
     name = "binding spell"
     category = RegionCategories.arcane
@@ -290,7 +274,6 @@ class BindingSpell(SimpleRegion):
 
 
 class HiddenCache(SimpleRegion):
-
     id = 12
     name = "hidden cache"
     category = RegionCategories.wild
@@ -300,7 +283,6 @@ class HiddenCache(SimpleRegion):
 
 
 class Hunt(Database.BaseRegion):
-
     id = 13
     name = "hunt"
     category = RegionCategories.wild
@@ -331,7 +313,6 @@ class Hunt(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
 
@@ -349,14 +330,12 @@ class Hunt(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.gain(self.quest_gain(), con=con)
 
 
 class Abandon(Database.BaseRegion):
-
     id = 14
     name = "abandon"
     category = RegionCategories.wild
@@ -374,7 +353,6 @@ class Abandon(Database.BaseRegion):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             played_creatures = [c for c, _ in owner.get_played(con=con)]

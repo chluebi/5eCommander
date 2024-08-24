@@ -52,5 +52,5 @@ strict_equality = true
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-select = ["E", "F", "W", "C", "D", "RUF100"]
-ignore = []
+lint.select = ["E", "F", "W", "C", "RUF100"]
+lint.ignore = ["D10", "E402", "F405", "E731", "C416", "F403", "F401", "C403", "W291", "F841", "E501", "E712", "C417", "C901"]

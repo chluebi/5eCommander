@@ -15,7 +15,6 @@ from src.core.exceptions import CreatureCannotCampaign, CreatureCannotQuest
 
 
 class SimpleCreature(Database.BaseCreature):
-
     id = -1
     name = "simple creature"
     quest_region_categories = []
@@ -136,7 +135,6 @@ class SimpleCreature(Database.BaseCreature):
 
 
 class Commoner(SimpleCreature):
-
     id = 0
     name = "commoner"
     quest_region_categories: list[RegionCategory] = [RegionCategories.market]
@@ -147,7 +145,6 @@ class Commoner(SimpleCreature):
 
 
 class Ruffian(SimpleCreature):
-
     id = 1
     name = "ruffian"
     quest_region_categories: list[RegionCategory] = [RegionCategories.market]
@@ -161,7 +158,6 @@ class Ruffian(SimpleCreature):
 
 
 class Knight(SimpleCreature):
-
     id = 2
     name = "knight"
     quest_region_categories: list[RegionCategory] = [
@@ -178,7 +174,6 @@ class Knight(SimpleCreature):
 
 
 class Aristocrat(SimpleCreature):
-
     id = 3
     name = "aristocrat"
     quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
@@ -189,7 +184,6 @@ class Aristocrat(SimpleCreature):
 
 
 class Servant(SimpleCreature):
-
     id = 4
     name = "servant"
     quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
@@ -200,7 +194,6 @@ class Servant(SimpleCreature):
 
 
 class Beggar(SimpleCreature):
-
     id = 5
     name = "beggar"
     quest_region_categories: list[RegionCategory] = [RegionCategories.market]
@@ -211,7 +204,6 @@ class Beggar(SimpleCreature):
 
 
 class Messenger(SimpleCreature):
-
     id = 6
     name = "messenger"
     quest_region_categories: list[RegionCategory] = [
@@ -226,7 +218,6 @@ class Messenger(SimpleCreature):
 
 
 class NoviceAdventurer(SimpleCreature):
-
     id = 7
     name = "novice adventurer"
     quest_region_categories: list[RegionCategory] = [
@@ -240,7 +231,6 @@ class NoviceAdventurer(SimpleCreature):
 
 
 class Towncrier(SimpleCreature):
-
     id = 8
     name = "towncrier"
     quest_region_categories: list[RegionCategory] = [RegionCategories.market]
@@ -248,13 +238,12 @@ class Towncrier(SimpleCreature):
 
     def quest_gain(self) -> List[Gain]:
         return [Gain(Resource.RALLY, 1)]
-    
+
     def campaign_price(self) -> Optional[list[Price]]:
         return None
 
 
 class Spy(SimpleCreature):
-
     id = 9
     name = "spy"
     quest_region_categories: list[RegionCategory] = [
@@ -272,7 +261,6 @@ class Spy(SimpleCreature):
 
 
 class General(SimpleCreature):
-
     id = 10
     name = "general"
     quest_region_categories: list[RegionCategory] = [RegionCategories.noble]
@@ -283,7 +271,6 @@ class General(SimpleCreature):
 
 
 class Scout(SimpleCreature):
-
     id = 11
     name = "scout"
     quest_region_categories: list[RegionCategory] = [
@@ -297,7 +284,6 @@ class Scout(SimpleCreature):
 
 
 class NoviceMage(SimpleCreature):
-
     id = 12
     name = "novice mage"
     quest_region_categories: list[RegionCategory] = [RegionCategories.arcane]
@@ -305,7 +291,6 @@ class NoviceMage(SimpleCreature):
 
 
 class Mentor(SimpleCreature):
-
     id = 13
     name = "mentor"
     quest_region_categories: list[RegionCategory] = [RegionCategories.arcane]
@@ -324,14 +309,12 @@ class Mentor(SimpleCreature):
         con: Optional[Database.TransactionManager] = None,
         extra_data: dict[Any, Any] = {},
     ) -> None:
-
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.draw_cards(N=1, con=con)
 
 
 class Druid(SimpleCreature):
-
     id = 14
     name = "druid"
     quest_region_categories: list[RegionCategory] = [RegionCategories.arcane, RegionCategories.wild]

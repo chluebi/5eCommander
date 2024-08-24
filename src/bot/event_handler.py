@@ -59,7 +59,6 @@ banned_events: List[Type[Event]] = [
 async def get_channel_exhaustively(
     bot: "Bot", guild: discord.Guild, channel_id: int
 ) -> Optional[discord.PartialMessageable]:
-
     channel = bot.channel_cache.get(channel_id)
 
     if channel is None:
@@ -92,7 +91,6 @@ async def get_channel_exhaustively(
 
 
 class EventHandler(commands.Cog):
-
     def __init__(self, bot: "Bot"):
         self.bot = bot
         self.keep_alive = KeepAlive()
@@ -105,9 +103,7 @@ class EventHandler(commands.Cog):
 
     @tasks.loop(seconds=0, count=1)
     async def refresh_free_creature_views(self) -> None:
-
         for guild_db in self.bot.db.get_guilds():
-
             try:
                 guild = await self.bot.fetch_guild(guild_db.id)
             except discord.NotFound:
@@ -116,7 +112,6 @@ class EventHandler(commands.Cog):
             free_creatures = guild_db.get_free_creatures()
 
             for fc in free_creatures:
-
                 print("refreshing fc", fc)
 
                 if fc.is_expired(time.time()):
@@ -154,7 +149,6 @@ class EventHandler(commands.Cog):
                 await asyncio.sleep(4)
 
     async def event_handler(self, connection: Any, pid: Any, channel: Any, payload: str) -> None:
-
         embeds_to_send: List[Tuple[discord.Embed, discord.PartialMessageable]] = []
 
         if waiting_lock.locked():
@@ -169,9 +163,7 @@ class EventHandler(commands.Cog):
             print("acquired", handler_lock)
 
             for guild_db in self.bot.db.get_guilds():
-
                 with self.bot.db.transaction() as con:
-
                     events = sorted(
                         guild_db.get_events(0, time.time(), also_resolved=False, con=con),
                         key=lambda x: x.id,
@@ -189,7 +181,6 @@ class EventHandler(commands.Cog):
 
                     for event in events:
                         if event.parent_event_id is not None:
-
                             if event.parent_event_id in event_children:
                                 event_children[event.parent_event_id].append(event)
                                 valid_events.append(event)
@@ -237,7 +228,6 @@ class EventHandler(commands.Cog):
                     channel = await get_channel_exhaustively(self.bot, guild, channel_id)
 
                     for root_event_id, children in flat_event_tree.items():
-
                         root_event = event_cache[root_event_id]
 
                         allowed = True
@@ -282,11 +272,9 @@ class EventHandler(commands.Cog):
                 print("transaction done")
 
                 for event in valid_events:
-
                     print("trying event for free creature stuff", event)
 
                     if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
-
                         print("is one")
 
                         try:
@@ -352,7 +340,6 @@ class EventHandler(commands.Cog):
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:
-
         await self.bot.wait_until_ready()
 
         await self.event_handler(None, None, None, "0")

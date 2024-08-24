@@ -29,7 +29,6 @@ class EmptyDeckException(commands.UserInputError):
 
 
 class MissingExtraData(commands.UserInputError):
-
     def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
         super().__init__(message)
         self.extra_data = extra_data if extra_data is not None else {}
@@ -41,7 +40,6 @@ class MissingExtraData(commands.UserInputError):
 
 
 class BadExtraData(commands.UserInputError):
-
     def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
         super().__init__(message)
         self.extra_data = extra_data if extra_data is not None else {}
@@ -65,12 +63,10 @@ class ExpiredFreeCreature(commands.UserInputError):
 
 
 class CreatureCannotQuest(commands.UserInputError):
-
     def __init__(self) -> None:
         super().__init__("Creature cannot quest.")
 
 
 class CreatureCannotCampaign(commands.UserInputError):
-
     def __init__(self) -> None:
         super().__init__("Creature cannot campaign.")

@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 
 
 class GuildAdmin(commands.Cog):
-
     def __init__(self, bot: "Bot"):
         self.bot = bot
 
@@ -50,7 +49,6 @@ class GuildAdmin(commands.Cog):
     @commands.guild_only()
     async def init_guild(self, ctxt: commands.Context["Bot"]) -> None:
         """Initialises the guild to play 5eCommander. Needs administator permissions."""
-
         assert ctxt.guild is not None
 
         try:
@@ -75,14 +73,13 @@ class GuildAdmin(commands.Cog):
         self, ctxt: commands.Context["Bot"], confirm: Optional[str] = "no"
     ) -> None:
         """Initialises the guild to play 5eCommander. Needs administator permissions."""
-
         assert ctxt.guild is not None
 
         if confirm != "Yes I confirm that I understand that all data will be deleted":
             await ctxt.send(
                 embed=error_embed(
                     "Confirm",
-                    f"The confirmation must be exactly 'Yes I confirm that I understand that all data will be deleted'.",
+                    "The confirmation must be exactly 'Yes I confirm that I understand that all data will be deleted'.",
                 )
             )
             return
@@ -91,7 +88,7 @@ class GuildAdmin(commands.Cog):
         self.bot.db.remove_guild(guild_db)
 
         await ctxt.send(
-            embed=success_embed("Guild Removed", f"All data relating to this guild removed")
+            embed=success_embed("Guild Removed", "All data relating to this guild removed")
         )
 
     @commands.hybrid_command()  # type: ignore
@@ -100,7 +97,6 @@ class GuildAdmin(commands.Cog):
     @commands.check(guild_exists)
     async def guild_info(self, ctxt: commands.Context["Bot"]) -> None:
         """Gives you the guild configuration"""
-
         assert ctxt.guild is not None
 
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
@@ -117,7 +113,6 @@ class GuildAdmin(commands.Cog):
     @commands.check(guild_exists)
     async def map(self, ctxt: commands.Context["Bot"]) -> None:
         """Gives you info about the locations in the game"""
-
         assert ctxt.guild is not None
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
@@ -128,7 +123,6 @@ class GuildAdmin(commands.Cog):
     @commands.check(guild_exists)
     async def conflict(self, ctxt: commands.Context["Bot"]) -> None:
         """Gives you info about the current conflict in the guild"""
-
         assert ctxt.guild is not None
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
@@ -136,7 +130,6 @@ class GuildAdmin(commands.Cog):
 
 
 class PlayerAdmin(commands.Cog):
-
     def __init__(self, bot: "Bot"):
         self.bot = bot
 
@@ -145,9 +138,8 @@ class PlayerAdmin(commands.Cog):
     @commands.check(guild_exists)
     async def join(self, ctxt: commands.Context["Bot"]) -> None:
         """Join the game"""
-
         if ctxt.guild is None:
-            await ctxt.send(embed=error_embed("User Error", f"You are not currently in a guild."))
+            await ctxt.send(embed=error_embed("User Error", "You are not currently in a guild."))
             return
 
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
@@ -155,24 +147,23 @@ class PlayerAdmin(commands.Cog):
         try:
             player_db = guild_db.add_player(ctxt.author.id)
         except sqlalchemy.exc.IntegrityError as e:
-            await ctxt.send(embed=error_embed("User Error", f"You already joined"))
+            await ctxt.send(embed=error_embed("User Error", "You already joined"))
             return
 
-        await ctxt.send(embed=success_embed("Success", f"You have joined the game!"))
+        await ctxt.send(embed=success_embed("Success", "You have joined the game!"))
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
     async def player_info(self, ctxt: commands.Context["Bot"], *, member: discord.Member) -> None:
         """Gives you the info about a player"""
-
         assert ctxt.guild is not None
         guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         try:
             player_db = guild_db.get_player(member.id)
         except PlayerNotFound as e:
-            await ctxt.send(embed=error_embed("User Error", f"No player of this name found"))
+            await ctxt.send(embed=error_embed("User Error", "No player of this name found"))
             return
 
         await ctxt.send(embed=player_embed(member, player_db, private=True))
@@ -182,7 +173,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def me(self, ctxt: commands.Context["Bot"]) -> None:
         """Gives you the info about yourself, privately"""
-
         if ctxt.interaction is None:
             raise commands.CheckFailure("This command can only be called as a slash command")
 
@@ -199,7 +189,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def play(self, ctxt: commands.Context["Bot"], card: int, region: int) -> None:
         """Uses a order to play a card to a region"""
-
         assert ctxt.guild is not None
 
         with self.bot.db.transaction() as con:
@@ -226,7 +215,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def play_to(self, ctxt: commands.Context["Bot"], region: int, card: int) -> None:
         """Uses a order to play a card to a region, but region is chosen first"""
-
         assert ctxt.guild is not None
 
         with self.bot.db.transaction() as con:
@@ -323,7 +311,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def campaign(self, ctxt: commands.Context["Bot"], card: int) -> None:
         """Play a creature to the campaign. Creature is out of deck until campaign ends."""
-
         assert ctxt.guild is not None
 
         with self.bot.db.transaction() as con:
@@ -369,7 +356,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(guild_exists)
     async def card(self, ctxt: commands.Context["Bot"], card: int) -> None:
         """Shows the info about a card"""
-
         assert ctxt.guild is not None
 
         with self.bot.db.transaction() as con:
@@ -399,7 +385,6 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def roll(self, ctxt: commands.Context["Bot"], amount: int = 1) -> None:
         """Roll for new creatures"""
-
         assert ctxt.guild is not None
 
         with self.bot.db.transaction() as con:

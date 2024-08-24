@@ -32,7 +32,6 @@ from sqlalchemy import RootTransaction, Connection
 
 
 class Database:
-
     def __init__(self, start_condition: StartCondition):
         self.start_condition = start_condition
 
@@ -40,7 +39,6 @@ class Database:
         return float(time.time() + seconds)
 
     class TransactionManager:
-
         def __init__(
             self,
             parent: Database,
@@ -104,9 +102,7 @@ class Database:
             assert False
 
         def add_event(self, event: Event) -> None:
-
             if self.parent_manager:
-
                 parent = self.parent_manager
                 while parent.events == [] and parent.parent_manager:
                     parent = parent.parent_manager
@@ -168,7 +164,6 @@ class Database:
         assert False
 
     class StartCondition:
-
         def __init__(
             self,
             start_config: dict[Any, Any],
@@ -182,7 +177,6 @@ class Database:
             self.start_deck = start_deck
 
     class Guild:
-
         def __init__(self, parent: Database, id: int):
             self.parent = parent
             self.id = id
@@ -379,7 +373,6 @@ class Database:
             assert False
 
         class RegionAddedEvent(Event):
-
             event_type = "region_added"
 
             def __init__(
@@ -414,7 +407,6 @@ class Database:
                 return f"<region:{self.region_id}> has been added"
 
         class RegionRemovedEvent(Event):
-
             event_type = "region_removed"
 
             def __init__(
@@ -449,7 +441,6 @@ class Database:
                 return f"<region:{self.region_id}> has been removed"
 
         class PlayerAddedEvent(Event):
-
             event_type = "player_added"
 
             def __init__(
@@ -484,7 +475,6 @@ class Database:
                 return f"<player:{self.player_id}> has joined"
 
         class PlayerRemovedEvent(Event):
-
             event_type = "player_removed"
 
             def __init__(
@@ -519,7 +509,6 @@ class Database:
                 return f"<player:{self.player_id}> has left"
 
         class ConflictStartEvent(Event):
-
             event_type = "conflict_start"
 
             def __init__(
@@ -549,16 +538,14 @@ class Database:
                 return json.dumps({})
 
             def text(self) -> str:
-                return f"A new conflict has started!"
+                return "A new conflict has started!"
 
             def resolve(self, con: Any) -> None:
-
                 con = cast(Database.TransactionManager, con)
                 self.parent = cast(Database, self.parent)
                 self.guild = cast(Database.Guild, self.guild)
 
                 with self.parent.transaction(parent=con) as sub_con:
-
                     until = self.parent.timestamp_after(
                         self.guild.get_config(con=sub_con)["conflict_duration"]
                     )
@@ -572,7 +559,6 @@ class Database:
                     )
 
         class ConflictEndEvent(Event):
-
             event_type = "conflict_end"
 
             def __init__(
@@ -602,23 +588,19 @@ class Database:
                 return json.dumps({})
 
             def text(self) -> str:
-                return f"The conflict has ended, all campaigning creatures are returned."
+                return "The conflict has ended, all campaigning creatures are returned."
 
             def resolve(self, con: Any) -> None:
-
                 con = cast(Database.TransactionManager, con)
                 self.parent = cast(Database, self.parent)
                 self.guild = cast(Database.Guild, self.guild)
 
                 with self.parent.transaction(parent=con) as sub_con:
-
                     player_scores: dict[int, int] = {}
                     players = self.guild.get_players(con=sub_con)
 
                     if len(players) > 0:
-
                         for player_db in self.guild.get_players(con=sub_con):
-
                             player_strength = 0
 
                             for c, s in player_db.get_campaign(con=sub_con):
@@ -656,7 +638,6 @@ class Database:
                     )
 
         class ConflictResultEvent(Event):
-
             event_type = "conflict_result"
 
             def __init__(
@@ -699,7 +680,6 @@ class Database:
                 return f"**{winner_text}**\n\n{ranking_text}"
 
     class BaseRegion:
-
         id = -1
         name = "default_region"
         category: Optional[RegionCategory] = None
@@ -740,7 +720,6 @@ class Database:
             return
 
     class Region:
-
         def __init__(
             self, parent: Database, id: int, region: Database.BaseRegion, guild: Database.Guild
         ):
@@ -785,7 +764,6 @@ class Database:
             assert False
 
         class RegionRechargeEvent(Event):
-
             event_type = "region_recharge"
 
             def __init__(
@@ -827,7 +805,6 @@ class Database:
                 self.guild.get_region(self.region_id).unoccupy(int(self.timestamp), con=con)
 
     class Player:
-
         def __init__(self, parent: Database, id: int, guild: Database.Guild):
             self.parent = parent
             self.id = id
@@ -1000,7 +977,6 @@ class Database:
             extra_data: dict[Any, Any],
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
-
             with self.parent.transaction(parent=con) as sub_con:
                 expected_extra_data = {
                     "creatures_to_delete": {"text": "creatures to delete", "type": "list creature"}
@@ -1222,7 +1198,6 @@ class Database:
             con: Optional[Database.TransactionManager] = None,
             extra_data: dict[Any, Any] = {},
         ) -> None:
-
             if region.region.category not in creature.creature.quest_region_categories:
                 raise CreatureCannotQuestHere(
                     f"Region is {region.region.category} but creature can only go to {creature.creature.quest_region_categories}"
@@ -1278,7 +1253,6 @@ class Database:
             con: Optional[Database.TransactionManager] = None,
             extra_data: dict[Any, Any] = {},
         ) -> None:
-
             base_creature: Database.BaseCreature = creature.creature
 
             with self.parent.transaction(parent=con) as sub_con:
@@ -1305,7 +1279,6 @@ class Database:
                 self.campaign_creature(creature, strength, con=sub_con)
 
         class PlayerDrawEvent(Event):
-
             event_type = "player_draw"
 
             def __init__(
@@ -1348,7 +1321,6 @@ class Database:
                 return f"<player:{self.player_id}> draws {self.num_cards} cards"
 
         class PlayerGainEvent(Event):
-
             event_type = "player_gain"
 
             def __init__(
@@ -1395,7 +1367,6 @@ class Database:
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerPayEvent(Event):
-
             event_type = "player_pay"
 
             def __init__(
@@ -1442,7 +1413,6 @@ class Database:
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerPlayToRegionEvent(Event):
-
             event_type = "player_play_to_region"
 
             def __init__(
@@ -1498,7 +1468,6 @@ class Database:
                 return f"<player:{self.player_id}> sends <creature:{self.creature_id}> to <region:{self.region_id}>"
 
         class PlayerPlayToCampaignEvent(Event):
-
             event_type = "player_play_to_campaign"
 
             def __init__(
@@ -1550,7 +1519,6 @@ class Database:
                 return f"<player:{self.player_id}> makes <creature:{self.creature_id}> campaign"
 
         class PlayerOrderRechargeEvent(Event):
-
             event_type = "player_order_recharge"
 
             def __init__(
@@ -1594,7 +1562,6 @@ class Database:
                     player_orders = player.get_resources(con=sub_con)[Resource.ORDERS]
 
                     if player_orders + 1 <= guild_config["max_orders"]:
-
                         sub_con.add_event(
                             Database.Player.PlayerOrderRechargedEvent(
                                 self.parent,
@@ -1629,7 +1596,6 @@ class Database:
                         )
 
         class PlayerOrderRechargedEvent(PlayerOrderRechargeEvent):
-
             event_type = "player_order_recharged"
 
             @staticmethod
@@ -1652,7 +1618,6 @@ class Database:
                 pass
 
         class PlayerMagicRechargeEvent(Event):
-
             event_type = "player_magic_recharge"
 
             def __init__(
@@ -1696,7 +1661,6 @@ class Database:
                     player_magic = player.get_resources(con=sub_con)[Resource.MAGIC]
 
                     if player_magic + 1 <= guild_config["max_magic"]:
-
                         sub_con.add_event(
                             Database.Player.PlayerMagicRechargedEvent(
                                 self.parent,
@@ -1731,7 +1695,6 @@ class Database:
                         )
 
         class PlayerMagicRechargedEvent(PlayerMagicRechargeEvent):
-
             event_type = "player_magic_recharged"
 
             @staticmethod
@@ -1754,7 +1717,6 @@ class Database:
                 pass
 
         class PlayerCardRechargeEvent(Event):
-
             event_type = "player_card_recharge"
 
             def __init__(
@@ -1797,7 +1759,6 @@ class Database:
                     guild_config = self.guild.get_config(con=sub_con)
 
                     if len(player.get_hand(con=sub_con)) < guild_config["max_cards"]:
-
                         sub_con.add_event(
                             Database.Player.PlayerCardRechargedEvent(
                                 self.parent,
@@ -1832,7 +1793,6 @@ class Database:
                         )
 
         class PlayerCardRechargedEvent(PlayerCardRechargeEvent):
-
             event_type = "player_card_recharged"
 
             @staticmethod
@@ -1855,7 +1815,6 @@ class Database:
                 pass
 
     class BaseCreature:
-
         id = -1
         name = "default_creature"
         quest_region_categories: list[RegionCategory] = []
@@ -1925,7 +1884,6 @@ class Database:
             return 0
 
     class Creature:
-
         def __init__(
             self,
             parent: Database,
@@ -1956,7 +1914,6 @@ class Database:
             return self.creature.text()
 
         class CreatureRechargeEvent(Event):
-
             event_type = "creature_recharge"
 
             def __init__(
@@ -2001,7 +1958,6 @@ class Database:
                         creature.owner.recharge_creature(creature, con=sub_con)
 
     class FreeCreature:
-
         def __init__(
             self,
             parent: Database,
@@ -2087,7 +2043,6 @@ class Database:
             owner: Database.Player,
             con: Optional[Database.TransactionManager] = None,
         ) -> Database.Creature:
-
             self.guild.get_free_creature(self.channel_id, self.message_id)
 
             if self.is_expired(timestamp):
@@ -2123,7 +2078,6 @@ class Database:
                 return creature
 
         class FreeCreatureEvent(Event):
-
             event_type = "free_creature_base_event"
 
             def __init__(
@@ -2158,7 +2112,6 @@ class Database:
                 assert False
 
         class FreeCreatureProtectedEvent(FreeCreatureEvent):
-
             event_type = "free_creature_protected"
 
             def __init__(
@@ -2203,7 +2156,6 @@ class Database:
                 )
 
         class FreeCreatureExpiresEvent(FreeCreatureEvent):
-
             event_type = "free_creature_expires"
 
             def __init__(
@@ -2259,7 +2211,6 @@ class Database:
                         pass
 
         class FreeCreatureClaimedEvent(FreeCreatureEvent):
-
             event_type = "free_creature_claimed"
 
             def __init__(

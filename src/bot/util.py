@@ -84,15 +84,15 @@ def player_embed(
 
     resources_text[Resource.ORDERS] += f"/{max_orders}"
     if resources[Resource.ORDERS] < max_orders:
-        resources_text[
-            Resource.ORDERS
-        ] += f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerOrderRechargeEvent.event_type].timestamp)})"
+        resources_text[Resource.ORDERS] += (
+            f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerOrderRechargeEvent.event_type].timestamp)})"
+        )
 
     resources_text[Resource.MAGIC] += f"/{max_magic}"
     if resources[Resource.MAGIC] < max_magic:
-        resources_text[
-            Resource.MAGIC
-        ] += f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerMagicRechargeEvent.event_type].timestamp)})"
+        resources_text[Resource.MAGIC] += (
+            f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerMagicRechargeEvent.event_type].timestamp)})"
+        )
 
     resources_text_joined = "\n".join([resources_text[r] for r in BaseResources])
 
@@ -152,19 +152,20 @@ def player_embed(
 
 
 def regions_embed(guild_db: Database.Guild) -> discord.Embed:
-
     regions = sorted(guild_db.get_regions(), key=lambda x: x.id)
     regions_cache = {r.id: r for r in regions}
     regions_occupied = {r.id: r.occupied() for r in regions}
 
-    region_categories: defaultdict[RegionCategory, List[int]] = defaultdict(lambda: [])
+    region_ids_by_region_categories: defaultdict[RegionCategory, List[int]] = defaultdict(
+        lambda: []
+    )
     for r in regions:
         assert r.region.category is not None
-        region_categories[r.region.category].append(r.id)
+        region_ids_by_region_categories[r.region.category].append(r.id)
 
     embed = standard_embed("Map", "All locations")
 
-    for rc, sub_regions in region_categories.items():
+    for rc, sub_regions in region_ids_by_region_categories.items():
         rc_text = ""
         for rid in sub_regions:
             creature, timestamp = regions_occupied[rid]
@@ -182,7 +183,6 @@ def regions_embed(guild_db: Database.Guild) -> discord.Embed:
 
 
 def creature_embed(creature: Database.BaseCreature) -> discord.Embed:
-
     creature_title = creature.text()
     creature_text = f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
     creature_text += f"**When sent to campaign**: {creature.campaign_ability_effect_full_text() if creature.campaign_ability_effect_full_text() else '*no special ability*'}\n"
@@ -191,7 +191,6 @@ def creature_embed(creature: Database.BaseCreature) -> discord.Embed:
 
 
 class ClaimView(discord.ui.View):
-
     interaction: discord.Interaction | None = None
     message: discord.Message | None = None
 
@@ -203,7 +202,6 @@ class ClaimView(discord.ui.View):
 def free_creature_embed_text(
     creature: Database.BaseCreature, roller: discord.Member
 ) -> Tuple[str, str, str, Optional[str]]:
-
     creature_title = "Roll"
     creature_text: str = f"**{creature.text()}**\n\n"
     creature_text += f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
@@ -222,7 +220,6 @@ def free_creature_embed_text(
 
 
 def creature_claim_callback_factory(free_creature: Database.FreeCreature) -> Any:
-
     async def callback(interaction: discord.Interaction) -> None:
         player_db = free_creature.guild.get_player(interaction.user.id)
         try:
@@ -241,7 +238,6 @@ def creature_claim_callback_factory(free_creature: Database.FreeCreature) -> Any
 
 
 def free_creature_embed(creature: Database.BaseCreature, roller: discord.Member) -> discord.Embed:
-
     creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
         creature, roller
     )
@@ -258,7 +254,6 @@ def free_creature_embed(creature: Database.BaseCreature, roller: discord.Member)
 def free_creature_protected_embed(
     free_creature: Database.FreeCreature, roller: discord.Member, timestamp: float
 ) -> Tuple[discord.Embed, discord.ui.View]:
-
     creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
         free_creature.creature, roller
     )
@@ -286,7 +281,6 @@ def free_creature_protected_embed(
 def free_creature_claimed_embed(
     free_creature: Database.FreeCreature, roller: discord.Member, claimer: discord.Member
 ) -> discord.Embed:
-
     creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
         free_creature.creature, roller
     )
@@ -305,7 +299,6 @@ def free_creature_claimed_embed(
 def free_creature_unprotected_embed(
     free_creature: Database.FreeCreature, roller: discord.Member, timestamp: float
 ) -> Tuple[discord.Embed, discord.ui.View]:
-
     creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
         free_creature.creature, roller
     )
@@ -331,12 +324,11 @@ def free_creature_unprotected_embed(
 def free_creature_expired_embed(
     free_creature: Database.FreeCreature, roller: discord.Member
 ) -> discord.Embed:
-
     creature_title, creature_text, footer_text, footer_url = free_creature_embed_text(
         free_creature.creature, roller
     )
 
-    creature_text += f"\n\n❌ Expired ❌"
+    creature_text += "\n\n❌ Expired ❌"
 
     embed = standard_embed(creature_title, creature_text)
     embed.set_footer(
@@ -348,7 +340,6 @@ def free_creature_expired_embed(
 
 
 def conflict_embed(guild: discord.Guild, guild_db: Database.Guild) -> discord.Embed:
-
     conflict_text = ""
 
     end_events = guild_db.get_events(
@@ -445,7 +436,6 @@ def format_str(s: str, guild: discord.Guild, guild_db: Database.Guild) -> str:
 def format_embed(
     embed: discord.Embed, guild: discord.Guild, guild_db: Database.Guild
 ) -> discord.Embed:
-
     assert embed.title is not None
     assert embed.description is not None
 

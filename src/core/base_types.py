@@ -50,7 +50,6 @@ def resource_to_emoji(resource: Resource) -> str:
 def resource_change_to_string(
     resource_change: Union[Price | Gain], third_person: bool = False
 ) -> str:
-
     change_text = ""
 
     if third_person:
@@ -160,7 +159,6 @@ RegionCategory = namedtuple("RegionCategory", ["name", "emoji"], defaults=["defa
 
 
 class Event:
-
     event_type = "base_event"
 
     def __init__(

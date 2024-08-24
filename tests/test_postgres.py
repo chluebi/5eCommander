@@ -328,7 +328,6 @@ def test_deck() -> None:
                 pass
 
         for i in range(1, len(start_condition.start_deck) * 2):
-
             prev_events = get_events()
             assert len(prev_events) == i - 1
 
@@ -735,7 +734,6 @@ from src.event_resolver.resolver import (
 def event_handler_factory(
     guild_db: Database.Guild, events: List[Event]
 ) -> Callable[[Any, Any, Any, str], None]:
-
     def event_handler(connection: Any, pid: Any, channel: Any, payload: str) -> None:
         with guild_db.parent.transaction() as con:
             event = guild_db.get_event_by_id(int(payload), con=con)
@@ -746,7 +744,6 @@ def event_handler_factory(
 
 
 def add_player_async_factory(guild_db: Database.Guild) -> Coroutine[Any, Any, Any]:
-
     async def add_player_async() -> Any:
         await asyncio.sleep(2)
         return guild_db.add_player(1)

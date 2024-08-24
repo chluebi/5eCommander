@@ -36,7 +36,6 @@ def connect_to_db() -> PostgresDatabase:
 
 
 class Bot(commands.Bot):
-
     def __init__(self, initial_extensions: List[str]) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
@@ -69,7 +68,6 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_command_error(ctxt: commands.Context[Bot], error: Exception) -> None:
-
     error_message = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     m = f"""```{error}```"""
 
@@ -83,7 +81,6 @@ async def on_command_error(ctxt: commands.Context[Bot], error: Exception) -> Non
 
 @bot.event
 async def on_app_command_error(interaction: discord.Interaction, error: Exception) -> None:
-
     error_message = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     m = f"""```{error}```"""
 

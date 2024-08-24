@@ -29,6 +29,9 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
+    - name: Run Ruff
+      run: ruff check .
+
     - name: Run MyPy
       run: mypy --explicit-package-bases .
 

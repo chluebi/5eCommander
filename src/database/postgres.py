@@ -47,7 +47,6 @@ from src.definitions.creatures import creatures
 
 
 class PostgresDatabase(Database):
-
     def __init__(self, start_condition: Database.StartCondition, engine: Engine):
         super().__init__(start_condition)
         self.engine = engine
@@ -270,7 +269,6 @@ class PostgresDatabase(Database):
         metadata.create_all(self.engine)
 
     class TransactionManager(Database.TransactionManager):
-
         def __init__(
             self,
             parent: Database,
@@ -369,7 +367,6 @@ class PostgresDatabase(Database):
         guild_id: int,
         con: Optional[Database.TransactionManager] = None,
     ) -> Database.Guild:
-
         guild = PostgresDatabase.Guild(self, guild_id)
 
         with self.transaction(parent=con) as sub_con:
@@ -431,7 +428,6 @@ class PostgresDatabase(Database):
             return guild
 
     class Guild(Database.Guild):
-
         def __init__(self, parent: Database, guild_id: int):
             super().__init__(parent, guild_id)
 
@@ -444,7 +440,6 @@ class PostgresDatabase(Database):
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             with self.parent.transaction(parent=con) as sub_con:
-
                 resolved_string = "" if also_resolved else "AND resolved = :resolved"
 
                 if event_type is None:
@@ -496,7 +491,6 @@ class PostgresDatabase(Database):
                     extra_data = r[5]
 
                     for event_class in event_classes:
-
                         if r[4] == event_class.event_type:
                             event = event_class.from_extra_data(
                                 self.parent, r[0], r[2], r[3], self, extra_data
@@ -514,9 +508,8 @@ class PostgresDatabase(Database):
             con: Optional[Database.TransactionManager] = None,
         ) -> Event:
             with self.parent.transaction(parent=con) as sub_con:
-
                 sql = text(
-                    f"""
+                    """
                     SELECT * FROM events WHERE id = :event_id AND guild_id = :guild_id
                     """
                 )
@@ -527,7 +520,6 @@ class PostgresDatabase(Database):
                 extra_data = r[5]
 
                 for event_class in event_classes:
-
                     if r[4] == event_class.event_type:
                         event = event_class.from_extra_data(
                             self, r[0], r[2], r[3], self, extra_data
@@ -1030,7 +1022,6 @@ class PostgresDatabase(Database):
                 return creature
 
     class Region(Database.Region):
-
         def __init__(
             self, parent: Database, id: int, region: Database.BaseRegion, guild: Database.Guild
         ):
@@ -1339,7 +1330,6 @@ class PostgresDatabase(Database):
             con: Optional[Database.TransactionManager] = None,
         ) -> list[Event]:
             with self.parent.transaction(parent=con) as sub_con:
-
                 resolved_string = "" if also_resolved else "AND resolved = :resolved"
 
                 if event_type is None:
@@ -1396,7 +1386,6 @@ class PostgresDatabase(Database):
                     assert extra_data["player_id"] == self.id
 
                     for event_class in event_classes:
-
                         if r[4] == event_class.event_type:
                             event = event_class.from_extra_data(
                                 self.parent, r[0], r[2], r[3], self.guild, extra_data
@@ -1411,7 +1400,6 @@ class PostgresDatabase(Database):
         def draw_card_raw(
             self, con: Optional[Database.TransactionManager] = None
         ) -> Database.Creature:
-
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     """
@@ -1661,7 +1649,6 @@ class PostgresDatabase(Database):
                 )
 
     class Creature(Database.Creature):
-
         def __init__(
             self,
             parent: Database,
@@ -1670,7 +1657,6 @@ class PostgresDatabase(Database):
             guild: Database.Guild,
             owner: Database.Player,
         ):
-
             super().__init__(parent, id, creature, guild, owner)
 
     class FreeCreature(Database.FreeCreature):
