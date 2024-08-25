@@ -185,8 +185,8 @@ class EventHandler(commands.Cog):
                                 event_children[event.parent_event_id].append(event)
                                 valid_events.append(event)
 
-                            if event.timestamp + 60 < time.time():
-                                # this is a sanity check where basically we count something as a root event if should've happened a minute ago
+                            if event.timestamp + 5 < time.time():
+                                # this is a sanity check where basically we count something as a root event if it should've happened 5 seconds ago
                                 # we assume the parent isnt arriving
                                 valid_events.append(event)
                                 root_events.append(event)
@@ -263,11 +263,17 @@ class EventHandler(commands.Cog):
 
                     for event in valid_events:
                         print("resolving", event)
-                        event.resolve(con=con)
+                        try:
+                            event.resolve(con=con)
+                            cast(PostgresDatabase.Guild, event.guild).mark_event_as_resolved(
+                                event, con=con
+                            )
 
-                        cast(PostgresDatabase.Guild, event.guild).mark_event_as_resolved(
-                            event, con=con
-                        )
+                        except Exception as error:
+                            error_string = "".join(
+                                traceback.format_exception(type(error), error, error.__traceback__)
+                            )
+                            self.bot.logger.error(error_string)
 
                 print("transaction done")
 

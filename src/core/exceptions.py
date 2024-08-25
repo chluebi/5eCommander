@@ -28,28 +28,6 @@ class EmptyDeckException(commands.UserInputError):
     pass
 
 
-class MissingExtraData(commands.UserInputError):
-    def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
-        super().__init__(message)
-        self.extra_data = extra_data if extra_data is not None else {}
-
-    def __str__(self) -> str:
-        if self.extra_data:
-            return f"{super().__str__()} (Extra data: {self.extra_data})"
-        return super().__str__()
-
-
-class BadExtraData(commands.UserInputError):
-    def __init__(self, message: str = "", extra_data: Optional[dict[Any, Any]] = None):
-        super().__init__(message)
-        self.extra_data = extra_data if extra_data is not None else {}
-
-    def __str__(self) -> str:
-        if self.extra_data:
-            return f"{super().__str__()} (Extra data: {self.extra_data})"
-        return super().__str__()
-
-
 class CreatureCannotQuestHere(commands.UserInputError):
     pass
 

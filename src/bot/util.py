@@ -1,4 +1,4 @@
-from typing import Any, Union, List, cast, Callable, Tuple, Optional
+from typing import Any, Union, List, cast, Callable, Tuple, Optional, Coroutine, TYPE_CHECKING
 
 import asyncio
 import os
@@ -22,8 +22,58 @@ from src.core.base_types import (
 )
 from src.core.exceptions import CreatureNotFound, RegionNotFound
 
+from src.definitions.extra_data import EXTRA_DATA, Choice
+
+
+if TYPE_CHECKING:
+    from src.bot.main import Bot
+
 
 DEVELOPMENT_GUILD = discord.Object(id=int(os.environ["DEVELOPMENT_GUILD_ID"]))
+
+CALLBACK = Callable[[commands.Context["Bot"], EXTRA_DATA], Coroutine[None, None, None]]
+PENDING_CHOICE = Tuple[Choice, CALLBACK, EXTRA_DATA]
+
+
+def get_pending_choice(
+    guild_id: int,
+    player_id: int,
+    pending_choices: dict[int, dict[int, Optional[PENDING_CHOICE]]],
+) -> Optional[PENDING_CHOICE]:
+    guild_players = pending_choices.get(guild_id)
+    if guild_players is None:
+        return None
+    player_choice = guild_players.get(player_id)
+    return player_choice
+
+
+def add_pending_choice(
+    guild_id: int,
+    player_id: int,
+    choice: Choice,
+    callback: CALLBACK,
+    extra_data: EXTRA_DATA,
+    pending_choices: dict[int, dict[int, Optional[PENDING_CHOICE]]],
+) -> None:
+    guild_players = pending_choices.get(guild_id)
+    if guild_players is None:
+        pending_choices[guild_id] = {}
+    guild_players = pending_choices[guild_id]
+
+    guild_players[player_id] = choice, callback, extra_data
+
+
+def clear_pending_choice(
+    guild_id: int,
+    player_id: int,
+    pending_choices: dict[int, dict[int, Optional[PENDING_CHOICE]]],
+) -> None:
+    guild_players = pending_choices.get(guild_id)
+    if guild_players is None:
+        pending_choices[guild_id] = {}
+    guild_players = pending_choices[guild_id]
+
+    guild_players[player_id] = None
 
 
 blue = Color.blue()

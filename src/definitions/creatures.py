@@ -6,12 +6,13 @@ from src.core.base_types import (
     Price,
     Gain,
     RegionCategory,
+    RegionCategories,
     resource_changes_to_string,
     resource_changes_to_short_string,
 )
 from src.database.database import Database
-from src.core.base_types import RegionCategories
 from src.core.exceptions import CreatureCannotCampaign, CreatureCannotQuest
+from src.definitions.extra_data import EXTRA_DATA
 
 
 class SimpleCreature(Database.BaseCreature):
@@ -50,7 +51,7 @@ class SimpleCreature(Database.BaseCreature):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         price = self.quest_price()
 
@@ -62,14 +63,14 @@ class SimpleCreature(Database.BaseCreature):
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con, extra_data=extra_data)
+            owner.pay_price(price, con=con)
 
     def quest_ability_effect(
         self,
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         gain = self.quest_gain()
 
@@ -78,7 +79,7 @@ class SimpleCreature(Database.BaseCreature):
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.gain(gain, con=con, extra_data=extra_data)
+            owner.gain(gain, con=con)
 
     # campaigning
     def campaign_ability_effect_short_text(self) -> str:
@@ -97,7 +98,7 @@ class SimpleCreature(Database.BaseCreature):
         self,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         price = self.campaign_price()
 
@@ -109,13 +110,13 @@ class SimpleCreature(Database.BaseCreature):
 
         with creature_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con, extra_data=extra_data)
+            owner.pay_price(price, con=con)
 
     def campaign_ability_effect(
         self,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> int:
         gain = self.campaign_gain()
 
@@ -129,7 +130,7 @@ class SimpleCreature(Database.BaseCreature):
 
         with creature_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.gain(gain, con=con, extra_data=extra_data)
+            owner.gain(gain, con=con)
 
         return strength
 
@@ -307,7 +308,7 @@ class Mentor(SimpleCreature):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner

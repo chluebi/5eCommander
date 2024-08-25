@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, List, cast
 
 from src.core.base_types import (
     Resource,
@@ -12,6 +12,14 @@ from src.core.base_types import (
 from src.database.database import Database
 from src.core.base_types import RegionCategories
 from src.core.exceptions import NotEnoughResourcesException
+from src.definitions.extra_data import (
+    ExtraDataCategory,
+    Choice,
+    SelectedCreature,
+    EXTRA_DATA,
+    MissingExtraData,
+    BadExtraData,
+)
 from src.definitions.creatures import Ruffian
 
 
@@ -37,7 +45,7 @@ class SimpleRegion(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         price = self.quest_price()
 
@@ -46,14 +54,14 @@ class SimpleRegion(Database.BaseRegion):
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con, extra_data=extra_data)
+            owner.pay_price(price, con=con)
 
     def quest_effect(
         self,
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         gain = self.quest_gain()
 
@@ -62,7 +70,7 @@ class SimpleRegion(Database.BaseRegion):
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.gain(gain, con=con, extra_data=extra_data)
+            owner.gain(gain, con=con)
 
 
 class RoyalGift(SimpleRegion):
@@ -108,24 +116,24 @@ class Delegation(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         price = self.quest_price()
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con, extra_data=extra_data)
+            owner.pay_price(price, con=con)
 
     def quest_effect(
         self,
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.gain(self.quest_gain(), con=con, extra_data=extra_data)
+            owner.gain(self.quest_gain(), con=con)
             owner.draw_cards(N=1, con=con)
 
 
@@ -172,20 +180,20 @@ class Ruffians(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         price = self.quest_price()
 
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con, extra_data=extra_data)
+            owner.pay_price(price, con=con)
 
     def quest_effect(
         self,
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -254,7 +262,7 @@ class Library(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -311,7 +319,7 @@ class Hunt(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -328,7 +336,7 @@ class Hunt(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -344,21 +352,34 @@ class Abandon(Database.BaseRegion):
         return "☠️"
 
     def quest_effect_full_text(self) -> str:
-        return "Any creatures you have currently played instead never return."
+        return "Choose a card from your hand. Destroy it."
 
     def quest_effect(
         self,
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: dict[Any, Any] = {},
+        extra_data: EXTRA_DATA = {},
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            played_creatures = [c for c, _ in owner.get_played(con=con)]
-            for c in played_creatures:
-                if c != creature_db:
-                    owner.delete_creature_in_played(creature_db, con=con)
+
+            if extra_data is None or not extra_data.get(ExtraDataCategory.CREATURES_IN_HAND):
+                raise MissingExtraData(
+                    Choice(
+                        0,
+                        "Choose a card from your hand to destroy it.",
+                        ExtraDataCategory.CREATURES_IN_HAND,
+                        [],
+                    )
+                )
+            current_list = extra_data.get(ExtraDataCategory.CREATURES_IN_HAND)
+            assert current_list is not None
+            assert current_list
+
+            selected_creature = cast(SelectedCreature, current_list.pop(0))
+            creature_db = selected_creature.item
+            owner.delete_creature_in_hand(creature_db, con=con)
 
 
 regions_list = [

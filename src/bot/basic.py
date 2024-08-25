@@ -1,7 +1,8 @@
-from typing import Optional, Any, List, cast, TYPE_CHECKING
+from typing import Optional, Any, List, cast, TYPE_CHECKING, Sequence
 
 import os
 import time
+import copy
 import asyncio
 import sys
 import logging
@@ -16,6 +17,9 @@ from discord.ext import commands
 from src.bot.setup_logging import logger, setup_logging
 from src.bot.util import (
     DEVELOPMENT_GUILD,
+    get_pending_choice,
+    add_pending_choice,
+    clear_pending_choice,
     get_relative_timestamp,
     standard_embed,
     success_embed,
@@ -31,9 +35,18 @@ from src.bot.util import (
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
-from src.core.base_types import Resource, Price
+from src.core.base_types import Resource, Price, Selected
 from src.definitions.start_condition import start_condition
 from src.definitions.creatures import creatures
+from src.definitions.extra_data import (
+    ExtraDataCategory,
+    MissingExtraData,
+    BadExtraData,
+    Choice,
+    EXTRA_DATA,
+    fetch_from_category,
+    get_selected_from_int,
+)
 
 
 if TYPE_CHECKING:
@@ -184,57 +197,69 @@ class PlayerAdmin(commands.Cog):
 
         await ctxt.send(embed=player_embed(ctxt.author, player_db, private=False), ephemeral=True)
 
+    async def _play(
+        self, ctxt: commands.Context["Bot"], card: int, region: int, extra_data: EXTRA_DATA
+    ) -> None:
+        assert ctxt.guild is not None
+
+        try:
+            with self.bot.db.transaction() as con:
+                guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+                player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+                creatures = player_db.get_hand(con=con)
+                creature_db = [c for c in creatures if c.id == card][0]
+
+                regions = guild_db.get_regions(con=con)
+                region_db = [r for r in regions if r.id == region][0]
+
+                player_db.play_creature_to_region(
+                    creature_db, region_db, con=con, extra_data=extra_data if extra_data else {}
+                )
+
+                clear_pending_choice(ctxt.guild.id, ctxt.author.id, self.bot.pending_choices)
+
+                await ctxt.send(
+                    embed=success_embed(
+                        "Creature Played",
+                        f"Successfully played {creature_db.text()} to {region_db.text()}",
+                    )
+                )
+
+        except MissingExtraData as e:
+
+            async def callback(ctxt: commands.Context["Bot"], extra_data: EXTRA_DATA) -> None:
+                await self._play(ctxt, card, region, extra_data)
+
+            add_pending_choice(
+                ctxt.guild.id,
+                ctxt.author.id,
+                e.choice,
+                callback,
+                extra_data,
+                self.bot.pending_choices,
+            )
+
+            await ctxt.send(
+                embed=standard_embed(
+                    "Choice needed",
+                    f"{e.choice.text}\n\nUse ``/choose`` to make your choice.",
+                )
+            )
+
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
     async def play(self, ctxt: commands.Context["Bot"], card: int, region: int) -> None:
         """Uses a order to play a card to a region"""
-        assert ctxt.guild is not None
-
-        with self.bot.db.transaction() as con:
-            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
-            player_db = guild_db.get_player(ctxt.author.id, con=con)
-
-            creatures = player_db.get_hand(con=con)
-            creature_db = [c for c in creatures if c.id == card][0]
-
-            regions = guild_db.get_regions(con=con)
-            region_db = [r for r in regions if r.id == region][0]
-
-            player_db.play_creature_to_region(creature_db, region_db, con=con)
-
-            await ctxt.send(
-                embed=success_embed(
-                    "Creature Played",
-                    f"Successfully played {creature_db.text()} to {region_db.text()}",
-                )
-            )
+        await self._play(ctxt, card, region, None)
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
     async def play_to(self, ctxt: commands.Context["Bot"], region: int, card: int) -> None:
         """Uses a order to play a card to a region, but region is chosen first"""
-        assert ctxt.guild is not None
-
-        with self.bot.db.transaction() as con:
-            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
-            player_db = guild_db.get_player(ctxt.author.id, con=con)
-
-            creatures = player_db.get_hand(con=con)
-            creature_db = [c for c in creatures if c.id == card][0]
-
-            regions = guild_db.get_regions(con=con)
-            region_db = [r for r in regions if r.id == region][0]
-
-            player_db.play_creature_to_region(creature_db, region_db, con=con)
-
-            await ctxt.send(
-                embed=success_embed(
-                    "Creature Played",
-                    f"Successfully played {creature_db.text()} to {region_db.text()}",
-                )
-            )
+        await self._play(ctxt, card, region, None)
 
     @play.autocomplete("card")
     @play_to.autocomplete("card")
@@ -350,6 +375,76 @@ class PlayerAdmin(commands.Cog):
             for c in creatures
             if c.text().startswith(current)
         ]
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.guild_only()
+    @commands.check(player_exists)
+    async def choose(self, ctxt: commands.Context["Bot"], choice: int) -> None:
+        """Make a choice depending on previous commands."""
+        assert ctxt.guild is not None
+
+        pending = get_pending_choice(ctxt.guild.id, ctxt.author.id, self.bot.pending_choices)
+        if pending is None:
+            await ctxt.send(
+                embed=error_embed(
+                    "No choice to be made",
+                    "You do not have a current command open you can make a choice about",
+                ),
+                ephemeral=True,
+            )
+            return
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+            player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+            choice_obj, callback, extra_data = pending
+            if extra_data:
+                extra_data = copy.deepcopy(extra_data)
+            else:
+                extra_data = {}
+
+            new_selected = get_selected_from_int(player_db, choice_obj, choice, con=con)
+
+            if choice_obj.category in extra_data:
+                extra_data[choice_obj.category].append(new_selected)
+            else:
+                extra_data[choice_obj.category] = [new_selected]
+
+            await callback(ctxt, extra_data)
+
+    @choose.autocomplete("choice")
+    async def choice_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+
+        pending = get_pending_choice(
+            interaction.guild.id, interaction.user.id, self.bot.pending_choices
+        )
+        if pending is None:
+            return []
+
+        choice, _, _ = pending
+
+        guild_db = self.bot.db.get_guild(interaction.guild.id)
+        player_db = guild_db.get_player(interaction.user.id)
+
+        options: Sequence[Selected] = []
+
+        if choice.category == ExtraDataCategory.CHOICES:
+            options = choice.options
+        else:
+            options = fetch_from_category(player_db, choice.category)
+
+        return [
+            discord.app_commands.Choice(
+                name=(o.text()),
+                value=o.value(),
+            )
+            for o in options
+            if current in o.text()
+        ][:20]
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()

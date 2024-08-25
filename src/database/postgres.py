@@ -1056,8 +1056,8 @@ class PostgresDatabase(Database):
                 )
 
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                # add directly to parent instead of connection
-                self.parent.add_event(
+
+                sub_con.add_event(
                     Database.Region.RegionRechargeEvent(
                         self.parent, event_id, until, None, self.guild, self.id
                     ),
@@ -1072,8 +1072,6 @@ class PostgresDatabase(Database):
                 occupant, until = self.occupied(con=sub_con)
                 if occupant is None or until is None:
                     return
-                if current < until:
-                    raise Exception("Trying to unoccupy with too early timestamp")
 
                 sql = text(
                     "DELETE FROM occupies WHERE guild_id = :guild_id AND region_id = :region_id"

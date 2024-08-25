@@ -1,9 +1,11 @@
-from typing import Optional, Any, List, cast
+from typing import Optional, Any, List, cast, Tuple, Coroutine, Callable
 
 import os
 import sys
 import logging
 import traceback
+
+from collections import defaultdict
 
 import sqlalchemy
 import sqlalchemy.exc
@@ -11,11 +13,18 @@ import discord
 from discord.ext import commands
 
 from src.bot.setup_logging import logger, setup_logging
-from src.bot.util import DEVELOPMENT_GUILD, standard_embed, success_embed, error_embed
+from src.bot.util import (
+    DEVELOPMENT_GUILD,
+    PENDING_CHOICE,
+    standard_embed,
+    success_embed,
+    error_embed,
+)
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound
 from src.definitions.start_condition import start_condition
+from src.definitions.extra_data import Choice, EXTRA_DATA
 
 
 # initial setup taken from https://github.com/Rapptz/discord.py/blob/master/examples/app_commands/basic.py
@@ -46,6 +55,11 @@ class Bot(commands.Bot):
         self.db = connect_to_db()
         self.logger = logger
         self.channel_cache: dict[int, discord.PartialMessageable] = {}
+
+        self.pending_choices: dict[
+            int,
+            dict[int, Optional[PENDING_CHOICE]],
+        ] = {}
 
     async def setup_hook(self) -> None:
         pass

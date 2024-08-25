@@ -26,7 +26,17 @@ BaseResources = [
 
 Price = namedtuple("Price", ["resource", "amount"], defaults=[Resource.GOLD, 0])
 Gain = namedtuple("Gain", ["resource", "amount"], defaults=[Resource.GOLD, 0])
-Choice = namedtuple("Choice", ["choices"], defaults=[[]])
+
+
+class Selected:
+    def __init__(self, item: Any) -> None:
+        self.item = item
+
+    def text(self) -> str:
+        assert False
+
+    def value(self) -> int:
+        assert False
 
 
 def resource_to_emoji(resource: Resource) -> str:
