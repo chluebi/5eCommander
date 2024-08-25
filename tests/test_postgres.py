@@ -379,7 +379,7 @@ def test_deck() -> None:
         assert hand_full
 
         # remove a creature to make space
-        player7_db.delete_creature_from_hand(player7_db.get_hand()[0])
+        player7_db.delete_creature_in_hand(player7_db.get_hand()[0])
         assert len(player7_db.get_hand()) == len(start_condition.start_deck) - 1
 
         # deck empty

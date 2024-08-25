@@ -1473,7 +1473,7 @@ class PostgresDatabase(Database):
                         },
                     )
 
-        def delete_creature_from_hand(
+        def remove_creature_from_hand(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
@@ -1487,15 +1487,7 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
 
-                sql = text(
-                    "DELETE FROM creatures WHERE owner_id = :player_id AND guild_id = :guild_id AND id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-
-        def delete_creature_from_played(
+        def remove_creature_from_played(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
@@ -1509,70 +1501,13 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
 
-                sql = text(
-                    "DELETE FROM creatures WHERE owner_id = :player_id AND guild_id = :guild_id AND id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-
-        def recharge_creature(
-            self,
-            creature: Database.Creature,
-            con: Optional[Database.TransactionManager] = None,
-        ) -> None:
-            with self.parent.transaction(parent=con) as sub_con:
-                sql = text(
-                    "DELETE FROM played WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-                sql = text(
-                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-
-        def discard_creature_from_hand(
-            self,
-            creature: Database.Creature,
-            con: Optional[Database.TransactionManager] = None,
-        ) -> None:
-            with self.parent.transaction(parent=con) as sub_con:
-                sql = text(
-                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-                sql = text(
-                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-
-        def play_creature(
+        def add_creature_to_played(
             self,
             creature: Database.Creature,
             until: float,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
-                sql = text(
-                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
                 sql = text(
                     "INSERT INTO played (player_id, guild_id, creature_id, timestamp_recharge) VALUES (:player_id, :guild_id, :creature_id, :timestamp_recharge)"
                 )
@@ -1586,20 +1521,13 @@ class PostgresDatabase(Database):
                     },
                 )
 
-        def campaign_creature(
+        def add_creature_to_campaign(
             self,
             creature: Database.Creature,
             strength: int,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
-                sql = text(
-                    "DELETE FROM hand WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
                 sql = text(
                     "INSERT INTO campaign (player_id, guild_id, creature_id, strength) VALUES (:player_id, :guild_id, :creature_id, :strength)"
                 )
@@ -1613,7 +1541,7 @@ class PostgresDatabase(Database):
                     },
                 )
 
-        def uncampaign_creature(
+        def remove_creature_from_campaign(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
@@ -1621,13 +1549,6 @@ class PostgresDatabase(Database):
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
                     "DELETE FROM campaign WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
-                )
-                sub_con.execute(
-                    sql,
-                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
-                )
-                sql = text(
-                    "INSERT INTO discard (player_id, guild_id, creature_id) VALUES (:player_id, :guild_id, :creature_id)"
                 )
                 sub_con.execute(
                     sql,

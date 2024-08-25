@@ -358,7 +358,7 @@ class Abandon(Database.BaseRegion):
             played_creatures = [c for c, _ in owner.get_played(con=con)]
             for c in played_creatures:
                 if c != creature_db:
-                    owner.delete_creature_from_played(creature_db, con=con)
+                    owner.delete_creature_in_played(creature_db, con=con)
 
 
 regions_list = [

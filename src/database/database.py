@@ -970,37 +970,6 @@ class Database:
                         return False
             return True
 
-        def _delete_creatures(
-            self,
-            hand_size: int,
-            a: int,
-            extra_data: dict[Any, Any],
-            con: Optional[Database.TransactionManager] = None,
-        ) -> None:
-            with self.parent.transaction(parent=con) as sub_con:
-                expected_extra_data = {
-                    "creatures_to_delete": {"text": "creatures to delete", "type": "list creature"}
-                }
-
-                try:
-                    creatures_to_delete = extra_data["creatures_to_delete"]
-                except KeyError:
-                    raise MissingExtraData(extra_data=expected_extra_data)
-
-                try:
-                    assert len(set(creatures_to_delete)) >= a
-                    for creature_id in creatures_to_delete:
-                        assert self.guild.get_creature(creature_id, con=sub_con).owner == self
-                except Exception as e:
-                    raise BadExtraData(str(e), extra_data=expected_extra_data)
-
-                # like this extra_data can be further propagated
-                creatures_to_delete = creatures_to_delete[:a]
-                extra_data["creatures_to_delete"] = creatures_to_delete
-
-                for c in creatures_to_delete:
-                    self.delete_creature_from_hand(c)
-
         def gain(
             self,
             gain: list[Gain],
@@ -1133,30 +1102,70 @@ class Database:
 
                 return cards_drawn, discard_reshuffled, hand_full
 
-        def delete_creature_from_hand(
+        def remove_creature_from_hand(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
 
-        def delete_creature_from_played(
+        def delete_creature_in_hand(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = self.get_hand(con=sub_con)
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in hand")
+                self.guild.remove_creature(creature)
+
+        def remove_creature_from_played(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
+
+        def delete_creature_in_played(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = [c for c, _ in self.get_played(con=sub_con)]
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in played")
+                self.guild.remove_creature(creature)
 
         def recharge_creature(
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
-            pass
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = [c for c, _ in self.get_played(con=sub_con)]
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in played")
+                self.remove_creature_from_played(creature, con=sub_con)
+                self.add_to_discard(creature, con=sub_con)
 
         def discard_creature_from_hand(
             self,
             creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = self.get_hand(con=sub_con)
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in hand")
+                self.remove_creature_from_hand(creature, con=sub_con)
+                self.add_to_discard(creature, con=sub_con)
+
+        def add_creature_to_played(
+            self,
+            creature: Database.Creature,
+            until: float,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
@@ -1167,12 +1176,37 @@ class Database:
             until: float,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = self.get_hand(con=sub_con)
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in hand")
+                self.remove_creature_from_hand(creature, con=sub_con)
+                self.add_creature_to_played(creature, until, con=sub_con)
+
+        def add_creature_to_campaign(
+            self,
+            creature: Database.Creature,
+            strength: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
             pass
 
         def campaign_creature(
             self,
             creature: Database.Creature,
             strength: int,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = self.get_hand(con=sub_con)
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in hand")
+                self.remove_creature_from_hand(creature, con=sub_con)
+                self.add_creature_to_campaign(creature, strength, con=sub_con)
+
+        def remove_creature_from_campaign(
+            self,
+            creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             pass
@@ -1182,7 +1216,12 @@ class Database:
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
-            pass
+            with self.parent.transaction(parent=con) as sub_con:
+                creatures = [c for c, _ in self.get_campaign(con=sub_con)]
+                if creature not in creatures:
+                    raise CreatureNotFound("Creature not found in campaign")
+                self.remove_creature_from_campaign(creature, con=sub_con)
+                self.add_to_discard(creature, con=sub_con)
 
         def add_to_discard(
             self,
