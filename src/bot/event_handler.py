@@ -112,8 +112,6 @@ class EventHandler(commands.Cog):
             free_creatures = guild_db.get_free_creatures()
 
             for fc in free_creatures:
-                print("refreshing fc", fc)
-
                 if fc.is_expired(time.time()):
                     continue
 
@@ -160,7 +158,6 @@ class EventHandler(commands.Cog):
         identifier = random.randint(1, 10000)
 
         async with handler_lock:
-            print("acquired", handler_lock)
 
             for guild_db in self.bot.db.get_guilds():
                 with self.bot.db.transaction() as con:
@@ -259,10 +256,7 @@ class EventHandler(commands.Cog):
 
                         embeds_to_send.append((format_embed(embed, guild, guild_db), channel))
 
-                    print("embeds to send computed")
-
                     for event in valid_events:
-                        print("resolving", event)
                         try:
                             event.resolve(con=con)
                             cast(PostgresDatabase.Guild, event.guild).mark_event_as_resolved(
@@ -275,13 +269,10 @@ class EventHandler(commands.Cog):
                             )
                             self.bot.logger.error(error_string)
 
-                print("transaction done")
 
                 for event in valid_events:
-                    print("trying event for free creature stuff", event)
 
                     if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
-                        print("is one")
 
                         try:
                             free_creature = guild_db.get_free_creature(
@@ -334,15 +325,11 @@ class EventHandler(commands.Cog):
                         except CreatureNotFound:
                             pass
 
-            print("now sending embeds")
-
             for embed, channel in embeds_to_send:
                 cast_channel = cast(discord.PartialMessageable, channel)
 
                 await cast_channel.send(embed=embed)
                 await asyncio.sleep(2)  # rate limit
-
-            print("full event list resolved")
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:
