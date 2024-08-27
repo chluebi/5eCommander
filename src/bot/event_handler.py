@@ -158,7 +158,6 @@ class EventHandler(commands.Cog):
         identifier = random.randint(1, 10000)
 
         async with handler_lock:
-
             for guild_db in self.bot.db.get_guilds():
                 with self.bot.db.transaction() as con:
                     events = sorted(
@@ -269,11 +268,8 @@ class EventHandler(commands.Cog):
                             )
                             self.bot.logger.error(error_string)
 
-
                 for event in valid_events:
-
                     if isinstance(event, PostgresDatabase.FreeCreature.FreeCreatureEvent):
-
                         try:
                             free_creature = guild_db.get_free_creature(
                                 event.channel_id, event.message_id
@@ -329,7 +325,7 @@ class EventHandler(commands.Cog):
                 cast_channel = cast(discord.PartialMessageable, channel)
 
                 await cast_channel.send(embed=embed)
-                await asyncio.sleep(2)  # rate limit
+                await asyncio.sleep(4)  # rate limit
 
     @tasks.loop(seconds=0, count=1, reconnect=True)
     async def event_handler_listener(self) -> None:

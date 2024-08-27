@@ -44,8 +44,6 @@ from src.definitions.extra_data import (
     BadExtraData,
     Choice,
     EXTRA_DATA,
-    fetch_from_category,
-    get_selected_from_int,
 )
 
 
@@ -214,7 +212,7 @@ class PlayerAdmin(commands.Cog):
                 region_db = [r for r in regions if r.id == region][0]
 
                 player_db.play_creature_to_region(
-                    creature_db, region_db, con=con, extra_data=extra_data if extra_data else {}
+                    creature_db, region_db, con=con, extra_data=extra_data
                 )
 
                 clear_pending_choice(ctxt.guild.id, ctxt.author.id, self.bot.pending_choices)
@@ -252,14 +250,14 @@ class PlayerAdmin(commands.Cog):
     @commands.check(player_exists)
     async def play(self, ctxt: commands.Context["Bot"], card: int, region: int) -> None:
         """Uses a order to play a card to a region"""
-        await self._play(ctxt, card, region, None)
+        await self._play(ctxt, card, region, [])
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
     async def play_to(self, ctxt: commands.Context["Bot"], region: int, card: int) -> None:
         """Uses a order to play a card to a region, but region is chosen first"""
-        await self._play(ctxt, card, region, None)
+        await self._play(ctxt, card, region, [])
 
     @play.autocomplete("card")
     @play_to.autocomplete("card")
@@ -402,14 +400,10 @@ class PlayerAdmin(commands.Cog):
             if extra_data:
                 extra_data = copy.deepcopy(extra_data)
             else:
-                extra_data = {}
+                extra_data = []
 
-            new_selected = get_selected_from_int(player_db, choice_obj, choice, con=con)
-
-            if choice_obj.category in extra_data:
-                extra_data[choice_obj.category].append(new_selected)
-            else:
-                extra_data[choice_obj.category] = [new_selected]
+            new_selected = choice_obj.select_option(player_db, choice_obj, choice, con)
+            extra_data.append(new_selected)
 
             await callback(ctxt, extra_data)
 
@@ -430,12 +424,7 @@ class PlayerAdmin(commands.Cog):
         guild_db = self.bot.db.get_guild(interaction.guild.id)
         player_db = guild_db.get_player(interaction.user.id)
 
-        options: Sequence[Selected] = []
-
-        if choice.category == ExtraDataCategory.CHOICES:
-            options = choice.options
-        else:
-            options = fetch_from_category(player_db, choice.category)
+        options = choice.get_options(player_db, None)
 
         return [
             discord.app_commands.Choice(

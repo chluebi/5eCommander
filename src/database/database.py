@@ -707,7 +707,7 @@ class Database:
             region_db: Database.Region,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             return
 
@@ -716,7 +716,7 @@ class Database:
             region_db: Database.Region,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             return
 
@@ -1242,7 +1242,7 @@ class Database:
             creature: Database.Creature,
             region: Database.Region,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             if region.region.category not in creature.creature.quest_region_categories:
                 raise CreatureCannotQuestHere(
@@ -1297,7 +1297,7 @@ class Database:
             self,
             creature: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: dict[Any, Any] = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             base_creature: Database.BaseCreature = creature.creature
 
@@ -1567,7 +1567,7 @@ class Database:
                 guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
-                play_extra_data: dict[Any, Any],
+                play_extra_data: EXTRA_DATA,
             ):
                 super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
@@ -1935,7 +1935,7 @@ class Database:
             region_db: Database.Region,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             return
 
@@ -1944,7 +1944,7 @@ class Database:
             region_db: Database.Region,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             return
 
@@ -1959,7 +1959,7 @@ class Database:
             self,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> None:
             return
 
@@ -1967,7 +1967,7 @@ class Database:
             self,
             creature_db: Database.Creature,
             con: Optional[Database.TransactionManager] = None,
-            extra_data: EXTRA_DATA = {},
+            extra_data: EXTRA_DATA = [],
         ) -> int:
             return 0
 

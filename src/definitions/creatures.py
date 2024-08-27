@@ -51,7 +51,7 @@ class SimpleCreature(Database.BaseCreature):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         price = self.quest_price()
 
@@ -70,7 +70,7 @@ class SimpleCreature(Database.BaseCreature):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         gain = self.quest_gain()
 
@@ -98,7 +98,7 @@ class SimpleCreature(Database.BaseCreature):
         self,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         price = self.campaign_price()
 
@@ -116,7 +116,7 @@ class SimpleCreature(Database.BaseCreature):
         self,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> int:
         gain = self.campaign_gain()
 
@@ -308,7 +308,7 @@ class Mentor(SimpleCreature):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner

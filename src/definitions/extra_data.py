@@ -1,4 +1,5 @@
-from typing import Optional, Any, List, Tuple, cast, NamedTuple
+from __future__ import annotations
+from typing import Optional, Any, List, Tuple, cast, NamedTuple, Callable
 
 from enum import Enum
 from collections import namedtuple
@@ -32,6 +33,15 @@ ExtraDataCategory = Enum(
 )
 
 
+class Choice(NamedTuple):
+    timestamp: int
+    text: str
+    get_options: Callable[[Database.Player, Optional[Database.TransactionManager]], List[Selected]]
+    select_option: Callable[
+        [Database.Player, Choice, int, Optional[Database.TransactionManager]], Selected
+    ]
+
+
 class SelectedChoice(Selected):
     def __init__(self, item: int, text_info: str) -> None:
         super().__init__(item)
@@ -42,13 +52,6 @@ class SelectedChoice(Selected):
 
     def value(self) -> int:
         return cast(int, self.item)
-
-
-class Choice(NamedTuple):
-    timestamp: int
-    text: str
-    category: ExtraDataCategory
-    options: List[SelectedChoice]
 
 
 class SelectedCreature(Selected):
@@ -99,60 +102,7 @@ class SelectedRegion(Selected):
         return cast(Database.Region, self.item).id
 
 
-EXTRA_DATA = Optional[dict[ExtraDataCategory, List[Selected]]]
-
-
-def fetch_from_category(
-    player_db: Database.Player,
-    cat: ExtraDataCategory,
-    con: Optional[Database.TransactionManager] = None,
-) -> List[Selected]:
-    match cat:
-        case ExtraDataCategory.CHOICES:
-            assert False
-        case ExtraDataCategory.CREATURES_IN_HAND:
-            return [SelectedCreature(c) for c in player_db.get_hand(con=con)]
-        case ExtraDataCategory.CREATURES_IN_DECK:
-            return [SelectedCreature(c) for c in player_db.get_deck(con=con)]
-        case ExtraDataCategory.CREATURES_IN_DISCARD:
-            return [SelectedCreature(c) for c in player_db.get_discard(con=con)]
-        case ExtraDataCategory.CREATURES_IN_PLAYED:
-            return [SelectedPlayedCreature(c) for c in player_db.get_played(con=con)]
-        case ExtraDataCategory.CREATURES_IN_CAMPAIGN:
-            return [SelectedCampaignCreature(c) for c in player_db.get_campaign(con=con)]
-        case ExtraDataCategory.REGIONS:
-            return [SelectedRegion(r) for r in player_db.guild.get_regions(con=con)]
-
-
-def get_selected_from_int(
-    player_db: Database.Player,
-    choice: Choice,
-    v: int,
-    con: Optional[Database.TransactionManager] = None,
-) -> Selected:
-    match choice.category:
-        case ExtraDataCategory.CHOICES:
-            return choice.options[v]
-        case ExtraDataCategory.CREATURES_IN_HAND:
-            return SelectedCreature(player_db.guild.get_creature(v, con=con))
-        case ExtraDataCategory.CREATURES_IN_DECK:
-            return SelectedCreature(player_db.guild.get_creature(v, con=con))
-        case ExtraDataCategory.CREATURES_IN_DISCARD:
-            return SelectedCreature(player_db.guild.get_creature(v, con=con))
-        case ExtraDataCategory.CREATURES_IN_PLAYED:
-            played = player_db.get_played(con=con)
-            for c, t in played:
-                if c.id == v:
-                    return SelectedPlayedCreature((c, t))
-            raise CreatureNotFound()
-        case ExtraDataCategory.CREATURES_IN_CAMPAIGN:
-            campaign = player_db.get_campaign(con=con)
-            for c, s in campaign:
-                if c.id == v:
-                    return SelectedCampaignCreature((c, s))
-            raise CreatureNotFound()
-        case ExtraDataCategory.REGIONS:
-            return SelectedRegion(player_db.guild.get_region(v, con=con))
+EXTRA_DATA = List[Selected]
 
 
 class MissingExtraData(commands.UserInputError):
@@ -165,9 +115,9 @@ class MissingExtraData(commands.UserInputError):
 
 
 class BadExtraData(commands.UserInputError):
-    def __init__(self, message: str = "", extra_data: EXTRA_DATA = None):
+    def __init__(self, message: str = "", extra_data: EXTRA_DATA = []):
         super().__init__(message)
-        self.extra_data = extra_data if extra_data is not None else {}
+        self.extra_data = extra_data
 
     def __str__(self) -> str:
         if self.extra_data:

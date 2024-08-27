@@ -8,6 +8,7 @@ from src.core.base_types import (
     resource_changes_to_string,
     resource_changes_to_short_string,
     resource_to_emoji,
+    Selected,
 )
 from src.database.database import Database
 from src.core.base_types import RegionCategories
@@ -45,7 +46,7 @@ class SimpleRegion(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         price = self.quest_price()
 
@@ -61,7 +62,7 @@ class SimpleRegion(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         gain = self.quest_gain()
 
@@ -116,7 +117,7 @@ class Delegation(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         price = self.quest_price()
 
@@ -129,7 +130,7 @@ class Delegation(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -180,7 +181,7 @@ class Ruffians(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         price = self.quest_price()
 
@@ -193,7 +194,7 @@ class Ruffians(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -262,7 +263,7 @@ class Library(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -319,7 +320,7 @@ class Hunt(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -336,7 +337,7 @@ class Hunt(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
@@ -359,25 +360,35 @@ class Abandon(Database.BaseRegion):
         region_db: Database.Region,
         creature_db: Database.Creature,
         con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = {},
+        extra_data: EXTRA_DATA = [],
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
 
-            if extra_data is None or not extra_data.get(ExtraDataCategory.CREATURES_IN_HAND):
+            def get_options(
+                player_db: Database.Player, con: Optional[Database.TransactionManager]
+            ) -> List[Selected]:
+                return [cast(Selected, SelectedCreature(c)) for c in player_db.get_hand(con=con)]
+
+            def select_option(
+                player_db: Database.Player,
+                c: Choice,
+                v: int,
+                con: Optional[Database.TransactionManager],
+            ) -> Selected:
+                return [s for s in c.get_options(player_db, con) if s.value() == v][0]
+
+            if not extra_data:
                 raise MissingExtraData(
                     Choice(
                         0,
                         "Choose a card from your hand to destroy it.",
-                        ExtraDataCategory.CREATURES_IN_HAND,
-                        [],
+                        get_options,
+                        select_option,
                     )
                 )
-            current_list = extra_data.get(ExtraDataCategory.CREATURES_IN_HAND)
-            assert current_list is not None
-            assert current_list
 
-            selected_creature = cast(SelectedCreature, current_list.pop(0))
+            selected_creature = cast(SelectedCreature, extra_data.pop(0))
             creature_db = selected_creature.item
             owner.delete_creature_in_hand(creature_db, con=con)
 
