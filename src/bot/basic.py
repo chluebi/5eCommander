@@ -474,7 +474,7 @@ class PlayerAdmin(commands.Cog):
         with self.bot.db.transaction() as con:
             guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
             player_db = guild_db.get_player(ctxt.author.id, con=con)
-            creatures = [guild_db.get_random_from_creature_pool(con=con) for i in range(amount)]
+            creatures = [guild_db.roll_creature(con=con) for i in range(amount)]
 
         for c in creatures:
             with self.bot.db.transaction() as con:

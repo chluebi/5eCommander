@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 import json
 import copy
+import math
+import random
 from typing import List, Tuple, Type, Optional, Union, Any, cast, Generic, TypeVar, TYPE_CHECKING
 from collections import defaultdict
 
@@ -335,6 +337,18 @@ class Database:
             self, con: Optional[Database.TransactionManager] = None
         ) -> Database.BaseCreature:
             assert False
+
+        def roll_creature(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> Database.BaseCreature:
+            creature = self.get_random_from_creature_pool(con=con)
+            i = 0
+            while i < 10:
+                if 1/math.pow(creature.claim_cost+1, 0.13*creature.claim_cost) > random.random():
+                    break
+                creature = self.get_random_from_creature_pool(con=con)
+
+            return creature
 
         def remove_from_creature_pool(
             self,
