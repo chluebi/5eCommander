@@ -103,13 +103,15 @@ class Delegation(Database.BaseRegion):
     category = RegionCategories.noble
 
     def quest_price(self) -> list[Price]:
-        return [Price(Resource.GOLD, 2)]
+        return [Price(Resource.GOLD, 4)]
 
     def quest_gain(self) -> list[Gain]:
-        return [Gain(Resource.ORDERS, 1)]
+        return [Gain(Resource.ORDERS, 1), Gain(Resource.INTEL, 1)]
 
     def quest_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.quest_price() + self.quest_gain()) + ", +1 🃏"
+        return resource_changes_to_short_string(
+            self.quest_price() + self.quest_gain()
+        ) + ", +1 🃏".replace(" ", "\u00a0")
 
     def quest_effect_full_text(self) -> str:
         return resource_changes_to_string(self.quest_price() + self.quest_gain()) + " Draw 1 Card."
@@ -161,36 +163,22 @@ class Collections(SimpleRegion):
         return [Gain(Resource.GOLD, 3)]
 
 
-class Ruffians(Database.BaseRegion):
+class Laborers(Database.BaseRegion):
     id = 5
-    name = "ruffians"
+    name = "laborers"
     category = RegionCategories.market
-    related_creatures = [Ruffian()]
 
     def quest_price(self) -> list[Price]:
-        return [Price(Resource.GOLD, 3)]
+        return []
+
+    def quest_gain(self) -> list[Gain]:
+        return [Gain(Resource.GOLD, 5)]
 
     def quest_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.quest_price() + [Gain(Resource.STRENGTH, 3)])
+        return f"-2 🃏 → {resource_changes_to_short_string(self.quest_price() + self.quest_gain())}"
 
     def quest_effect_full_text(self) -> str:
-        return (
-            resource_changes_to_string(list(self.quest_price()))
-            + " Add a ruffian (+2 strength) to your campaign."
-        )
-
-    def quest_effect_price(
-        self,
-        region_db: Database.Region,
-        creature_db: Database.Creature,
-        con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = [],
-    ) -> None:
-        price = self.quest_price()
-
-        with region_db.parent.transaction(parent=con) as con:
-            owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con)
+        return f"Choose 2 cards in your hand. Discard them. Then gain 5 {resource_to_emoji(Resource.GOLD)}gold."
 
     def quest_effect(
         self,
@@ -201,8 +189,27 @@ class Ruffians(Database.BaseRegion):
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            new_creature_db = creature_db.guild.add_creature(Ruffian(), owner, con=con)
-            owner.add_creature_to_campaign(new_creature_db, 2, con=con)
+
+            creatures_to_discard: List[SelectedCreature] = []
+
+            for i in range(2):
+                if not extra_data:
+                    raise MissingExtraData(
+                        Choice(
+                            0,
+                            f"Choose a card from your hand to discard [{i+1}/2].",
+                            get_cards_in_hand_options,
+                            select_option_by_value,
+                        )
+                    )
+
+                creatures_to_discard.append(cast(SelectedCreature, extra_data.pop(0)))
+
+            for c in creatures_to_discard:
+                creature_db = c.item
+                owner.discard_creature_from_hand(creature_db, con=con)
+
+            owner.gain(self.quest_gain(), con=con)
 
 
 class Cave(SimpleRegion):
@@ -383,13 +390,57 @@ class Abandon(Database.BaseRegion):
             owner.delete_creature_in_hand(creature_db, con=con)
 
 
+class Ruffians(Database.BaseRegion):
+    id = 1000
+    name = "ruffians"
+    category = RegionCategories.market
+    related_creatures = [Ruffian()]
+
+    def quest_price(self) -> list[Price]:
+        return [Price(Resource.GOLD, 3)]
+
+    def quest_effect_short_text(self) -> str:
+        return resource_changes_to_short_string(self.quest_price() + [Gain(Resource.STRENGTH, 3)])
+
+    def quest_effect_full_text(self) -> str:
+        return (
+            resource_changes_to_string(list(self.quest_price()))
+            + " Add a ruffian (+2 strength) to your campaign."
+        )
+
+    def quest_effect_price(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: EXTRA_DATA = [],
+    ) -> None:
+        price = self.quest_price()
+
+        with region_db.parent.transaction(parent=con) as con:
+            owner: Database.Player = creature_db.owner
+            owner.pay_price(price, con=con)
+
+    def quest_effect(
+        self,
+        region_db: Database.Region,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: EXTRA_DATA = [],
+    ) -> None:
+        with region_db.parent.transaction(parent=con) as con:
+            owner: Database.Player = creature_db.owner
+            new_creature_db = creature_db.guild.add_creature(Ruffian(), owner, con=con)
+            owner.add_creature_to_campaign(new_creature_db, 2, con=con)
+
+
 regions_list = [
     RoyalGift(),
     CourtPolitics(),
     Delegation(),
     ArtefactFence(),
     Collections(),
-    Ruffians(),
+    Laborers(),
     Cave(),
     Dungeon(),
     HiddenLair(),
@@ -399,6 +450,7 @@ regions_list = [
     HiddenCache(),
     Hunt(),
     Abandon(),
+    Ruffians(),
 ]
 
 

@@ -32,6 +32,9 @@ class Selected:
     def __init__(self, item: Any) -> None:
         self.item = item
 
+    def __repr__(self) -> str:
+        return f"Selected [{self.text()}]"
+
     def text(self) -> str:
         assert False
 

@@ -1254,6 +1254,13 @@ class Database:
             con: Optional[Database.TransactionManager] = None,
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
+                    Database.Player.PlayerDiscardCreatureEvent(
+                        self.parent, event_id, time.time(), None, self.guild, self.id, creature.id
+                    )
+                )
+
                 creatures = self.get_hand(con=sub_con)
                 if creature not in creatures:
                     raise CreatureNotFound("Creature not found in hand (discard_creature)")
@@ -1590,6 +1597,48 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> receives <creature:{self.creature_id}>"
+
+        class PlayerDiscardCreatureEvent(Event):
+            event_type = "player_discard_creature"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                player_id: int,
+                creature_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+                self.player_id = player_id
+                self.creature_id = creature_id
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerDiscardCreatureEvent:
+                return Database.Player.PlayerDiscardCreatureEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event_id,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["creature_id"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id, "creature_id": self.creature_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> discards <creature:{self.creature_id}>"
 
         class PlayerDeleteCreatureEvent(Event):
             event_type = "player_delete_creature"
@@ -2511,6 +2560,7 @@ event_classes: list[type[Event]] = [
     Database.Player.PlayerMagicRechargedEvent,
     Database.Player.PlayerCardRechargeEvent,
     Database.Player.PlayerCardRechargedEvent,
+    Database.Player.PlayerDiscardCreatureEvent,
     Database.Player.PlayerDeleteCreatureEvent,
     Database.Player.PlayerCreateCreatureEvent,
 ]

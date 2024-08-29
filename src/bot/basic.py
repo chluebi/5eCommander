@@ -212,7 +212,7 @@ class PlayerAdmin(commands.Cog):
                 region_db = [r for r in regions if r.id == region][0]
 
                 player_db.play_creature_to_region(
-                    creature_db, region_db, con=con, extra_data=extra_data
+                    creature_db, region_db, con=con, extra_data=copy.copy(extra_data)
                 )
 
                 clear_pending_choice(ctxt.guild.id, ctxt.author.id, self.bot.pending_choices)
@@ -236,6 +236,9 @@ class PlayerAdmin(commands.Cog):
                 callback,
                 extra_data,
                 self.bot.pending_choices,
+            )
+            new_pending = get_pending_choice(
+                ctxt.guild.id, ctxt.author.id, self.bot.pending_choices
             )
 
             await ctxt.send(
@@ -399,13 +402,11 @@ class PlayerAdmin(commands.Cog):
             player_db = guild_db.get_player(ctxt.author.id, con=con)
 
             choice_obj, callback, extra_data = pending
-            if extra_data:
-                extra_data = copy.deepcopy(extra_data)
-            else:
-                extra_data = []
 
             new_selected = choice_obj.select_option(player_db, choice_obj, choice, con)
             extra_data.append(new_selected)
+
+            extra_data = [copy.copy(e) for e in extra_data]
 
             await callback(ctxt, extra_data)
 
