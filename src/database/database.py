@@ -312,10 +312,17 @@ class Database:
         ) -> List[Database.BaseCreature]:
             basecreatures = self.get_basecreatures(con=con)
             all_creatures = copy.copy(basecreatures)
+
             for c in basecreatures:
-                for r in c.related_creatures:
-                    if r not in all_creatures:
-                        all_creatures.append(r)
+                for related in c.related_creatures:
+                    if related not in all_creatures:
+                        all_creatures.append(related)
+
+            for r in self.get_regions(con=con):
+                for related in r.region.related_creatures:
+                    if related not in all_creatures:
+                        all_creatures.append(related)
+
             return all_creatures
 
         def get_creature(
@@ -709,6 +716,7 @@ class Database:
         id = -1
         name = "default_region"
         category: Optional[RegionCategory] = None
+        related_creatures: List[Database.BaseCreature] = []
 
         def __init__(self: Database.BaseRegion) -> None:
             return
@@ -1158,7 +1166,7 @@ class Database:
 
                 creatures = self.get_hand(con=sub_con)
                 if creature not in creatures:
-                    raise CreatureNotFound("Creature not found in hand")
+                    raise CreatureNotFound("Creature not found in hand (delete from hand)")
                 self.remove_creature_from_hand(creature, con=sub_con)
 
         def remove_creature_from_played(
@@ -1206,7 +1214,7 @@ class Database:
             with self.parent.transaction(parent=con) as sub_con:
                 creatures = self.get_hand(con=sub_con)
                 if creature not in creatures:
-                    raise CreatureNotFound("Creature not found in hand")
+                    raise CreatureNotFound("Creature not found in hand (discard_creature)")
                 self.remove_creature_from_hand(creature, con=sub_con)
                 self.add_to_discard(creature, con=sub_con)
 
@@ -1227,7 +1235,7 @@ class Database:
             with self.parent.transaction(parent=con) as sub_con:
                 creatures = self.get_hand(con=sub_con)
                 if creature not in creatures:
-                    raise CreatureNotFound("Creature not found in hand")
+                    raise CreatureNotFound("Creature not found in hand (play_creature)")
                 self.remove_creature_from_hand(creature, con=sub_con)
                 self.add_creature_to_played(creature, until, con=sub_con)
 
@@ -1248,7 +1256,7 @@ class Database:
             with self.parent.transaction(parent=con) as sub_con:
                 creatures = self.get_hand(con=sub_con)
                 if creature not in creatures:
-                    raise CreatureNotFound("Creature not found in hand")
+                    raise CreatureNotFound("Creature not found in hand (campaign_creature)")
                 self.remove_creature_from_hand(creature, con=sub_con)
                 self.add_creature_to_campaign(creature, strength, con=sub_con)
 

@@ -163,6 +163,7 @@ class Ruffians(Database.BaseRegion):
     id = 5
     name = "ruffians"
     category = RegionCategories.market
+    related_creatures = [Ruffian()]
 
     def quest_price(self) -> list[Price]:
         return [Price(Resource.GOLD, 3)]
@@ -199,7 +200,7 @@ class Ruffians(Database.BaseRegion):
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             new_creature_db = creature_db.guild.add_creature(Ruffian(), owner, con=con)
-            owner.campaign_creature(new_creature_db, 2, con=con)
+            owner.add_creature_to_campaign(new_creature_db, 2, con=con)
 
 
 class Cave(SimpleRegion):
