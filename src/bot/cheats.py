@@ -25,7 +25,7 @@ from src.bot.util import (
 )
 from src.bot.checks import guild_exists, player_exists
 from src.core.exceptions import GuildNotFound, PlayerNotFound, CreatureNotFound
-from src.core.base_types import Resource, Price, Selected
+from src.core.base_types import Resource, Price, Selected, Gain, resource_change_to_string
 from src.definitions.start_condition import start_condition
 from src.definitions.creatures import creatures
 
@@ -74,6 +74,38 @@ class Cheats(commands.Cog):
             )
             for c in basecreatures
             if current.lower() in c.text().lower()
+        ]
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
+    async def cheat_give_resource(self, ctxt: commands.Context["Bot"], *, member: discord.Member, resource: int, amount: int = 1) -> None:
+        """Administrator Cheat command to add give a player a resource."""
+        assert ctxt.guild is not None
+
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
+        player_db = guild_db.get_player(member.id)
+
+        with self.bot.db.transaction() as con:
+            actual_resource = Resource(resource)
+            gain = Gain(actual_resource, amount)
+            player_db.gain([gain], con=con)
+
+            await ctxt.send(embed=success_embed("Cheat successful", f"Gave {member.mention} to {resource_change_to_string(gain, third_person=True)}"), ephemeral=True)
+
+    @cheat_give_resource.autocomplete("resource")
+    async def resource_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+
+        return [
+            discord.app_commands.Choice(
+                name=r.name,
+                value=r.value,
+            )
+            for r in Resource
+            if current.lower() in r.name
         ]
 
 
