@@ -290,7 +290,7 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in filtered_creatures
-            if current in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}"
+            if current.lower() in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}".lower()
         ]
 
     @play.autocomplete("region")
@@ -326,7 +326,7 @@ class PlayerAdmin(commands.Cog):
                 name=f"{r.text()}: {r.region.quest_effect_full_text()}", value=r.id
             )
             for r in filtered_regions
-            if current in f"{r.text()}: {r.region.quest_effect_full_text()}"
+            if current.lower() in f"{r.text()}: {r.region.quest_effect_full_text()}".lower()
         ]
 
     @commands.hybrid_command()  # type: ignore
@@ -371,7 +371,7 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in creatures
-            if c.text().startswith(current)
+            if current.lower() in f"{c.text()}: {c.creature.campaign_ability_effect_full_text()}".lower()
         ]
 
     @commands.hybrid_command()  # type: ignore
@@ -432,7 +432,7 @@ class PlayerAdmin(commands.Cog):
                 value=o.value(),
             )
             for o in options
-            if current in o.text()
+            if current.lower() in o.text().lower()
         ][:20]
 
     @commands.hybrid_command()  # type: ignore
@@ -464,7 +464,7 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in basecreatures
-            if c.text().startswith(current)
+            if c.text().lower() in current.lower()
         ]
 
     @commands.hybrid_command()  # type: ignore
