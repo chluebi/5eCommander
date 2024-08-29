@@ -54,7 +54,7 @@ def resource_to_emoji(resource: Resource) -> str:
         case Resource.RALLY:
             return "🚩"
         case Resource.STRENGTH:
-            return "⚔️"
+            return "🏹"
 
 
 def resource_change_to_string(
@@ -131,7 +131,11 @@ def resource_change_to_short_string(resource_change: Union[Price | Gain]) -> str
     elif isinstance(resource_change, Price):
         change_text = "-{0} {1}"
 
-    return change_text.format(resource_change.amount, resource_to_emoji(resource_change.resource))
+    change_text = change_text.format(
+        resource_change.amount, resource_to_emoji(resource_change.resource)
+    )
+    change_text = change_text.replace(" ", "\u00a0")
+    return change_text
 
 
 def resource_changes_to_short_string(resource_changes: list[Price | Gain]) -> str:
@@ -162,7 +166,10 @@ def resource_changes_to_short_string(resource_changes: list[Price | Gain]) -> st
     if len(gains_text) == 0:
         return f"{price_text}"
 
-    return f"{price_text} -> {gains_text}"
+    text = f"{price_text} → {gains_text}"
+    text = text.replace(" ", "\u00a0")
+
+    return text
 
 
 RegionCategory = namedtuple("RegionCategory", ["name", "emoji"], defaults=["default_region", " "])

@@ -811,7 +811,7 @@ class Database:
 
         def text(self) -> str:
             assert self.region.category is not None
-            return f"{self.region.name} {self.region.category.emoji}"
+            return f"{self.region.category.emoji} {self.region.name.capitalize()}"
 
         def occupy(
             self,
@@ -2055,7 +2055,7 @@ class Database:
 
         def text(self) -> str:
             region_category_string = " ".join([r.emoji for r in self.quest_region_categories])
-            return f"{self.name.capitalize()}  {region_category_string}"
+            return f"{region_category_string} {self.name.capitalize()}"
 
         # questing
         def quest_ability_effect_short_text(self) -> str:

@@ -107,7 +107,7 @@ class Delegation(Database.BaseRegion):
         return [Gain(Resource.ORDERS, 1)]
 
     def quest_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.quest_price() + self.quest_gain()) + "+1 🃏"
+        return resource_changes_to_short_string(self.quest_price() + self.quest_gain()) + ", +1 🃏"
 
     def quest_effect_full_text(self) -> str:
         return resource_changes_to_string(self.quest_price() + self.quest_gain()) + " Draw 1 Card."
@@ -304,7 +304,7 @@ class Hunt(Database.BaseRegion):
         return (
             ">= 5 "
             + resource_to_emoji(Resource.STRENGTH)
-            + " -> "
+            + " → "
             + resource_changes_to_short_string(list(self.quest_gain()))
         )
 
@@ -351,7 +351,7 @@ class Abandon(Database.BaseRegion):
     category = RegionCategories.wild
 
     def quest_effect_short_text(self) -> str:
-        return "☠️"
+        return "🗑️"
 
     def quest_effect_full_text(self) -> str:
         return "Choose a card from your hand. Destroy it."

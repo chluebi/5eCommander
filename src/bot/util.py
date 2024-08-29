@@ -129,7 +129,8 @@ def player_embed(
     recharges = player_db.get_recharges()
 
     resources_text = {
-        r: f"{r.name.lower()} {resource_to_emoji(r)}: {v}" for r, v in resources.items()
+        r: f"{r.name.lower().capitalize()} {resource_to_emoji(r)}: ".ljust(15, " ") + f"{v}"
+        for r, v in resources.items()
     }
 
     resources_text[Resource.ORDERS] += f"/{max_orders}"
@@ -144,7 +145,7 @@ def player_embed(
             f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerMagicRechargeEvent.event_type].timestamp)})"
         )
 
-    resources_text_joined = "\n".join([resources_text[r] for r in BaseResources])
+    resources_text_joined = "\n".join([f"``{resources_text[r]}``" for r in BaseResources])
 
     hand = player_db.get_hand()
 
@@ -219,7 +220,7 @@ def regions_embed(guild_db: Database.Guild) -> discord.Embed:
         rc_text = ""
         for rid in sub_regions:
             creature, timestamp = regions_occupied[rid]
-            r_text = f"{regions_cache[rid].region.name}:  **{regions_cache[rid].region.quest_effect_short_text()}**"
+            r_text = f"{regions_cache[rid].text()}:  ``{regions_cache[rid].region.quest_effect_short_text()}``"
 
             if creature is not None and timestamp is not None:
                 r_text = f"~~{r_text}~~"
