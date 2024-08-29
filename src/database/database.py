@@ -2154,6 +2154,13 @@ class Database:
         ) -> int:
             return 0
 
+        def campaign_recharge_effect(
+            self,
+            creature_db: Database.Creature,
+            con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            return
+
     class Creature:
         def __init__(
             self,
@@ -2227,6 +2234,7 @@ class Database:
                     creature = self.guild.get_creature(self.creature_id, con=sub_con)
                     if creature in [c for c, _ in creature.owner.get_played()]:
                         creature.owner.recharge_creature(creature, con=sub_con)
+                        creature.creature.campaign_recharge_effect(creature, con=sub_con)
 
     class FreeCreature:
         def __init__(
