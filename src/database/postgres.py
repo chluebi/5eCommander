@@ -320,7 +320,7 @@ class PostgresDatabase(Database):
         con: Optional[Database.TransactionManager] = None,
     ) -> int:
         with self.transaction(parent=con) as sub_con:
-            sql = text("SELECT COALESCE(MAX(id), -1) + 1 FROM events WHERE guild_id = :guild_id")
+            sql = text("SELECT COALESCE(MAX(id), 0) + 1 FROM events WHERE guild_id = :guild_id")
             result = sub_con.execute(sql, {"guild_id": guild.id}).scalar() + (
                 len(con.get_root().get_events()) if con else 0
             )
@@ -370,6 +370,12 @@ class PostgresDatabase(Database):
         guild = PostgresDatabase.Guild(self, guild_id)
 
         with self.transaction(parent=con) as sub_con:
+            sub_con.add_event(
+                Database.Guild.GuildCreatedEvent(
+                    self, self.fresh_event_id(guild, con=sub_con), time.time(), None, guild
+                )
+            )
+
             sql_guild = text(
                 """
                 INSERT INTO guilds (id, config)
@@ -582,7 +588,7 @@ class PostgresDatabase(Database):
         def fresh_region_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
-                    "SELECT COALESCE(MAX(id), -1) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
+                    "SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM regions WHERE guild_id = :guild_id"
                 )
                 result = sub_con.execute(sql, {"guild_id": self.id}).scalar() + (
                     len(con.get_root().get_events()) if con else 0
@@ -602,6 +608,7 @@ class PostgresDatabase(Database):
                     VALUES (:id, :guild_id, :base_region_id)
                 """
                 )
+
                 sub_con.execute(
                     sql, {"id": region_id, "guild_id": self.id, "base_region_id": base_region.id}
                 )
@@ -780,7 +787,7 @@ class PostgresDatabase(Database):
         def fresh_creature_id(self, con: Optional[Database.TransactionManager] = None) -> int:
             with self.parent.transaction(parent=con) as sub_con:
                 sql = text(
-                    "SELECT COALESCE(MAX(id), -1) + 1 FROM creatures WHERE guild_id = :guild_id"
+                    "SELECT COALESCE(MAX(id), 0) + 1 FROM creatures WHERE guild_id = :guild_id"
                 )
                 result = sub_con.execute(sql, {"guild_id": self.id}).scalar() + (
                     len(con.get_root().get_events()) if con else 0
