@@ -17,6 +17,8 @@ from src.definitions.extra_data import (
     ExtraDataCategory,
     Choice,
     SelectedCreature,
+    get_cards_in_hand_options,
+    select_option_by_value,
     EXTRA_DATA,
     MissingExtraData,
     BadExtraData,
@@ -366,26 +368,13 @@ class Abandon(Database.BaseRegion):
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
 
-            def get_options(
-                player_db: Database.Player, con: Optional[Database.TransactionManager]
-            ) -> List[Selected]:
-                return [cast(Selected, SelectedCreature(c)) for c in player_db.get_hand(con=con)]
-
-            def select_option(
-                player_db: Database.Player,
-                c: Choice,
-                v: int,
-                con: Optional[Database.TransactionManager],
-            ) -> Selected:
-                return [s for s in c.get_options(player_db, con) if s.value() == v][0]
-
             if not extra_data:
                 raise MissingExtraData(
                     Choice(
                         0,
                         "Choose a card from your hand to destroy it.",
-                        get_options,
-                        select_option,
+                        get_cards_in_hand_options,
+                        select_option_by_value,
                     )
                 )
 

@@ -172,7 +172,9 @@ def resource_changes_to_short_string(resource_changes: list[Price | Gain]) -> st
     return text
 
 
-RegionCategory = namedtuple("RegionCategory", ["name", "emoji"], defaults=["default_region", " "])
+RegionCategory = namedtuple(
+    "RegionCategory", ["name", "emoji", "id"], defaults=["default_region", " "]
+)
 
 
 class Event:
@@ -222,11 +224,11 @@ class Event:
 
 
 class RegionCategories:
-    noble = RegionCategory("Noble", "👑")
-    market = RegionCategory("Market", "⚖️")
-    dungeon = RegionCategory("Dungeon", "🕸️")
-    arcane = RegionCategory("Arcane", "🔮")
-    wild = RegionCategory("Wild", "🐗")
+    noble = RegionCategory("Noble", "👑", 0)
+    market = RegionCategory("Market", "⚖️", 1)
+    dungeon = RegionCategory("Dungeon", "🕸️", 2)
+    arcane = RegionCategory("Arcane", "🔮", 3)
+    wild = RegionCategory("Wild", "🐗", 4)
 
 
 region_categories = [

@@ -15,6 +15,8 @@ from src.core.base_types import (
     resource_changes_to_string,
     resource_changes_to_short_string,
     resource_to_emoji,
+    RegionCategories,
+    region_categories,
 )
 from src.core.exceptions import CreatureNotFound
 from src.database.database import Database
@@ -100,6 +102,77 @@ class SelectedRegion(Selected):
 
     def value(self) -> int:
         return cast(Database.Region, self.item).id
+
+
+class SelectedRegionCategory(Selected):
+    def __init__(self, item: RegionCategory) -> None:
+        super().__init__(item)
+        self.item = item
+
+    def text(self) -> str:
+        return (
+            str(cast(RegionCategory, self.item).emoji)
+            + " "
+            + str(cast(RegionCategory, self.item).name)
+        )
+
+    def value(self) -> int:
+        return int(cast(RegionCategory, self.item).id)
+
+
+def get_cards_in_hand_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [cast(Selected, SelectedCreature(c)) for c in player_db.get_hand(con=con)]
+
+
+def get_cards_in_deck_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [cast(Selected, SelectedCreature(c)) for c in player_db.get_deck(con=con)]
+
+
+def get_cards_in_discard_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [cast(Selected, SelectedCreature(c)) for c in player_db.get_discard(con=con)]
+
+
+def get_cards_in_played_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [
+        cast(Selected, SelectedPlayedCreature((c, v))) for c, v in player_db.get_played(con=con)
+    ]
+
+
+def get_cards_in_campaign_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [
+        cast(Selected, SelectedCampaignCreature((c, s))) for c, s in player_db.get_campaign(con=con)
+    ]
+
+
+def get_regions_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [cast(Selected, SelectedRegion(r)) for r in player_db.guild.get_regions(con=con)]
+
+
+def get_region_categories_options(
+    player_db: Database.Player, con: Optional[Database.TransactionManager]
+) -> List[Selected]:
+    return [cast(Selected, SelectedRegionCategory(r)) for r in region_categories]
+
+
+def select_option_by_value(
+    player_db: Database.Player,
+    c: Choice,
+    v: int,
+    con: Optional[Database.TransactionManager],
+) -> Selected:
+    return [s for s in c.get_options(player_db, con) if s.value() == v][0]
 
 
 EXTRA_DATA = List[Selected]
