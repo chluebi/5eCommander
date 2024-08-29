@@ -58,7 +58,7 @@ class Cheats(commands.Cog):
             ):
                 raise CreatureNotFound(message="Creature not found")
 
-            player_db.creature_creature_in_hand(basecreature, con=con)
+            player_db.create_creature_in_hand(basecreature, con=con)
 
             await ctxt.send(
                 embed=success_embed(

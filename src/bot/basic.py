@@ -237,9 +237,6 @@ class PlayerAdmin(commands.Cog):
                 extra_data,
                 self.bot.pending_choices,
             )
-            new_pending = get_pending_choice(
-                ctxt.guild.id, ctxt.author.id, self.bot.pending_choices
-            )
 
             await ctxt.send(
                 embed=standard_embed(
@@ -333,28 +330,54 @@ class PlayerAdmin(commands.Cog):
             if current.lower() in f"{r.text()}: {r.region.quest_effect_full_text()}".lower()
         ]
 
+    async def _campaign(
+        self, ctxt: commands.Context["Bot"], card: int, extra_data: EXTRA_DATA
+    ) -> None:
+        assert ctxt.guild is not None
+
+        try:
+            with self.bot.db.transaction() as con:
+                guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
+                player_db = guild_db.get_player(ctxt.author.id, con=con)
+
+                creatures = player_db.get_hand(con=con)
+                creature_db = [c for c in creatures if c.id == card][0]
+
+                player_db.play_creature_to_campaign(creature_db, con=con, extra_data=extra_data)
+
+                await ctxt.send(
+                    embed=success_embed(
+                        "Creature Campaigned",
+                        f"Successfully sent {creature_db.text()} to campaign",
+                    )
+                )
+        except MissingExtraData as e:
+
+            async def callback(ctxt: commands.Context["Bot"], extra_data: EXTRA_DATA) -> None:
+                await self._campaign(ctxt, card, extra_data)
+
+            add_pending_choice(
+                ctxt.guild.id,
+                ctxt.author.id,
+                e.choice,
+                callback,
+                extra_data,
+                self.bot.pending_choices,
+            )
+
+            await ctxt.send(
+                embed=standard_embed(
+                    "Choice needed",
+                    f"{e.choice.text}\n\nUse ``/choose`` to make your choice.",
+                )
+            )
+
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(player_exists)
     async def campaign(self, ctxt: commands.Context["Bot"], card: int) -> None:
         """Play a creature to the campaign. Creature is out of deck until campaign ends."""
-        assert ctxt.guild is not None
-
-        with self.bot.db.transaction() as con:
-            guild_db = self.bot.db.get_guild(ctxt.guild.id, con=con)
-            player_db = guild_db.get_player(ctxt.author.id, con=con)
-
-            creatures = player_db.get_hand(con=con)
-            creature_db = [c for c in creatures if c.id == card][0]
-
-            player_db.play_creature_to_campaign(creature_db, con=con)
-
-            await ctxt.send(
-                embed=success_embed(
-                    "Creature Campaigned",
-                    f"Successfully sent {creature_db.text()} to campaign",
-                )
-            )
+        await self._campaign(ctxt, card, [])
 
     @campaign.autocomplete("card")
     async def campaign_card_in_hand_autocomplete(

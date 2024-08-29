@@ -1163,7 +1163,7 @@ class Database:
 
                 return cards_drawn, discard_reshuffled, hand_full
 
-        def creature_creature_in_hand(
+        def create_creature_in_hand(
             self,
             creature: Database.BaseCreature,
             con: Optional[Database.TransactionManager] = None,
@@ -1178,6 +1178,32 @@ class Database:
 
                 new_creature = self.guild.add_creature(creature, self, con=sub_con)
                 self.add_creature_to_hand(new_creature, con=sub_con)
+
+        def remove_creature_from_deck(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            assert False
+
+        def draw_creature_from_deck(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
+                sub_con.add_event(
+                    Database.Player.PlayerDrawCreatureEvent(
+                        self.parent, event_id, time.time(), None, self.guild, self.id, creature.id
+                    )
+                )
+
+                if creature not in self.get_deck(con=sub_con):
+                    raise CreatureNotFound("Creature not found in deck")
+
+                self.remove_creature_from_deck(creature, con=con)
+                self.add_creature_to_hand(creature, con=con)
 
         def add_creature_to_hand(
             self,
@@ -1401,18 +1427,18 @@ class Database:
 
             with self.parent.transaction(parent=con) as sub_con:
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
-                sub_con.add_event(
-                    Database.Player.PlayerPlayToCampaignEvent(
-                        self.parent,
-                        event_id,
-                        time.time(),
-                        None,
-                        self.guild,
-                        self.id,
-                        creature.id,
-                        copy.deepcopy(extra_data),
-                    )
+                event = Database.Player.PlayerPlayToCampaignEvent(
+                    self.parent,
+                    event_id,
+                    time.time(),
+                    None,
+                    self.guild,
+                    self.id,
+                    creature.id,
+                    0,
+                    [],
                 )
+                sub_con.add_event(event)
 
                 base_creature.campaign_ability_effect_price(
                     creature, con=sub_con, extra_data=extra_data
@@ -1420,6 +1446,7 @@ class Database:
                 strength = base_creature.campaign_ability_effect(
                     creature, con=sub_con, extra_data=extra_data
                 )
+                event.strength = strength
                 self.campaign_creature(creature, strength, con=sub_con)
 
         class PlayerDrawEvent(Event):
@@ -1557,7 +1584,7 @@ class Database:
                 return f"<player:{self.player_id}> {gain_string}"
 
         class PlayerCreateCreatureEvent(Event):
-            event_type = "player_creature_creature"
+            event_type = "player_create_creature"
 
             def __init__(
                 self,
@@ -1597,6 +1624,50 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> receives <creature:{self.creature_id}>"
+
+
+        class PlayerDrawCreatureEvent(Event):
+            event_type = "player_draw_creature"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                player_id: int,
+                creature_id: int,
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+                self.player_id = player_id
+                self.creature_id = creature_id
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Player.PlayerDrawCreatureEvent:
+                return Database.Player.PlayerDrawCreatureEvent(
+                    parent,
+                    id,
+                    timestamp,
+                    parent_event_id,
+                    guild,
+                    extra_data["player_id"],
+                    extra_data["creature_id"],
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({"player_id": self.player_id, "creature_id": self.creature_id})
+
+            def text(self) -> str:
+                return f"<player:{self.player_id}> draws <creature:{self.creature_id}> from deck"
+
 
         class PlayerDiscardCreatureEvent(Event):
             event_type = "player_discard_creature"
@@ -1749,11 +1820,13 @@ class Database:
                 guild: Database.Guild,
                 player_id: int,
                 creature_id: int,
+                strength: int,
                 play_extra_data: EXTRA_DATA,
             ):
                 super().__init__(parent, id, timestamp, parent_event_id, guild)
                 self.player_id = player_id
                 self.creature_id = creature_id
+                self.strength = strength
                 self.play_extra_data = play_extra_data
 
             @staticmethod
@@ -1773,6 +1846,7 @@ class Database:
                     guild,
                     extra_data["player_id"],
                     extra_data["creature_id"],
+                    extra_data["strength"],
                     extra_data["play_extra_data"],
                 )
 
@@ -1781,12 +1855,13 @@ class Database:
                     {
                         "player_id": self.player_id,
                         "creature_id": self.creature_id,
+                        "strength": self.strength,
                         "play_extra_data": self.play_extra_data,
                     }
                 )
 
             def text(self) -> str:
-                return f"<player:{self.player_id}> makes <creature:{self.creature_id}> campaign"
+                return f"<player:{self.player_id}> makes <creature:{self.creature_id}> campaign gaining {self.strength} {resource_to_emoji(Resource.STRENGTH)} Strength"
 
         class PlayerOrderRechargeEvent(Event):
             event_type = "player_order_recharge"
@@ -2155,9 +2230,7 @@ class Database:
             return 0
 
         def campaign_recharge_effect(
-            self,
-            creature_db: Database.Creature,
-            con: Optional[Database.TransactionManager] = None
+            self, creature_db: Database.Creature, con: Optional[Database.TransactionManager] = None
         ) -> None:
             return
 
@@ -2571,4 +2644,5 @@ event_classes: list[type[Event]] = [
     Database.Player.PlayerDiscardCreatureEvent,
     Database.Player.PlayerDeleteCreatureEvent,
     Database.Player.PlayerCreateCreatureEvent,
+    Database.Player.PlayerDrawCreatureEvent
 ]

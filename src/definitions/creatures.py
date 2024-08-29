@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Any, List
+from typing import Optional, Any, List, cast
 
 from src.core.base_types import (
     Resource,
@@ -9,10 +9,19 @@ from src.core.base_types import (
     RegionCategories,
     resource_changes_to_string,
     resource_changes_to_short_string,
+    resource_to_emoji,
+    Selected
 )
 from src.database.database import Database
 from src.core.exceptions import CreatureCannotCampaign, CreatureCannotQuest
-from src.definitions.extra_data import EXTRA_DATA
+from src.definitions.extra_data import (
+    EXTRA_DATA,
+    MissingExtraData,
+    Choice,
+    get_cards_in_deck_options,
+    select_option_by_value,
+    SelectedCreature
+)
 
 
 class SimpleCreature(Database.BaseCreature):
@@ -303,6 +312,12 @@ class Mentor(SimpleCreature):
     def quest_ability_effect_full_text(self) -> str:
         return "Draw 1 Card."
 
+    def campaign_ability_effect_short_text(self) -> str:
+        return f"🔍→🃏, X{resource_to_emoji(Resource.STRENGTH)}"
+
+    def campaign_ability_effect_full_text(self) -> str:
+        return "Choose a card from your deck, draw it. Gain as much strength as its claim cost."
+
     def quest_ability_effect(
         self,
         region_db: Database.Region,
@@ -313,6 +328,27 @@ class Mentor(SimpleCreature):
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             owner.draw_cards(N=1, con=con)
+
+    def campaign_ability_effect(
+        self,
+        creature_db: Database.Creature,
+        con: Optional[Database.TransactionManager] = None,
+        extra_data: List[Selected] = [],
+    ) -> int:
+        with creature_db.parent.transaction(parent=con) as con:
+            if not extra_data:
+                raise MissingExtraData(
+                    Choice(
+                        0,
+                        "Choose a card from your deck to draw.",
+                        get_cards_in_deck_options,
+                        select_option_by_value,
+                    )
+                )
+
+            drawn_creature = cast(SelectedCreature, extra_data.pop(0)).item
+            creature_db.owner.draw_creature_from_deck(drawn_creature, con=con)
+        return int(drawn_creature.creature.claim_cost)
 
 
 class Druid(SimpleCreature):

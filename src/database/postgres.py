@@ -1509,6 +1509,20 @@ class PostgresDatabase(Database):
                     {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
                 )
 
+        def remove_creature_from_deck(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    "DELETE FROM deck WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
         def remove_creature_from_played(
             self,
             creature: Database.Creature,
