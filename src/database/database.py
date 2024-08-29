@@ -405,6 +405,40 @@ class Database:
         ) -> Database.FreeCreature:
             assert False
 
+
+        class GuildCreatedEvent(Event):
+            event_type = "guild_created"
+
+            def __init__(
+                self,
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild
+            ):
+                super().__init__(parent, id, timestamp, parent_event_id, guild)
+
+            @staticmethod
+            def from_extra_data(
+                parent: Database,
+                id: int,
+                timestamp: float,
+                parent_event_id: Optional[int],
+                guild: Database.Guild,
+                extra_data: dict[Any, Any],
+            ) -> Database.Guild.GuildCreatedEvent:
+                return Database.Guild.GuildCreatedEvent(
+                    parent, id, timestamp, parent_event_id, guild
+                )
+
+            def extra_data(self) -> str:
+                return json.dumps({})
+
+            def text(self) -> str:
+                return "This guild has been created"
+
+
         class RegionAddedEvent(Event):
             event_type = "region_added"
 
@@ -2403,6 +2437,7 @@ class Database:
 
 
 event_classes: list[type[Event]] = [
+    Database.Guild.GuildCreatedEvent,
     Database.Guild.RegionAddedEvent,
     Database.Guild.RegionRemovedEvent,
     Database.Guild.PlayerAddedEvent,
