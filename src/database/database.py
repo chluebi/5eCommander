@@ -1120,6 +1120,22 @@ class Database:
 
                 return cards_drawn, discard_reshuffled, hand_full
 
+        def creature_creature_in_hand(
+            self,
+            creature: Database.BaseCreature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                new_creature = self.guild.add_creature(creature, self, con=sub_con)
+                self.add_creature_to_hand(new_creature, con=sub_con)
+
+        def add_creature_to_hand(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            pass
+
         def remove_creature_from_hand(
             self,
             creature: Database.Creature,

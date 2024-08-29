@@ -343,7 +343,7 @@ creatures_list = [
 
 assert len(set([c.id for c in creatures_list])) == len(creatures_list)
 
-creatures = {c.id: c for c in creatures_list}
+creatures: dict[int, Database.BaseCreature] = {c.id: c for c in creatures_list}
 
 assert all(key == c.id for key, c in creatures.items())
 assert len(set([c.id for c in creatures.values()])) == len(creatures)

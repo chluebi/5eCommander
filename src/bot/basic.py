@@ -464,7 +464,7 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in basecreatures
-            if c.text().lower() in current.lower()
+            if current.lower() in c.text().lower()
         ]
 
     @commands.hybrid_command()  # type: ignore

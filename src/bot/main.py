@@ -65,7 +65,7 @@ class Bot(commands.Bot):
         pass
 
 
-bot = Bot(["src.bot.basic", "src.bot.event_handler"])
+bot = Bot(["src.bot.basic", "src.bot.cheats", "src.bot.event_handler"])
 
 
 @bot.event

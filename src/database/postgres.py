@@ -1471,6 +1471,23 @@ class PostgresDatabase(Database):
                         },
                     )
 
+        def add_creature_to_hand(
+            self,
+            creature: Database.Creature,
+            con: Optional[Database.TransactionManager] = None,
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    """
+                    INSERT INTO hand (player_id, guild_id, creature_id, position)
+                    VALUES (:player_id, :guild_id, :creature_id, (SELECT COALESCE(MAX(position), -1) + 1 FROM hand WHERE player_id = :player_id AND guild_id = :guild_id))
+                """
+                )
+                sub_con.execute(
+                    sql,
+                    {"player_id": self.id, "guild_id": self.guild.id, "creature_id": creature.id},
+                )
+
         def remove_creature_from_hand(
             self,
             creature: Database.Creature,
