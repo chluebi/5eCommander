@@ -362,7 +362,10 @@ class Database:
             creature = self.get_random_from_creature_pool(con=con)
             i = 0
             while i < 10:
-                if 1/math.pow(creature.claim_cost+1, 0.13*creature.claim_cost) > random.random():
+                if (
+                    1 / math.pow(creature.claim_cost + 1, 0.13 * creature.claim_cost)
+                    > random.random()
+                ):
                     break
                 creature = self.get_random_from_creature_pool(con=con)
 
@@ -405,7 +408,6 @@ class Database:
         ) -> Database.FreeCreature:
             assert False
 
-
         class GuildCreatedEvent(Event):
             event_type = "guild_created"
 
@@ -415,7 +417,7 @@ class Database:
                 id: int,
                 timestamp: float,
                 parent_event_id: Optional[int],
-                guild: Database.Guild
+                guild: Database.Guild,
             ):
                 super().__init__(parent, id, timestamp, parent_event_id, guild)
 
@@ -437,7 +439,6 @@ class Database:
 
             def text(self) -> str:
                 return "This guild has been created"
-
 
         class RegionAddedEvent(Event):
             event_type = "region_added"
@@ -1548,7 +1549,6 @@ class Database:
                 )
                 return f"<player:{self.player_id}> {gain_string}"
 
-
         class PlayerCreateCreatureEvent(Event):
             event_type = "player_creature_creature"
 
@@ -1590,7 +1590,6 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> receives <creature:{self.creature_id}>"
-
 
         class PlayerDeleteCreatureEvent(Event):
             event_type = "player_delete_creature"
@@ -2513,5 +2512,5 @@ event_classes: list[type[Event]] = [
     Database.Player.PlayerCardRechargeEvent,
     Database.Player.PlayerCardRechargedEvent,
     Database.Player.PlayerDeleteCreatureEvent,
-    Database.Player.PlayerCreateCreatureEvent
+    Database.Player.PlayerCreateCreatureEvent,
 ]

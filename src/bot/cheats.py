@@ -41,7 +41,9 @@ class Cheats(commands.Cog):
     @commands.hybrid_command()  # type: ignore
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
-    async def cheat_give_card(self, ctxt: commands.Context["Bot"], *, member: discord.Member, card: int) -> None:
+    async def cheat_give_card(
+        self, ctxt: commands.Context["Bot"], *, member: discord.Member, card: int
+    ) -> None:
         """Administrator Cheat command to add a card to a player's hand."""
         assert ctxt.guild is not None
 
@@ -50,12 +52,20 @@ class Cheats(commands.Cog):
 
         with self.bot.db.transaction() as con:
             basecreature = creatures.get(card)
-            if basecreature is None or basecreature not in guild_db.get_all_obtainable_basecreatures(con=con):
+            if (
+                basecreature is None
+                or basecreature not in guild_db.get_all_obtainable_basecreatures(con=con)
+            ):
                 raise CreatureNotFound(message="Creature not found")
 
             player_db.creature_creature_in_hand(basecreature, con=con)
 
-            await ctxt.send(embed=success_embed("Cheat successful", f"Gave {basecreature.text()} to {member.mention}"), ephemeral=True)
+            await ctxt.send(
+                embed=success_embed(
+                    "Cheat successful", f"Gave {basecreature.text()} to {member.mention}"
+                ),
+                ephemeral=True,
+            )
 
     @cheat_give_card.autocomplete("card")
     async def card_in_guild_autocomplete(
@@ -65,7 +75,7 @@ class Cheats(commands.Cog):
         guild_db = self.bot.db.get_guild(interaction.guild.id)
         basecreatures = guild_db.get_all_obtainable_basecreatures()
 
-        print('basecreatures', basecreatures)
+        print("basecreatures", basecreatures)
 
         return [
             discord.app_commands.Choice(
@@ -79,7 +89,14 @@ class Cheats(commands.Cog):
     @commands.hybrid_command()  # type: ignore
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
-    async def cheat_give_resource(self, ctxt: commands.Context["Bot"], *, member: discord.Member, resource: int, amount: int = 1) -> None:
+    async def cheat_give_resource(
+        self,
+        ctxt: commands.Context["Bot"],
+        *,
+        member: discord.Member,
+        resource: int,
+        amount: int = 1,
+    ) -> None:
         """Administrator Cheat command to add give a player a resource."""
         assert ctxt.guild is not None
 
@@ -91,7 +108,13 @@ class Cheats(commands.Cog):
             gain = Gain(actual_resource, amount)
             player_db.gain([gain], con=con)
 
-            await ctxt.send(embed=success_embed("Cheat successful", f"Gave {member.mention} to {resource_change_to_string(gain, third_person=True)}"), ephemeral=True)
+            await ctxt.send(
+                embed=success_embed(
+                    "Cheat successful",
+                    f"Gave {member.mention} to {resource_change_to_string(gain, third_person=True)}",
+                ),
+                ephemeral=True,
+            )
 
     @cheat_give_resource.autocomplete("resource")
     async def resource_autocomplete(
@@ -107,8 +130,6 @@ class Cheats(commands.Cog):
             for r in Resource
             if current.lower() in r.name
         ]
-
-
 
 
 async def setup(bot: "Bot") -> None:

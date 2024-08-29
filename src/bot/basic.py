@@ -290,7 +290,8 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in filtered_creatures
-            if current.lower() in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}".lower()
+            if current.lower()
+            in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}".lower()
         ]
 
     @play.autocomplete("region")
@@ -371,7 +372,8 @@ class PlayerAdmin(commands.Cog):
                 value=c.id,
             )
             for c in creatures
-            if current.lower() in f"{c.text()}: {c.creature.campaign_ability_effect_full_text()}".lower()
+            if current.lower()
+            in f"{c.text()}: {c.creature.campaign_ability_effect_full_text()}".lower()
         ]
 
     @commands.hybrid_command()  # type: ignore
@@ -445,7 +447,10 @@ class PlayerAdmin(commands.Cog):
 
         with self.bot.db.transaction() as con:
             basecreature = creatures.get(card)
-            if basecreature is None or basecreature not in guild_db.get_all_obtainable_basecreatures(con=con):
+            if (
+                basecreature is None
+                or basecreature not in guild_db.get_all_obtainable_basecreatures(con=con)
+            ):
                 raise CreatureNotFound(message="Creature not found")
 
             await ctxt.send(embed=creature_embed(basecreature))
