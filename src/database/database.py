@@ -307,6 +307,17 @@ class Database:
         ) -> List[Database.BaseCreature]:
             assert False
 
+        def get_all_obtainable_basecreatures(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> List[Database.BaseCreature]:
+            basecreatures = self.get_basecreatures(con=con)
+            all_creatures = copy.copy(basecreatures)
+            for c in basecreatures:
+                for r in c.related_creatures:
+                    if r not in all_creatures:
+                        all_creatures.append(r)
+            return all_creatures
+
         def get_creature(
             self,
             creature_id: int,
@@ -1921,6 +1932,7 @@ class Database:
         name = "default_creature"
         quest_region_categories: list[RegionCategory] = []
         claim_cost: int = 0
+        related_creatures: List[Database.BaseCreature] = []
 
         def __init__(self: Database.BaseCreature):
             return

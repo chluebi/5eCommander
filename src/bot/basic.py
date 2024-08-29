@@ -34,7 +34,7 @@ from src.bot.util import (
 )
 from src.bot.checks import guild_exists, player_exists, always_fails
 from src.database.postgres import PostgresDatabase
-from src.core.exceptions import GuildNotFound, PlayerNotFound
+from src.core.exceptions import GuildNotFound, PlayerNotFound, CreatureNotFound
 from src.core.base_types import Resource, Price, Selected
 from src.definitions.start_condition import start_condition
 from src.definitions.creatures import creatures
@@ -441,9 +441,12 @@ class PlayerAdmin(commands.Cog):
     async def card(self, ctxt: commands.Context["Bot"], card: int) -> None:
         """Shows the info about a card"""
         assert ctxt.guild is not None
+        guild_db = self.bot.db.get_guild(ctxt.guild.id)
 
         with self.bot.db.transaction() as con:
-            basecreature = creatures[card]
+            basecreature = creatures.get(card)
+            if basecreature is None or basecreature not in guild_db.get_all_obtainable_basecreatures(con=con):
+                raise CreatureNotFound(message="Creature not found")
 
             await ctxt.send(embed=creature_embed(basecreature))
 
@@ -453,7 +456,7 @@ class PlayerAdmin(commands.Cog):
     ) -> List[discord.app_commands.Choice[int]]:
         assert interaction.guild is not None
         guild_db = self.bot.db.get_guild(interaction.guild.id)
-        basecreatures = guild_db.get_basecreatures()
+        basecreatures = guild_db.get_all_obtainable_basecreatures()
 
         return [
             discord.app_commands.Choice(
