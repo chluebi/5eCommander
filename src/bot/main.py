@@ -36,7 +36,7 @@ def connect_to_db() -> PostgresDatabase:
         username=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
         host=str(os.environ["POSTGRES_HOST"]),
-        port=45432,
+        port=5432,
         database=os.environ["POSTGRES_DB"],
     )
 
