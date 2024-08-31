@@ -84,7 +84,7 @@ class Cheats(commands.Cog):
             )
             for c in basecreatures
             if current.lower() in c.text().lower()
-        ]
+        ][:20]
 
     @commands.hybrid_command()  # type: ignore
     @commands.check(is_admin_or_owner)
