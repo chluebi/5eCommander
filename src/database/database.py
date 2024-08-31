@@ -1187,9 +1187,7 @@ class Database:
             assert False
 
         def draw_creature_from_deck(
-            self,
-            creature: Database.Creature,
-            con: Optional[Database.TransactionManager] = None
+            self, creature: Database.Creature, con: Optional[Database.TransactionManager] = None
         ) -> None:
             with self.parent.transaction(parent=con) as sub_con:
                 event_id = self.parent.fresh_event_id(self.guild, con=sub_con)
@@ -1625,7 +1623,6 @@ class Database:
             def text(self) -> str:
                 return f"<player:{self.player_id}> receives <creature:{self.creature_id}>"
 
-
         class PlayerDrawCreatureEvent(Event):
             event_type = "player_draw_creature"
 
@@ -1667,7 +1664,6 @@ class Database:
 
             def text(self) -> str:
                 return f"<player:{self.player_id}> draws <creature:{self.creature_id}> from deck"
-
 
         class PlayerDiscardCreatureEvent(Event):
             event_type = "player_discard_creature"
@@ -2264,6 +2260,16 @@ class Database:
         def text(self) -> str:
             return self.creature.text()
 
+        def occupies(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> Optional[Tuple[Database.Region, int]]:
+            assert False
+
+        def change_strength(
+            self, new_strength: int, con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            assert False
+
         class CreatureRechargeEvent(Event):
             event_type = "creature_recharge"
 
@@ -2644,5 +2650,5 @@ event_classes: list[type[Event]] = [
     Database.Player.PlayerDiscardCreatureEvent,
     Database.Player.PlayerDeleteCreatureEvent,
     Database.Player.PlayerCreateCreatureEvent,
-    Database.Player.PlayerDrawCreatureEvent
+    Database.Player.PlayerDrawCreatureEvent,
 ]

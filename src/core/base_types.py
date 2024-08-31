@@ -90,7 +90,7 @@ def resource_change_to_string(
 
 
 def resource_changes_to_string(
-    resource_changes: list[Price | Gain], third_person: bool = False
+    resource_changes: Union[list[Price], list[Gain], list[Price | Gain]], third_person: bool = False
 ) -> str:
     resource_changes = [
         resource_change for resource_change in resource_changes if resource_change.amount != 0
@@ -141,7 +141,9 @@ def resource_change_to_short_string(resource_change: Union[Price | Gain]) -> str
     return change_text
 
 
-def resource_changes_to_short_string(resource_changes: list[Price | Gain]) -> str:
+def resource_changes_to_short_string(
+    resource_changes: Union[list[Price], list[Gain], list[Price | Gain]],
+) -> str:
     resource_changes = [
         resource_change for resource_change in resource_changes if resource_change.amount != 0
     ]

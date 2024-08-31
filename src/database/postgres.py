@@ -1101,7 +1101,7 @@ class PostgresDatabase(Database):
                     sql, {"guild_id": self.guild.id, "region_id": self.id}
                 ).fetchone()
                 if result is not None:
-                    creature = self.guild.get_creature(result[0])
+                    creature = self.guild.get_creature(result[0], con=sub_con)
                     return (creature, result[2])
                 return (None, None)
 
@@ -1615,6 +1615,42 @@ class PostgresDatabase(Database):
             owner: Database.Player,
         ):
             super().__init__(parent, id, creature, guild, owner)
+
+        def occupies(
+            self, con: Optional[Database.TransactionManager] = None
+        ) -> Optional[Tuple[Database.Region, int]]:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    """
+                    SELECT r.id, r.base_region_id, o.timestamp_occupied FROM occupies o
+                    JOIN regions r ON r.id = o.region_id AND r.guild_id = o.guild_id
+                    WHERE o.guild_id = :guild_id AND o.creature_id = :creature_id
+                """
+                )
+                result = sub_con.execute(
+                    sql, {"guild_id": self.guild.id, "creature_id": self.id}
+                ).fetchone()
+                if result is not None:
+                    region = self.guild.get_region(result[0], con=sub_con)
+                    return (region, result[2])
+                return None
+
+        def change_strength(
+            self, new_strength: int, con: Optional[Database.TransactionManager] = None
+        ) -> None:
+            with self.parent.transaction(parent=con) as sub_con:
+                sql = text(
+                    "UPDATE campaign SET strength = :strength WHERE player_id = :player_id AND guild_id = :guild_id AND creature_id = :creature_id"
+                )
+                sub_con.execute(
+                    sql,
+                    {
+                        "player_id": self.owner.id,
+                        "guild_id": self.guild.id,
+                        "creature_id": self.id,
+                        "strength": new_strength,
+                    },
+                )
 
     class FreeCreature(Database.FreeCreature):
         def __init__(

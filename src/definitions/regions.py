@@ -23,7 +23,6 @@ from src.definitions.extra_data import (
     MissingExtraData,
     BadExtraData,
 )
-from src.definitions.creatures import Ruffian
 
 
 class SimpleRegion(Database.BaseRegion):
@@ -390,50 +389,6 @@ class Abandon(Database.BaseRegion):
             owner.delete_creature_in_hand(creature_db, con=con)
 
 
-class Ruffians(Database.BaseRegion):
-    id = 1000
-    name = "ruffians"
-    category = RegionCategories.market
-    related_creatures = [Ruffian()]
-
-    def quest_price(self) -> list[Price]:
-        return [Price(Resource.GOLD, 3)]
-
-    def quest_effect_short_text(self) -> str:
-        return resource_changes_to_short_string(self.quest_price() + [Gain(Resource.STRENGTH, 3)])
-
-    def quest_effect_full_text(self) -> str:
-        return (
-            resource_changes_to_string(list(self.quest_price()))
-            + " Add a ruffian (+2 strength) to your campaign."
-        )
-
-    def quest_effect_price(
-        self,
-        region_db: Database.Region,
-        creature_db: Database.Creature,
-        con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = [],
-    ) -> None:
-        price = self.quest_price()
-
-        with region_db.parent.transaction(parent=con) as con:
-            owner: Database.Player = creature_db.owner
-            owner.pay_price(price, con=con)
-
-    def quest_effect(
-        self,
-        region_db: Database.Region,
-        creature_db: Database.Creature,
-        con: Optional[Database.TransactionManager] = None,
-        extra_data: EXTRA_DATA = [],
-    ) -> None:
-        with region_db.parent.transaction(parent=con) as con:
-            owner: Database.Player = creature_db.owner
-            new_creature_db = creature_db.guild.add_creature(Ruffian(), owner, con=con)
-            owner.add_creature_to_campaign(new_creature_db, 2, con=con)
-
-
 regions_list = [
     RoyalGift(),
     CourtPolitics(),
@@ -450,7 +405,6 @@ regions_list = [
     HiddenCache(),
     Hunt(),
     Abandon(),
-    Ruffians(),
 ]
 
 
