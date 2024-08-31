@@ -55,6 +55,7 @@ class Bot(commands.Bot):
         self.db = connect_to_db()
         self.logger = logger
         self.channel_cache: dict[int, discord.PartialMessageable] = {}
+        self.owner_id = int(os.environ["OWNER_ID"])
 
         self.pending_choices: dict[
             int,

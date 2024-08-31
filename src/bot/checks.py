@@ -3,6 +3,7 @@ from typing import Optional, Any, List, cast, Callable, Union, Coroutine, TYPE_C
 import sqlalchemy
 import sqlalchemy.exc
 import discord
+import os
 from discord.ext import commands
 from discord.app_commands.commands import T
 
@@ -21,11 +22,11 @@ class GuildNotInitialised(commands.CheckFailure):
 class PlayerNotJoined(commands.CheckFailure):
     pass
 
-
 async def is_admin_or_owner(ctxt: commands.Context["Bot"]) -> bool:
     if isinstance(ctxt.author, discord.User):
         return False
-    return ctxt.author.id == ctxt.bot.owner_id or ctxt.author.guild_permissions.administrator
+    value = ctxt.author.id == ctxt.bot.owner_id or ctxt.author.guild_permissions.administrator
+    return value
 
 
 async def guild_exists(ctxt: commands.Context["Bot"]) -> bool:
