@@ -8,7 +8,7 @@ services:
     networks:
       - dbnetwork
     ports:
-      - "5432:5432"
+      - "75432:75432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
