@@ -1094,7 +1094,7 @@ class PostgresDatabase(Database):
                     """
                     SELECT c.id, c.base_creature_id, o.timestamp_occupied FROM occupies o
                     JOIN creatures c ON c.id = o.creature_id AND c.guild_id = o.guild_id
-                    WHERE o.guild_id = :guild_id AND o.region_id = :region_id
+                    WHERE o.guild_id = :guild_id AND o.region_id = :region_id AND c.guild_id = :guild_id
                 """
                 )
                 result = sub_con.execute(
@@ -1219,7 +1219,7 @@ class PostgresDatabase(Database):
                     SELECT d.creature_id, c.base_creature_id 
                     FROM deck d 
                     JOIN creatures c ON d.creature_id = c.id 
-                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id AND c.guild_id = :guild_id
                 """
                 )
                 results = sub_con.execute(
@@ -1241,7 +1241,7 @@ class PostgresDatabase(Database):
                     SELECT h.creature_id, c.base_creature_id 
                     FROM hand h 
                     JOIN creatures c ON h.creature_id = c.id 
-                    WHERE h.player_id = :player_id AND h.guild_id = :guild_id
+                    WHERE h.player_id = :player_id AND h.guild_id = :guild_id AND c.guild_id = :guild_id
                 """
                 )
                 results = sub_con.execute(
@@ -1263,7 +1263,7 @@ class PostgresDatabase(Database):
                     SELECT d.creature_id, c.base_creature_id 
                     FROM discard d 
                     JOIN creatures c ON d.creature_id = c.id 
-                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id AND c.guild_id = :guild_id
                 """
                 )
                 results = sub_con.execute(
@@ -1285,7 +1285,7 @@ class PostgresDatabase(Database):
                     SELECT p.creature_id, c.base_creature_id, p.timestamp_recharge 
                     FROM played p 
                     JOIN creatures c ON p.creature_id = c.id 
-                    WHERE p.player_id = :player_id AND p.guild_id = :guild_id
+                    WHERE p.player_id = :player_id AND p.guild_id = :guild_id AND c.guild_id = :guild_id
                 """
                 )
                 results = sub_con.execute(
@@ -1310,7 +1310,7 @@ class PostgresDatabase(Database):
                     SELECT ca.creature_id, c.base_creature_id, ca.strength 
                     FROM campaign ca 
                     JOIN creatures c ON ca.creature_id = c.id 
-                    WHERE ca.player_id = :player_id AND ca.guild_id = :guild_id
+                    WHERE ca.player_id = :player_id AND ca.guild_id = :guild_id AND c.guild_id = :guild_id
                 """
                 )
                 results = sub_con.execute(
@@ -1411,7 +1411,7 @@ class PostgresDatabase(Database):
                     SELECT d.creature_id, c.base_creature_id 
                     FROM deck d
                     JOIN creatures c ON d.creature_id = c.id
-                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id 
+                    WHERE d.player_id = :player_id AND d.guild_id = :guild_id AND c.guild_id = :guild_id
                     ORDER BY RANDOM() 
                     LIMIT 1
                 """
@@ -1624,7 +1624,7 @@ class PostgresDatabase(Database):
                     """
                     SELECT r.id, r.base_region_id, o.timestamp_occupied FROM occupies o
                     JOIN regions r ON r.id = o.region_id AND r.guild_id = o.guild_id
-                    WHERE o.guild_id = :guild_id AND o.creature_id = :creature_id
+                    WHERE o.guild_id = :guild_id AND o.creature_id = :creature_id AND r.guild_id = :guild_id
                 """
                 )
                 result = sub_con.execute(
