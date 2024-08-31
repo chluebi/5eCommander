@@ -87,9 +87,6 @@ async def on_command_error(ctxt: commands.Context[Bot], error: Exception) -> Non
 
     await ctxt.send(embed=error_embed(type(error).__name__, m))
 
-    if isinstance(error, commands.CheckFailure):
-        return
-
     logging.error(error_message)
 
 
@@ -102,9 +99,6 @@ async def on_app_command_error(interaction: discord.Interaction, error: Exceptio
         await interaction.followup.send(embed=error_embed(type(error).__name__, m))
     else:
         await interaction.response.send_message(embed=error_embed(type(error).__name__, m))
-
-    if isinstance(error, commands.CheckFailure):
-        return
 
     logging.error(error_message)
 
