@@ -23,7 +23,7 @@ from src.bot.util import (
     player_embed,
     format_embed,
 )
-from src.bot.checks import guild_exists, player_exists
+from src.bot.checks import guild_exists, player_exists, is_admin_or_owner
 from src.core.exceptions import GuildNotFound, PlayerNotFound, CreatureNotFound
 from src.core.base_types import Resource, Price, Selected, Gain, resource_change_to_string
 from src.definitions.start_condition import start_condition
@@ -39,7 +39,7 @@ class Cheats(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command()  # type: ignore
-    @commands.has_permissions(administrator=True)
+    @commands.check(is_admin_or_owner)
     @commands.guild_only()
     async def cheat_give_card(
         self, ctxt: commands.Context["Bot"], *, member: discord.Member, card: int
@@ -87,7 +87,7 @@ class Cheats(commands.Cog):
         ]
 
     @commands.hybrid_command()  # type: ignore
-    @commands.has_permissions(administrator=True)
+    @commands.check(is_admin_or_owner)
     @commands.guild_only()
     async def cheat_give_resource(
         self,
@@ -111,7 +111,7 @@ class Cheats(commands.Cog):
             await ctxt.send(
                 embed=success_embed(
                     "Cheat successful",
-                    f"Gave {member.mention} to {resource_change_to_string(gain, third_person=True)}",
+                    f"{member.mention} {resource_change_to_string(gain, third_person=True)}",
                 ),
                 ephemeral=True,
             )

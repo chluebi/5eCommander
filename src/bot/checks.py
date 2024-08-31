@@ -22,6 +22,12 @@ class PlayerNotJoined(commands.CheckFailure):
     pass
 
 
+async def is_admin_or_owner(ctxt: commands.Context["Bot"]) -> bool:
+    if isinstance(ctxt.author, discord.User):
+        return False
+    return ctxt.author.id == ctxt.bot.owner_id or ctxt.author.guild_permissions.administrator
+
+
 async def guild_exists(ctxt: commands.Context["Bot"]) -> bool:
     db = ctxt.bot.db
 

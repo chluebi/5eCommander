@@ -32,7 +32,7 @@ from src.bot.util import (
     free_creature_protected_embed,
     format_embed,
 )
-from src.bot.checks import guild_exists, player_exists, always_fails
+from src.bot.checks import guild_exists, player_exists, is_admin_or_owner
 from src.database.postgres import PostgresDatabase
 from src.core.exceptions import GuildNotFound, PlayerNotFound, CreatureNotFound
 from src.core.base_types import Resource, Price, Selected
@@ -56,7 +56,7 @@ class GuildAdmin(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command()  # type: ignore
-    @commands.has_permissions(administrator=True)
+    @commands.check(is_admin_or_owner)
     @commands.guild_only()
     async def init_guild(self, ctxt: commands.Context["Bot"]) -> None:
         """Initialises the guild to play 5eCommander. Needs administator permissions."""
@@ -77,7 +77,7 @@ class GuildAdmin(commands.Cog):
         )
 
     @commands.hybrid_command()  # type: ignore
-    @commands.has_permissions(administrator=True)
+    @commands.check(is_admin_or_owner)
     @commands.guild_only()
     @commands.check(guild_exists)
     async def delete_guild(
@@ -103,7 +103,7 @@ class GuildAdmin(commands.Cog):
         )
 
     @commands.hybrid_command()  # type: ignore
-    @commands.has_permissions(administrator=True)
+    @commands.check(is_admin_or_owner)
     @commands.guild_only()
     @commands.check(guild_exists)
     async def guild_info(self, ctxt: commands.Context["Bot"]) -> None:
@@ -115,9 +115,54 @@ class GuildAdmin(commands.Cog):
         await ctxt.send(
             embed=success_embed(
                 "Guild initialised",
-                f"Server config: ``{guild_db.get_config()}``\n Events: ``{guild_db.get_events(0, time.time())}``",
+                f"Guild config: ``{guild_db.get_config()}``",
             )
         )
+
+    @commands.hybrid_command()  # type: ignore
+    @commands.check(is_admin_or_owner)
+    @commands.guild_only()
+    @commands.check(guild_exists)
+    async def change_config(
+        self, ctxt: commands.Context["Bot"], option: str, new_value: int
+    ) -> None:
+        """Changes a single guild config option"""
+        assert ctxt.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(ctxt.guild.id)
+            config = guild_db.get_config(con=con)
+
+            if option in config:
+                config[option] = new_value
+
+            guild_db.set_config(config, con=con)
+
+        await ctxt.send(
+            embed=success_embed(
+                "Guild Options changed",
+                f"Server config: ``{guild_db.get_config()}``",
+            )
+        )
+
+    @change_config.autocomplete("option")
+    async def play_card_in_hand_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> List[discord.app_commands.Choice[int]]:
+        assert interaction.guild is not None
+
+        with self.bot.db.transaction() as con:
+            guild_db = self.bot.db.get_guild(interaction.guild.id)
+            config = guild_db.get_config(con=con)
+
+        return [
+            discord.app_commands.Choice(
+                name=f"{o} (currently {v})",
+                value=o,
+            )
+            for o, v in config.items()
+            if current.lower() in str(o).lower()
+        ][:20]
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
