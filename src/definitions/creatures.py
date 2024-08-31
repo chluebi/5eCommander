@@ -25,6 +25,8 @@ from src.definitions.extra_data import (
     select_option_by_value,
     SelectedCreature,
     SelectedRegion,
+    SelectedCampaignCreature,
+    SelectedPlayedCreature,
 )
 
 
@@ -455,7 +457,7 @@ class Towncrier(SimpleCreature):
         return f">= 5 {resource_to_emoji(Resource.STRENGTH)}❔ → {resource_changes_to_short_string(self.quest_gain())}"
 
     def quest_ability_effect_full_text(self) -> str:
-        return f"If you currently have 5 or more {resource_to_emoji(Resource.STRENGTH)} {str(Resource.STRENGTH).lower().title()}, {resource_changes_to_string(self.quest_gain())}"
+        return f"If you currently have 5 or more {resource_to_emoji(Resource.STRENGTH)} {str(Resource.STRENGTH.name).lower().title()}, {resource_changes_to_string(self.quest_gain())}"
 
     def campaign_price(self) -> None:
         return None
@@ -609,7 +611,7 @@ class RetiredGeneral(SimpleCreature):
         return f">= 10 {resource_to_emoji(Resource.RALLY)}❔ → {resource_changes_to_short_string(self.campaign_gain())}"
 
     def campaign_ability_effect_full_text(self) -> str:
-        return f"If you currently have 10 or more {resource_to_emoji(Resource.RALLY)} {str(Resource.RALLY).lower().title()}, {resource_changes_to_string(self.campaign_gain())}."
+        return f"If you currently have 10 or more {resource_to_emoji(Resource.RALLY)} {str(Resource.RALLY.name).lower().title()}, {resource_changes_to_string(self.campaign_gain())}."
 
     def campaign_ability_effect(
         self,
@@ -637,7 +639,7 @@ class SwordSmith(SimpleCreature):
         return f"{resource_changes_to_short_string(self.quest_price())} → X🏹"
 
     def quest_ability_effect_full_text(self) -> str:
-        return f"{resource_changes_to_string(self.quest_price())}. Each of your campaigning creatures gains +1 {resource_to_emoji(Resource.STRENGTH)} {str(Resource.STRENGTH).lower().title()}."
+        return f"{resource_changes_to_string(self.quest_price())}. Each of your campaigning creatures gains +1 {resource_to_emoji(Resource.STRENGTH)} {str(Resource.STRENGTH.name).lower().title()}."
 
     def campaign_price(self) -> None:
         return None
@@ -689,9 +691,9 @@ class Scout(SimpleCreature):
                     )
                 )
 
-            selected_creature = cast(SelectedCreature, extra_data.pop(0))
-            creature_db.owner.remove_creature_from_deck(selected_creature.item, con=con)
-            creature_db.owner.add_to_discard(selected_creature.item, con=con)
+            selected_creature = cast(SelectedCampaignCreature, extra_data.pop(0))
+            creature_db.owner.remove_creature_from_deck(selected_creature.item[0], con=con)
+            creature_db.owner.add_to_discard(selected_creature.item[0], con=con)
 
         return 0
 
@@ -787,7 +789,7 @@ class Paladin(SimpleCreature):
         return f"5 {resource_to_emoji(Resource.STRENGTH)}"
 
     def campaign_ability_effect_full_text(self) -> str:
-        return f"Double target campaigning creature {resource_to_emoji(Resource.STRENGTH)} {str(Resource.STRENGTH).lower().title()} (max +5)."
+        return f"Double target campaigning creature {resource_to_emoji(Resource.STRENGTH)} {Resource.STRENGTH.name.lower().title()} (max +5)."
 
     def campaign_ability_effect(
         self,
@@ -806,11 +808,9 @@ class Paladin(SimpleCreature):
                     )
                 )
 
-            selected_creature = cast(SelectedCreature, extra_data.pop(0))
-            s = [
-                s for c, s in creature_db.owner.get_campaign(con=con) if c == selected_creature.item
-            ][0]
-            selected_creature.item.change_strength(s + min(s, 5), con=con)
+            selected_creature = cast(SelectedCampaignCreature, extra_data.pop(0))
+            creature_db, strength = selected_creature.item
+            creature_db.change_strength(strength + min(strength, 5), con=con)
 
         return 0
 
@@ -940,7 +940,7 @@ class TalkingCat(SimpleCreature):
     ) -> None:
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
-            owner.delete_creature_in_played(creature_db, con=con)
+            owner.remove_creature_from_played(creature_db, con=con)
             owner.add_creature_to_hand(creature_db, con=con)
 
 
@@ -974,8 +974,9 @@ class Tavernkeeper(SimpleCreature):
         with region_db.parent.transaction(parent=con) as con:
             owner: Database.Player = creature_db.owner
             for c, _ in owner.get_played(con=con):
-                owner.delete_creature_in_played(c, con=con)
-                owner.add_to_discard(c, con=con)
+                if c != creature_db:
+                    owner.remove_creature_from_played(c, con=con)
+                    owner.add_to_discard(c, con=con)
 
             owner.reshuffle_discard(con=con)
 

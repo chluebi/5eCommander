@@ -53,6 +53,10 @@ banned_events: List[Type[Event]] = [
     PostgresDatabase.Player.PlayerDrawEvent,
     PostgresDatabase.Player.PlayerGainEvent,
     PostgresDatabase.Player.PlayerPayEvent,
+    PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent,
+    PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent,
+    PostgresDatabase.FreeCreature.FreeCreatureClaimedEvent,
+    PostgresDatabase.Creature.CreatureRechargeEvent,
 ]
 
 

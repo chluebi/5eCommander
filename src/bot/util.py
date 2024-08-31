@@ -129,7 +129,10 @@ def player_embed(
     recharges = player_db.get_recharges()
 
     resources_text = {
-        r: f"{r.name.lower().capitalize()} {resource_to_emoji(r)}: ".ljust(15, " ") + f"{v}"
+        r: "``"
+        + f"{r.name.lower().capitalize()} {resource_to_emoji(r)}: ".ljust(15, " ")
+        + f"{v}"
+        + "``"
         for r, v in resources.items()
     }
 
@@ -145,7 +148,7 @@ def player_embed(
             f" (+1 in {get_relative_timestamp(recharges[Database.Player.PlayerMagicRechargeEvent.event_type].timestamp)})"
         )
 
-    resources_text_joined = "\n".join([f"``{resources_text[r]}``" for r in BaseResources])
+    resources_text_joined = "\n".join([f"{resources_text[r]}" for r in BaseResources])
 
     hand = player_db.get_hand()
 
