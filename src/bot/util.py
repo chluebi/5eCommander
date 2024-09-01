@@ -238,7 +238,8 @@ def regions_embed(guild_db: Database.Guild) -> discord.Embed:
 
 def creature_embed(creature: Database.BaseCreature) -> discord.Embed:
     creature_title = creature.text()
-    creature_text = f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
+    creature_text = f"**Claim Cost**: {creature.claim_cost} {resource_to_emoji(Resource.GOLD)} {Resource.GOLD.name.lower().title()}\n\n"
+    creature_text += f"**When played**: {creature.quest_ability_effect_full_text() if creature.quest_ability_effect_full_text() else '*no special ability*'}\n"
     creature_text += f"**When sent to campaign**: {creature.campaign_ability_effect_full_text() if creature.campaign_ability_effect_full_text() else '*no special ability*'}\n"
 
     return standard_embed(creature_title, creature_text)
