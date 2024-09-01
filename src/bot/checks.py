@@ -22,6 +22,7 @@ class GuildNotInitialised(commands.CheckFailure):
 class PlayerNotJoined(commands.CheckFailure):
     pass
 
+
 async def is_admin_or_owner(ctxt: commands.Context["Bot"]) -> bool:
     if isinstance(ctxt.author, discord.User):
         return False
