@@ -743,6 +743,8 @@ class PostgresDatabase(Database):
                     ),
                 )
 
+                self.parent.start_condition.join_action(player, sub_con)
+
             return player
 
         def get_players(

@@ -1,6 +1,17 @@
+from typing import Optional
 from src.database.database import Database
+from src.core.base_types import Resource, Gain
 from src.definitions.regions import *
 from src.definitions.creatures import *
+
+
+def join_action(player_db: Database.Player, con: Optional[Database.TransactionManager]) -> None:
+    with player_db.parent.transaction(parent=con) as con:
+        player_db.gain(
+            [Gain(Resource.ORDERS, 4), Gain(Resource.GOLD, 2), Gain(Resource.RALLY, 3)], con=con
+        )
+        player_db.draw_cards(N=5, con=con)
+
 
 start_condition = Database.StartCondition(
     {
@@ -87,4 +98,5 @@ start_condition = Database.StartCondition(
         NoviceMage(),
         LoyalSquire(),
     ],
+    join_action,
 )

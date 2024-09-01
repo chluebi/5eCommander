@@ -5,7 +5,19 @@ import json
 import copy
 import math
 import random
-from typing import List, Tuple, Type, Optional, Union, Any, cast, Generic, TypeVar, TYPE_CHECKING
+from typing import (
+    List,
+    Tuple,
+    Type,
+    Optional,
+    Union,
+    Any,
+    cast,
+    Generic,
+    TypeVar,
+    Callable,
+    TYPE_CHECKING,
+)
 from collections import defaultdict
 
 from src.core.base_types import (
@@ -173,11 +185,13 @@ class Database:
             start_active_regions: list[Database.BaseRegion],
             start_available_creatures: list[Database.BaseCreature],
             start_deck: list[Database.BaseCreature],
+            join_action: Callable[[Database.Player, Optional[Database.TransactionManager]], None],
         ):
             self.start_config = start_config
             self.start_active_regions = start_active_regions
             self.start_available_creatures = start_available_creatures
             self.start_deck = start_deck
+            self.join_action = join_action
 
     class Guild:
         def __init__(self, parent: Database, id: int):
