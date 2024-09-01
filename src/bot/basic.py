@@ -190,6 +190,11 @@ class PlayerAdmin(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command()  # type: ignore
+    async def tutorial(self, ctxt: commands.Context["Bot"]) -> None:
+        """Send a link to the tutorial website."""
+        await ctxt.send(embed=standard_embed("Tutorial", "https://chluebi.github.io/5eCommander/"))
+
+    @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
     @commands.check(guild_exists)
     async def join(self, ctxt: commands.Context["Bot"]) -> None:
