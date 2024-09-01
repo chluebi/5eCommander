@@ -313,7 +313,10 @@ class EventHandler(commands.Cog):
                                     event,
                                     PostgresDatabase.FreeCreature.FreeCreatureExpiresEvent,
                                 ):
-                                    if "Claimed by" in message.content:
+                                    if any(
+                                        e.description and "Claimed by" in e.description
+                                        for e in message.embeds
+                                    ):
                                         continue
                                     await message.edit(
                                         embed=free_creature_expired_embed(free_creature, roller),
