@@ -129,7 +129,7 @@ class Cheats(commands.Cog):
             )
             for r in Resource
             if current.lower() in r.name
-        ]
+        ][:20]
 
 
 async def setup(bot: "Bot") -> None:

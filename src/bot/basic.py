@@ -337,7 +337,7 @@ class PlayerAdmin(commands.Cog):
             for c in filtered_creatures
             if current.lower()
             in f"{c.text()}: {c.creature.quest_ability_effect_full_text()}".lower()
-        ]
+        ][:20]
 
     @play.autocomplete("region")
     @play_to.autocomplete("region")
@@ -373,7 +373,7 @@ class PlayerAdmin(commands.Cog):
             )
             for r in filtered_regions
             if current.lower() in f"{r.text()}: {r.region.quest_effect_full_text()}".lower()
-        ]
+        ][:20]
 
     async def _campaign(
         self, ctxt: commands.Context["Bot"], card: int, extra_data: EXTRA_DATA
@@ -445,7 +445,7 @@ class PlayerAdmin(commands.Cog):
             for c in creatures
             if current.lower()
             in f"{c.text()}: {c.creature.campaign_ability_effect_full_text()}".lower()
-        ]
+        ][:20]
 
     @commands.hybrid_command()  # type: ignore
     @commands.guild_only()
