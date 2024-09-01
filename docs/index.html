@@ -1,0 +1,188 @@
+<head>
+    <div class="section navbar" id="navbar">
+        <a class="navbar-title" href="#title">
+            5eCommander
+        </a>
+        <a class="navbar-button" href="#tutorial">
+            Tutorial
+        </a>
+    </div>
+    <div class="grid-container main">
+        <div class="section grid-container" id="title-">
+            <div class="title">
+                5eCommander
+            </div>
+            <div class="sub-title">
+                A Discord Bot Game based on deckbuilding and worker placement. Free and <a href="https://github.com/chluebi/5eCommander">Open Source</a>.
+            </div>
+        </div>
+        <div class="section grid-container" id="tutorial">
+            <div class="section-title">
+                Tutorial - Setup
+            </div>
+                To initialise the bot on the guild, run (needs admin permissions):
+                <div class="code">
+                    /guild_init
+                </div>
+                Players can now join the game by running
+                <div class="code">
+                    /join
+                </div>
+                If you want to remove all data relating to this guild from the bot, run (needs admin permissions)
+                <div class="code">
+                    /delete_guild
+                </div>
+            <div class="section-title">
+                Tutorial - Basics
+            </div>
+            <div class="command">
+                <div class="code">
+                    /me
+                </div>
+                gives you an overview over your user. These are your <b>Resources</b> and your <b>Card Piles</b>.
+                Resources are fungible resources:
+                <ul>
+                    <li>Orders: Used to play cards to regions, recharges slowly</li>
+                    <li>Gold: Used for more powerful card abilities</li>
+                    <li>Artefacts: Gained in dungeons and used for powerful region abilities.</li>
+                    <li>Intel: Used to get Artefacts. Hard to get.</li>
+                    <li>Magic: Used for rolling new creatures, recharges</li>
+                    <li>Rally: Used for claiming rolled creatures, gained through campaigning</li>
+                </ul>
+                Your main card piles are the following:
+                <ul>
+                    <li>Hand: All the cards you can play or campaign, you slowly draw until your hand is full</li>
+                    <li>Deck: Where you draw from, draws are random from your deck.</li>
+                    <li>Played: Your creatures which are currently recharging after having been played. They go in your discard afterwards.</li>
+                    <li>Discard: Collects all your formerly played and campaigned creatures. Gets reshuffled into your deck if your deck becomes empty and you need to draw.</li>
+                    <li>Campaign: These are the creatures fighting for you in the conflict, many of them contributing in Strength. These only return to your discard when the conflict is over.</li>
+                </ul>
+                That's a lot! But it will make the actions we'll now discuss make more sense.
+                The main two things you can do is <b>Play to a region</b> and <b>Campaign</b>.
+                Use the following to play a card from your hand to a region:
+                <div class="code">
+                    /play [card] [region]
+                </div>
+                The main benefit you want to gain is the effect of the region, although some cards have their own effects.
+                The most important rule is that only cards which match the Region Category (the emoji in front of their name) of the region can go there.
+                You also need to pay 1 Order to play a card to a region, which means sometimes you may need to wait.
+                Something which does not cost any Orders is <b>Campaigning</b>:
+                <div class="code">
+                    /campaign [card]
+                </div>
+                This plays a card to campaign for you in the current conflict. Many cards will give you Strength which is needed to win the conflict.
+                Others may have more unique effects or can't campaign at all.
+
+                On your way to fantasy world domination, you will want to summon new followers with Magic.
+                <div class="code">
+                    /roll
+                </div>
+                Will summon a new potential card to add to your deck. 
+                You can see that each card rolled like this has a cost associated.
+                This needs to be paid in Rally. If you can pay the cost, you may claim the card and it is added to your discard pile.
+                <br>
+                <br>
+                You may use
+                <div class="code">
+                    com help
+                </div>
+                as a way to see more available commands.
+            </div>
+        </div>
+    </div>
+</head>
+<body>
+    <style>
+        body {
+            --color-text: #000000;
+            --color-primary: tan;
+            --color-dark: #753A0D;
+            --color-accent: #4B6356;
+            --color-code: #AEE8C9;
+        }
+        body {
+            font-size: 1.5rem;
+            color: var(--color-text);
+            font-family: "Segoe UI", "Segoe WP", Tahoma, Arial, sans-serif;
+            background-color: var(--color-primary);
+        }
+        a {
+            color: var(--color-accent);
+        }
+        .main {
+            grid-row-gap: 2rem;
+            width: 50%;
+            margin: 0 auto;
+        }
+        @media screen and (max-width: 992px) {
+            .main{
+                width: 90%;
+            }
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: auto;
+            justify-content: start;
+            align-content: start;
+        }
+        .navbar {
+            display: grid;
+            grid-template-rows: auto;
+            grid-template-columns: auto auto auto auto;
+            grid-column-gap: 3rem;
+            justify-content: center;
+
+            font-size: 2rem;
+
+            background-color: var(--color-dark);
+        }
+        .navbar-title {
+            color: var(--color-primary);
+        }
+        .navbar-button {
+            color: var(--color-primary);
+        }
+        .section {
+            scroll-snap-align: start;
+            border-bottom: 2px solid var(--color-dark);
+        }
+        .title {
+            font-size: 3rem;
+        }
+        .sub-title {
+            font-size: 1.5rem;
+        }
+        .section-title {
+            font-size: 4rem;
+        }
+        .group-title {
+            font-size: 3rem;
+        }
+        .group {
+            margin-bottom: 2rem;
+            margin-top: 2rem;
+        }
+        .command {
+            margin-bottom: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .code {
+            margin: 1rem;
+
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+
+            padding-left: 1rem;
+            padding-right: 1rem;
+
+            color: var(--color-code);
+            background-color: var(--color-accent);
+            border-bottom: 2px solid var(--color-dark);
+            border-radius: 5px;
+
+            width: -moz-fit-content;
+            width: fit-content;
+            block-size: fit-content
+        }
+    </style>
+</body>
