@@ -291,6 +291,11 @@ class EventHandler(commands.Cog):
                                     event,
                                     PostgresDatabase.FreeCreature.FreeCreatureProtectedEvent,
                                 ):
+                                    if any(
+                                        e.description and "Claimed by" in e.description
+                                        for e in message.embeds
+                                    ):
+                                        continue
                                     embed, view = free_creature_unprotected_embed(
                                         free_creature,
                                         roller,
