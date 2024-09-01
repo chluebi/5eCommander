@@ -14,7 +14,7 @@ start_condition = Database.StartCondition(
         "region_recharge": 3600,
         "creature_recharge": 12 * 3600,
         "free_protection": 120,
-        "free_expire": 7 * 24 * 3600,
+        "free_expire": 2 * 24 * 3600,
         "conflict_duration": 24 * 3600,
     },
     [
